@@ -137,23 +137,24 @@ docs/       회의록 · 데이터 명세 · 보고서
 
 ```mermaid
 gantt
-    title 과제 추진 및 개발 일정 (2026년 9월 ~ 12월)
-    dateFormat  YYYY-MM-DD
+    title 과제 추진 및 개발 일정
+    dateFormat  MM-DD
     axisFormat  %m-%d
     
     section 핵심 마일스톤 (발표 및 제출)
-    9/21 발표                  :milestone, m1, 2026-09-21, 0d
-    9/28 수행계획서 제출        :milestone, m2, 2026-09-28, 0d
-    10/19 중간발표             :milestone, m3, 2026-10-19, 0d
-    11/2 중간 보고서 제출       :milestone, m4, 2026-11-02, 0d
-    12/7 결과발표               :milestone, m5, 2026-12-07, 0d
-    12/20 결과보고서 제출       :milestone, critical, m6, 2026-12-20, 0d
+    9/21 발표                  :milestone, m1, 09-21, 0d
+    9/28 수행계획서 제출        :milestone, m2, 09-28, 0d
+    10/19 중간발표             :milestone, m3, 10-19, 0d
+    11/2 중간 보고서 제출       :milestone, m4, 11-02, 0d
+    12/7 결과발표               :milestone, m5, 12-07, 0d
+    12/20 결과보고서 제출       :milestone, critical, m6, 12-20, 0d
 
     section 5단계 개발 절차 (Task)
-    01. 요구사항 분석 및 구현계획 :active, t1, 2026-09-01, 2026-09-28
-    02. 모델 설계 및 데이터 수집   :t2, after t1, 2026-10-15
-    03. 데이터 실증            :t3, after t2, 2026-11-02
-    04. UI 설계 및 시각화 구현    :t4, after t3, 2026-11-25
-    05. 결과물 산출 및 피드백     :t5, after t4, 2026-12-07
+    01. 요구사항 분석 및 구현계획 :active, t1, 09-01, 09-28
+    02. 모델 설계 및 데이터 수집   :t2, after t1, 10-15
+    03. 데이터 실증            :t3, after t2, 11-02
+    04. UI 설계 및 시각화 구현    :t4, after t3, 11-25
+    05. 결과물 산출 및 피드백     :t5, after t4, 12-07
 ```
+
 
