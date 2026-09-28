@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>제주 안전지도 목업 01 · 읍면동 위험 점수</title>
+  <style>
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; color: #17243a; background: #f3f6fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button { font: inherit; cursor: pointer; }
+    .shell { max-width: 1440px; min-height: 100vh; margin: auto; background: #fff; box-shadow: 0 20px 70px #1b385514; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 34px; border-bottom: 1px solid #e5ebf1; }
+    .brand { display: flex; align-items: center; gap: 12px; font-size: 19px; font-weight: 800; letter-spacing: -.04em; }
+    .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #29384d; color: white; font-size: 17px; }
+    .header-right { display: flex; gap: 8px; align-items: center; color: #748399; font-size: 12px; }
+    .sample { color: #805c12; background: #fff2cc; padding: 6px 9px; border-radius: 6px; font-weight: 700; }
+    .intro { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 29px 34px 21px; }
+    h1 { margin: 0 0 7px; font-size: clamp(24px, 3vw, 34px); letter-spacing: -.06em; }
+    .intro p { margin: 0; color: #65758b; font-size: 14px; line-height: 1.55; }
+    .meta { text-align: right; color: #8795a6; font-size: 12px; line-height: 1.6; white-space: nowrap; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; padding: 0 34px 23px; }
+    .toolbar-label { margin-right: 7px; font-size: 13px; font-weight: 750; color: #35475f; }
+    .filter { border: 1px solid #dce5ed; border-radius: 9px; background: white; color: #52657c; padding: 10px 15px; font-size: 13px; font-weight: 750; transition: background .2s, color .2s; }
+    .filter[aria-pressed="true"] { border-color: #29384d; background: #29384d; color: white; }
+    .filter:hover:not([aria-pressed="true"]) { background: #eef4f7; }
+    .map-wrap { position: relative; margin: 0 34px; border: 1px solid #d7e7ee; border-radius: 16px; overflow: hidden; background: #d9edf3; }
+    .map-heading { position: absolute; z-index: 2; left: 24px; top: 20px; display: flex; gap: 9px; align-items: center; color: #2b5265; font-size: 12px; font-weight: 700; background: #ffffffde; padding: 9px 12px; border-radius: 8px; backdrop-filter: blur(8px); }
+    .map-heading .dot { width: 7px; height: 7px; border-radius: 50%; background: #cb181d; }
+    .zoom-controls { position: absolute; z-index: 3; right: 20px; top: 20px; display: flex; align-items: center; gap: 5px; padding: 5px; border-radius: 10px; background: #fffffff2; box-shadow: 0 4px 18px #19445d20; }
+    .zoom-controls button { min-width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #294b5e; font-size: 18px; font-weight: 700; }
+    .zoom-controls button:hover:not(:disabled) { background: #e7f1f4; }
+    .zoom-controls button:disabled { color: #aabac4; cursor: default; }
+    .zoom-controls .zoom-reset { padding: 0 8px; font-size: 11px; white-space: nowrap; }
+    #zoom-level { min-width: 40px; text-align: center; font-size: 11px; font-weight: 750; color: #526c7c; }
+    #map { display: block; width: 100%; height: auto; aspect-ratio: 1000 / 590; touch-action: none; cursor: grab; }
+    #map:active { cursor: grabbing; }
+    .region { cursor: pointer; transition: fill .25s, opacity .2s; }
+    .region:hover, .region:focus { filter: brightness(.92); outline: none; }
+    .region.is-selected { stroke: #143c54 !important; stroke-width: 2.3 !important; }
+    .subregion { cursor: pointer; transition: fill .25s; }
+    .subregion:hover, .subregion:focus { filter: brightness(.9); outline: none; }
+    .subregion.is-selected { stroke: #143c54 !important; stroke-width: 2.3 !important; }
+    .region-label { pointer-events: none; text-anchor: middle; fill: #23384c; font-size: 12px; font-weight: 750; paint-order: stroke; stroke: #fff; stroke-width: 3.5px; stroke-linejoin: round; }
+    .score-badge { pointer-events: none; stroke: #a50f1540; stroke-width: 1; }
+    .region-score { pointer-events: none; text-anchor: middle; font-size: 11px; font-weight: 800; }
+    .subregion-label, .subregion-score { pointer-events: none; text-anchor: middle; fill: #22384b; font-weight: 750; paint-order: stroke; stroke: #fff; stroke-linejoin: round; }
+    .subregion-score { paint-order: stroke; stroke: #fff; stroke-linejoin: round; }
+    .map-footer { position: absolute; z-index: 2; left: 20px; right: 20px; bottom: 17px; display: flex; justify-content: space-between; gap: 12px; align-items: flex-end; pointer-events: none; }
+    .legend, .map-note { background: #fffffff0; border-radius: 9px; padding: 10px 12px; box-shadow: 0 4px 18px #19445d13; }
+    .legend-title { margin-bottom: 7px; font-size: 11px; font-weight: 750; color: #42566b; }
+    .scale { display: flex; width: min(300px, calc(100vw - 80px)); height: 10px; overflow: hidden; border-radius: 9px; outline: 1px solid #e9dadd; }
+    .scale span { flex: 1; }
+    .scale-labels { display: flex; width: min(300px, calc(100vw - 80px)); margin-top: 6px; color: #52657a; font-size: 10px; font-weight: 700; text-align: center; line-height: 1.35; }
+    .scale-labels span { flex: 1; }
+    .scale-labels small { display: block; color: #8290a0; font-size: 10px; font-weight: 500; }
+    .map-note { color: #617589; font-size: 11px; }
+    .detail { display: grid; grid-template-columns: minmax(170px, 1fr) repeat(3, minmax(100px, .55fr)); gap: 20px; align-items: center; margin: 22px 34px 0; padding: 21px 24px; border: 1px solid #e1e8ef; border-radius: 14px; }
+    .detail-kicker { color: #73859a; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+    .detail h2 { margin: 4px 0 3px; font-size: 21px; letter-spacing: -.04em; }
+    .detail p { margin: 0; color: #718196; font-size: 12px; }
+    .detail-stat { padding-left: 20px; border-left: 1px solid #e5ebf1; }
+    .detail-stat span { display: block; color: #718196; font-size: 12px; }
+    .detail-stat strong { display: block; margin-top: 5px; font-size: 23px; letter-spacing: -.04em; }
+    .detail-stat small { font-size: 11px; color: #8593a4; font-weight: 500; }
+    #selected-score { font-size: 31px; font-weight: 850; }
+    #risk-level { display: inline-block; padding: 5px 10px; border-radius: 7px; font-size: 17px; }
+    .footnote { padding: 18px 34px 30px; color: #8a97a6; font-size: 11px; line-height: 1.55; }
+    @media(max-width: 700px) {
+      header, .intro { padding-left: 18px; padding-right: 18px; }
+      .header-right .source { display: none; }
+      .intro { align-items: start; padding-top: 22px; }
+      .meta { display: none; }
+      .toolbar { padding: 0 18px 16px; gap: 6px; }
+      .toolbar-label { width: 100%; }
+      .filter { padding: 9px 11px; font-size: 12px; }
+      .map-wrap { margin: 0 10px; border-radius: 10px; }
+      #map { min-height: 0; }
+      .map-heading { left: 10px; top: 10px; font-size: 10px; }
+      .zoom-controls { right: 8px; top: 8px; gap: 0; padding: 3px; }
+      .zoom-controls button { min-width: 27px; height: 27px; font-size: 15px; }
+      .zoom-controls .zoom-reset { padding: 0 4px; font-size: 10px; }
+      #zoom-level { min-width: 32px; font-size: 10px; }
+      .map-footer { position: static; display: block; padding: 0 10px 10px; }
+      .legend { box-shadow: none; }
+      .map-note { display: none; }
+      .detail { margin: 15px 18px 0; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 15px; }
+      .detail-main { grid-column: 1 / -1; }
+      .detail-stat { padding-left: 10px; }
+      .detail-stat strong { font-size: 18px; }
+      #selected-score { font-size: 24px; }
+      #risk-level { font-size: 14px; padding: 4px 6px; }
+      .footnote { padding: 15px 18px 25px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>제주 안전지도</span></div>
+      <div class="header-right"><span class="source">전체지도 · 읍면동 위험지수</span><span class="sample">목업 · 예시 점수</span></div>
+    </header>
+    <section class="intro">
+      <div><h1>지역별 위험을 한눈에</h1><p>기본 화면은 읍·면과 시내 동지역, 확대 화면은 리·동 단위 점수를 보여줍니다.</p></div>
+      <div class="meta">MOCKUP 01 / 03<br>위험지수 5단계 색상</div>
+    </section>
+    <nav class="toolbar" aria-label="위험 요소 선택">
+      <span class="toolbar-label">표시할 위험 요소</span>
+      <button class="filter" type="button" data-category="total" aria-pressed="true">종합</button>
+      <button class="filter" type="button" data-category="weather" aria-pressed="false">재난 · 날씨</button>
+      <button class="filter" type="button" data-category="traffic" aria-pressed="false">교통</button>
+      <button class="filter" type="button" data-category="crime" aria-pressed="false">범죄</button>
+    </nav>
+    <section class="map-wrap" aria-label="제주 지역별 위험지수 지도">
+      <div class="map-heading"><span class="dot"></span><span id="map-title">종합 위험지수 · 제주 전체</span></div>
+      <div class="zoom-controls" role="group" aria-label="지도 확대 축소">
+        <button id="zoom-out" type="button" aria-label="지도 축소" disabled>−</button>
+        <span id="zoom-level" aria-live="polite">100%</span>
+        <button id="zoom-in" type="button" aria-label="지도 확대">+</button>
+        <button id="zoom-reset" class="zoom-reset" type="button" aria-label="지도 전체 보기">전체</button>
+      </div>
+      <svg id="map" viewBox="0 0 1000 590" role="img" aria-label="제주 읍면동별 예시 위험 점수 지도"></svg>
+      <div class="map-footer">
+        <div class="legend"><div class="legend-title">위험지수 목업 구간 / 100점</div><div class="scale"><span style="background:#ffffff"></span><span style="background:#fee5d9"></span><span style="background:#fcae91"></span><span style="background:#fb6a4a"></span><span style="background:#cb181d"></span></div><div class="scale-labels"><span>낮음<small>0–39</small></span><span>주의<small>40–49</small></span><span>보통<small>50–59</small></span><span>높음<small>60–69</small></span><span>매우 높음<small>70–100</small></span></div></div>
+        <div class="map-note">확대하면 리·동 단위가 표시됩니다 · 점수는 예시</div>
+      </div>
+    </section>
+    <section class="detail" aria-live="polite" aria-label="선택 지역 상세">
+      <div class="detail-main"><div class="detail-kicker">선택 지역</div><h2 id="region-name">애월읍</h2><p id="region-context">제주시 · 종합 위험지수</p></div>
+      <div class="detail-stat"><span>선택 요소 점수</span><strong id="selected-score">60 <small>/ 100</small></strong></div>
+      <div class="detail-stat"><span id="average-title">표시 구역 평균</span><strong id="average-score">60 <small>/ 100</small></strong></div>
+      <div class="detail-stat"><span>위험 단계</span><strong id="risk-level">높음</strong></div>
+    </section>
+    <div class="footnote">지리 경계: <a href="https://github.com/raqoon886/Local_HangJeongDong">행정동 GeoJSON</a>, <a href="https://github.com/DevMinGeonPark/mapcn-kr">리 경계 데이터</a>(원출처: 행정안전부). 기본 화면의 제주시·서귀포시 동지역은 각각 한 구역으로 묶고, 확대하면 리·동 단위로 나눕니다. 모든 점수와 위험 단계는 시각화 비교를 위해 범위를 넓힌 목업 예시이며 평균은 단순평균입니다. 실제 위험도 산출식과 검증 데이터는 아직 적용되지 않았습니다. 추자면은 참고 이미지 범위에 맞춰 제외했습니다.</div>
+  </main>
+  <script src="assets/d3.min.js"></script>
+  <script src="assets/jeju-data.js"></script>
+  <script src="assets/jeju-ri-data.js"></script>
+  <script>
+    (() => {
+      const values = {
+        '한림읍': [47, 51, 42, 48], '애월읍': [56, 61, 58, 44], '구좌읍': [68, 77, 54, 42],
+        '조천읍': [62, 67, 59, 49], '한경면': [38, 45, 34, 35], '우도면': [59, 75, 41, 30],
+        '대정읍': [52, 58, 49, 42], '남원읍': [44, 51, 39, 37], '성산읍': [73, 83, 58, 44],
+        '안덕면': [46, 57, 41, 35], '표선면': [64, 71, 55, 48],
+        '제주시 동지역': [61, 55, 72, 56], '서귀포시 동지역': [57, 52, 64, 51]
+      };
+      // 목업의 단계별 표현을 비교할 수 있도록 예시 점수의 범위를 넓힌다.
+      Object.values(values).forEach(scores => scores.forEach((score, index) => {
+        scores[index] = Math.max(0, Math.min(100, Math.round(50 + (score - 50) * 1.7)));
+      }));
+      const categories = { total: ['종합', 0], weather: ['재난 · 날씨', 1], traffic: ['교통', 2], crime: ['범죄', 3] };
+      const groupOf = f => f.properties.name.endsWith('동') ? `${f.properties.city} 동지역` : f.properties.name;
+      const isDong = f => f.properties.name.endsWith('동');
+      const dongId = f => `dong:${f.properties.city}:${f.properties.name}`;
+      const riId = f => `ri:${f.properties.code}`;
+      const features = window.JEJU_FEATURES.features;
+      const riFeatures = window.JEJU_RI_FEATURES.features;
+      const collection = { type: 'FeatureCollection', features };
+      const projection = d3.geoMercator().fitExtent([[42, 104], [958, 485]], collection);
+      const path = d3.geoPath(projection);
+      const svg = d3.select('#map');
+      svg.append('rect').attr('width', 1000).attr('height', 590).attr('fill', '#d9edf3');
+      const defs = svg.append('defs');
+      const pattern = defs.append('pattern').attr('id', 'sea-lines').attr('width', 26).attr('height', 26).attr('patternUnits', 'userSpaceOnUse');
+      pattern.append('path').attr('d', 'M0 25 Q13 19 26 25').attr('fill', 'none').attr('stroke', '#b9d9e4').attr('stroke-width', .7).attr('opacity', .45);
+      svg.append('rect').attr('width', 1000).attr('height', 590).attr('fill', 'url(#sea-lines)');
+      const zoomLayer = svg.append('g');
+      const mapGroup = zoomLayer.append('g');
+      defs.append('clipPath').attr('id', 'jeju-land-clip').selectAll('path').data(features).join('path').attr('d', path);
+      const riLayer = zoomLayer.append('g').attr('clip-path', 'url(#jeju-land-clip)');
+      const color = d3.scaleThreshold().domain([40, 50, 60, 70]).range(['#ffffff', '#fee5d9', '#fcae91', '#fb6a4a', '#cb181d']);
+      const scoreTextColor = score => score < 40 ? '#6f5556' : score < 50 ? '#914d50' : score < 60 ? '#a53c3a' : score < 70 ? '#b72c24' : '#a50f15';
+      const badgeTextColor = score => score >= 70 ? '#fff' : '#3f1014';
+      const boundaryColor = score => score < 50 ? '#d8cbd0' : '#fff';
+      let category = 'total';
+      let selected = { kind: 'parent', parent: '애월읍', name: '애월읍' };
+      let zoomScale = 1;
+      let fine = false;
+      const groups = [...new Set(features.map(groupOf))];
+      const children = [
+        ...riFeatures.map(feature => ({ id: riId(feature), name: feature.properties.name, parent: feature.properties.parent, feature, type: 'ri' })),
+        ...features.filter(isDong).map(feature => ({ id: dongId(feature), name: feature.properties.name, parent: groupOf(feature), feature, type: 'dong' }))
+      ];
+      const childById = new Map(children.map(child => [child.id, child]));
+      const childScores = new Map(children.map(child => [child.id, []]));
+      const hash = text => [...text].reduce((value, character) => ((value * 31 + character.charCodeAt(0)) >>> 0), 7);
+      for (const [parent, items] of d3.group(children, child => child.parent)) {
+        for (let index = 0; index < 4; index++) {
+          const offsets = items.map(child => hash(`${child.id}:${index}`) % 25 - 12);
+          const meanOffset = d3.mean(offsets);
+          items.forEach((child, position) => {
+            childScores.get(child.id)[index] = Math.max(0, Math.min(100, Math.round(values[parent][index] + offsets[position] - meanOffset)));
+          });
+        }
+      }
+      const chooseParent = name => { selected = { kind: 'parent', parent: name, name }; render(); };
+      const chooseChild = id => { const child = childById.get(id); selected = { kind: 'child', id, parent: child.parent, name: child.name }; render(); };
+      const paths = mapGroup.selectAll('path.region').data(features).join('path')
+        .attr('class', 'region').attr('d', path).attr('stroke-width', 1.05).attr('vector-effect', 'non-scaling-stroke')
+        .attr('role', 'button').attr('tabindex', 0)
+        .attr('aria-label', d => `${groupOf(d)} 선택`)
+        .on('click', (_, d) => fine && isDong(d) ? chooseChild(dongId(d)) : chooseParent(groupOf(d)))
+        .on('keydown', (event, d) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); fine && isDong(d) ? chooseChild(dongId(d)) : chooseParent(groupOf(d)); } });
+      const riPaths = riLayer.selectAll('path.subregion').data(riFeatures).join('path')
+        .attr('class', 'subregion').attr('d', path).attr('stroke', '#fff').attr('stroke-width', 1.05).attr('vector-effect', 'non-scaling-stroke')
+        .attr('role', 'button').attr('tabindex', 0)
+        .on('click', (_, d) => chooseChild(riId(d)))
+        .on('keydown', (event, d) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); chooseChild(riId(d)); } });
+      const labelLayer = zoomLayer.append('g');
+      const pointFor = name => {
+        const subset = { type: 'FeatureCollection', features: features.filter(f => groupOf(f) === name) };
+        return projection(d3.geoCentroid(subset));
+      };
+      const labels = labelLayer.selectAll('g.label').data(groups).join('g').attr('class', 'label').attr('transform', d => `translate(${pointFor(d)})`);
+      labels.append('text').attr('class', 'region-label').attr('y', -3).text(d => d);
+      labels.append('rect').attr('class', 'score-badge').attr('x', -22).attr('y', 1).attr('width', 44).attr('height', 19).attr('rx', 9.5);
+      labels.append('text').attr('class', 'region-score').attr('y', 15);
+      const fineLabelLayer = zoomLayer.append('g');
+      const fineLabels = fineLabelLayer.selectAll('g.fine-label').data(children).join('g')
+        .attr('class', 'fine-label').attr('transform', child => `translate(${projection(d3.geoCentroid(child.feature))})`);
+      fineLabels.append('text').attr('class', 'subregion-label').text(child => child.name);
+      fineLabels.append('text').attr('class', 'subregion-score');
+      function layoutFineLabels() {
+        const pixelsPerUnit = svg.node().getBoundingClientRect().width / 1000;
+        const fontSize = Math.max(9, 11 / pixelsPerUnit) / zoomScale;
+        fineLabels.style('display', child => {
+          if (!fine) return 'none';
+          const bounds = path.bounds(child.feature);
+          const width = (bounds[1][0] - bounds[0][0]) * zoomScale * pixelsPerUnit;
+          const height = (bounds[1][1] - bounds[0][1]) * zoomScale * pixelsPerUnit;
+          return width >= 36 && height >= 24 ? null : 'none';
+        });
+        fineLabels.selectAll('text').style('font-size', `${fontSize}px`).style('stroke-width', `${3 / zoomScale}px`);
+        fineLabels.select('.subregion-label').attr('y', -3 / zoomScale);
+        fineLabels.select('.subregion-score').attr('y', 10 / zoomScale);
+      }
+      const zoom = d3.zoom().scaleExtent([1, 4]).translateExtent([[0, 0], [1000, 590]])
+        .on('zoom', event => {
+          zoomLayer.attr('transform', event.transform);
+          const wasFine = fine;
+          zoomScale = event.transform.k;
+          fine = zoomScale >= 1.45;
+          if (wasFine && !fine && selected.kind === 'child') selected = { kind: 'parent', parent: selected.parent, name: selected.parent };
+          document.getElementById('zoom-level').textContent = `${Math.round(zoomScale * 100)}%`;
+          document.getElementById('zoom-out').disabled = zoomScale <= 1.001;
+          document.getElementById('zoom-in').disabled = zoomScale >= 3.999;
+          if (wasFine !== fine) render();
+          layoutFineLabels();
+        });
+      svg.call(zoom);
+      document.getElementById('zoom-in').addEventListener('click', () => svg.transition().duration(200).call(zoom.scaleBy, 1.5));
+      document.getElementById('zoom-out').addEventListener('click', () => svg.transition().duration(200).call(zoom.scaleBy, 1 / 1.5));
+      document.getElementById('zoom-reset').addEventListener('click', () => svg.transition().duration(200).call(zoom.transform, d3.zoomIdentity));
+      function level(score) { return score >= 70 ? '매우 높음' : score >= 60 ? '높음' : score >= 50 ? '보통' : score >= 40 ? '주의' : '낮음'; }
+      function render() {
+        const [categoryLabel, index] = categories[category];
+        document.querySelectorAll('.filter').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.category === category)));
+        document.getElementById('map-title').textContent = `${categoryLabel} 위험지수 · ${fine ? '리·동 상세' : '제주 전체'}`;
+        paths.attr('fill', d => color(fine && isDong(d) ? childScores.get(dongId(d))[index] : values[groupOf(d)][index]))
+          .attr('stroke', d => fine || !isDong(d) ? boundaryColor(fine && isDong(d) ? childScores.get(dongId(d))[index] : values[groupOf(d)][index]) : color(values[groupOf(d)][index]))
+          .classed('is-selected', d => selected.kind === 'parent' ? groupOf(d) === selected.parent : fine && isDong(d) && dongId(d) === selected.id)
+          .attr('aria-label', d => fine && isDong(d) ? `${d.properties.name} ${childScores.get(dongId(d))[index]}점 선택` : `${groupOf(d)} ${values[groupOf(d)][index]}점 선택`);
+        riLayer.style('display', fine ? null : 'none');
+        riPaths.attr('fill', d => color(childScores.get(riId(d))[index]))
+          .attr('stroke', d => boundaryColor(childScores.get(riId(d))[index]))
+          .classed('is-selected', d => selected.kind === 'child' && riId(d) === selected.id)
+          .attr('aria-label', d => `${d.properties.parent} ${d.properties.name} ${childScores.get(riId(d))[index]}점 선택`);
+        labelLayer.style('display', fine ? 'none' : null);
+        labels.select('.score-badge').attr('fill', d => color(values[d][index]));
+        labels.select('.region-score').text(d => `${values[d][index]}점`);
+        labels.select('.region-score').attr('fill', d => badgeTextColor(values[d][index]));
+        fineLabels.select('.subregion-score').text(child => `${childScores.get(child.id)[index]}점`)
+          .style('fill', child => childScores.get(child.id)[index] >= 70 ? '#fff' : '#3f1014')
+          .style('stroke', child => childScores.get(child.id)[index] >= 70 ? '#891316' : '#fff');
+        layoutFineLabels();
+        const child = selected.kind === 'child' ? childById.get(selected.id) : null;
+        const score = child ? childScores.get(child.id)[index] : values[selected.parent][index];
+        document.getElementById('region-name').textContent = child ? `${selected.parent} ${child.name}` : selected.parent;
+        document.getElementById('region-context').textContent = child ? `${child.type === 'ri' ? '리' : '동'} 단위 예시 점수 · ${categoryLabel} 위험지수` : `${selected.parent.includes('제주시') ? '제주시' : selected.parent.includes('서귀포시') ? '서귀포시' : features.find(f => groupOf(f) === selected.parent).properties.city} · ${categoryLabel} 위험지수`;
+        document.getElementById('selected-score').innerHTML = `${score} <small>/ 100</small>`;
+        document.getElementById('selected-score').style.color = scoreTextColor(score);
+        document.getElementById('average-title').textContent = fine ? '세부 구역 평균' : '표시 구역 평균';
+        document.getElementById('average-score').innerHTML = `${Math.round(fine ? d3.mean(children, item => childScores.get(item.id)[index]) : d3.mean(groups, name => values[name][index]))} <small>/ 100</small>`;
+        const riskLevel = document.getElementById('risk-level');
+        riskLevel.textContent = level(score);
+        riskLevel.style.color = scoreTextColor(score);
+        riskLevel.style.backgroundColor = score < 40 ? '#f6f2f2' : `${color(score)}30`;
+      }
+      document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => { category = button.dataset.category; render(); }));
+      window.addEventListener('resize', layoutFineLabels);
+      render();
+    })();
+  </script>
+</body>
+</html>

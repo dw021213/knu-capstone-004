@@ -5,6 +5,22 @@
 > 여행객이 "지금 있는 곳이 얼마나 안전한지"를 **근거와 함께** 볼 수 있는 격자 기반 안전 분석 웹앱.
 > 기업 서비스 위에 얹지 않고 팀이 별도 웹앱으로 개발하며, 검증된 부분은 기업이 이후 마이그레이션을 검토한다.
 
+## 지도 표현 목업 실행
+
+현재 저장소에 포함된 화면 구현은 제주 안전지도의 지도 표현을 비교하는 **정적 HTML 목업 3개**입니다. 아래 명령을 저장소 루트에서 실행한 뒤 브라우저에서 각 주소를 여세요. Python 3 외의 설치나 API 키는 필요하지 않습니다.
+
+```bash
+python3 -m http.server 8765
+```
+
+| 화면 | 실행 주소 | 내용 |
+| --- | --- | --- |
+| [지역별 위험 점수](mockups/01-score-map.html) | <http://localhost:8765/mockups/01-score-map.html> | 읍면동 및 확대 시 리·동 단위 예시 위험 점수 |
+| [기상 위험장](mockups/02-weather-field.html) | <http://localhost:8765/mockups/02-weather-field.html> | 강수·강풍의 연속적인 예시 영향 범위 |
+| [안전 자원 분포](mockups/03-safety-elements.html) | <http://localhost:8765/mockups/03-safety-elements.html> | 경찰·소방·편의점 자료의 유형별 분포 |
+
+각 화면의 조작 방법, 데이터 출처와 한계는 [목업 설명](mockups/README.md)에 정리했습니다. 1·2번의 위험 수치와 기상 값은 예시이며, 3번의 경찰·소방 점은 개략 위치입니다. 현재 화면은 아래에 적힌 계획 단계의 React·Go 서비스와 연동되지 않았습니다.
+
 ![Go](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -124,14 +140,17 @@ gantt
 
 회의록: [docs/meetings](docs/meetings) · 데이터 출처 검증표: [docs/data/sources.md](docs/data/sources.md)
 
-## 저장소 구조 (예정)
+## 저장소 구조
 
 ```
 backend/    Go API 서버
 frontend/   React + TypeScript + Vite
 pipeline/   Python 수집 · 격자 집계 · 위험도 산출
 docs/       회의록 · 데이터 명세 · 보고서
+mockups/    정적 HTML 지도 표현 목업 3개와 로컬 지도 자산
 ```
+
+`backend/`, `frontend/`, `pipeline/`은 예정 구조이며 현재 저장소에는 `docs/`와 `mockups/`가 있습니다.
 ## 과제 추진 및 개발 일정
 gantt
     title 과제 추진 및 개발 일정
@@ -152,5 +171,4 @@ gantt
     03 데이터 실증                 :t3, 2026-10-16, 2026-11-02
     04 UI 설계 및 시각화 구현       :t4, 2026-11-03, 2026-11-25
     05 결과물 산출 및 피드백        :t5, 2026-11-26, 2026-12-20
-
 

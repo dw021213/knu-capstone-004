@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>제주 안전지도 목업 02 · 연속 기상 위험장</title>
+  <style>
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; color: #17283d; background: #f2f6f8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, select { font: inherit; }
+    button { cursor: pointer; }
+    a { color: #23647a; }
+    .shell { max-width: 1440px; min-height: 100vh; margin: auto; background: #fff; box-shadow: 0 20px 70px #1b385514; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 34px; border-bottom: 1px solid #e5ebf1; }
+    .brand { display: flex; align-items: center; gap: 12px; font-size: 19px; font-weight: 800; letter-spacing: -.04em; }
+    .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; background: #1e687e; color: white; font-size: 17px; }
+    .header-right { display: flex; gap: 8px; align-items: center; color: #748399; font-size: 12px; }
+    .sample { color: #805c12; background: #fff2cc; padding: 6px 9px; border-radius: 6px; font-weight: 700; }
+    .intro { display: flex; align-items: end; justify-content: space-between; gap: 20px; padding: 29px 34px 19px; }
+    h1 { margin: 0 0 7px; font-size: clamp(24px, 3vw, 34px); letter-spacing: -.06em; }
+    .intro p { margin: 0; color: #65758b; font-size: 14px; line-height: 1.55; }
+    .meta { text-align: right; color: #8795a6; font-size: 12px; line-height: 1.6; white-space: nowrap; }
+    .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; padding: 0 34px 20px; }
+    .toolbar-label { margin-right: 7px; font-size: 13px; font-weight: 750; color: #35475f; }
+    .filter { border: 1px solid #dce5ed; border-radius: 9px; background: #fff; color: #52657c; padding: 10px 16px; font-size: 13px; font-weight: 750; transition: background .2s, color .2s; }
+    .filter[aria-pressed="true"] { border-color: #1e687e; background: #1e687e; color: #fff; }
+    .filter:hover:not([aria-pressed="true"]) { background: #eef4f7; }
+    button:focus-visible, select:focus-visible, .station:focus-visible { outline: 3px solid #135b87; outline-offset: 3px; }
+    .toolbar-hint { margin-left: auto; color: #8795a6; font-size: 12px; }
+    .region-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; padding: 0 34px 16px; }
+    .region-tools label { color: #35475f; font-size: 13px; font-weight: 750; }
+    .region-tools select { min-width: 170px; max-width: 100%; border: 1px solid #dce5ed; border-radius: 9px; padding: 9px 32px 9px 11px; background: #fff; color: #344b60; font-size: 13px; }
+    .boundary-toggle { border: 1px solid #b9d2dc; border-radius: 9px; padding: 9px 12px; background: #eaf4f6; color: #235b70; font-size: 12px; font-weight: 750; }
+    .boundary-toggle[aria-pressed="false"] { border-color: #dce5ed; background: #fff; color: #65778b; }
+    .region-status { color: #718196; font-size: 12px; }
+    .map-wrap { position: relative; margin: 0 34px; overflow: hidden; border: 1px solid #d7e7ee; border-radius: 16px; background: #d8edf2; }
+    .map-heading { position: absolute; z-index: 2; top: 18px; left: 20px; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 40px); padding: 8px 11px; border-radius: 8px; background: #fffffff0; color: #2b5265; font-size: 12px; font-weight: 750; box-shadow: 0 4px 18px #19445d13; }
+    .map-heading .dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #e76e60; }
+    .zoom-controls { position: absolute; z-index: 3; top: 17px; right: 18px; display: flex; gap: 5px; }
+    .zoom-controls button { min-width: 34px; height: 34px; padding: 0 9px; border: 1px solid #d6e3e9; border-radius: 8px; background: #fffffff0; color: #2b5265; font-size: 17px; font-weight: 800; box-shadow: 0 4px 18px #19445d13; }
+    .zoom-controls button:last-child { font-size: 11px; }
+    #map { display: block; width: 100%; height: auto; aspect-ratio: 1000 / 590; }
+    .station { cursor: pointer; }
+    .station .hit { fill: transparent; }
+    .station .halo { fill: none; stroke: #fff; stroke-width: 2; opacity: .95; }
+    .station .core { fill: #203b50; stroke: #fff; stroke-width: 2.5; }
+    .station.is-selected .halo { stroke: #143c54; stroke-width: 3; }
+    .station.is-selected .core { fill: #fff; stroke: #143c54; stroke-width: 4; }
+    .station-label { pointer-events: none; text-anchor: middle; fill: #213c50; font-size: 13px; font-weight: 800; paint-order: stroke; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; }
+    .area-label { pointer-events: none; text-anchor: middle; fill: #40596a; font-size: 12px; font-weight: 800; letter-spacing: -.03em; paint-order: stroke; stroke: #ffffffdf; stroke-width: 3.5px; stroke-linejoin: round; }
+    .area-label.is-selected { fill: #123e56; font-size: 15px; stroke-width: 4px; }
+    .map-footer { position: absolute; z-index: 2; right: 18px; bottom: 16px; left: 18px; display: flex; justify-content: space-between; align-items: end; gap: 12px; pointer-events: none; }
+    .legend, .map-note { padding: 11px 13px; border-radius: 9px; background: #fffffff0; box-shadow: 0 4px 18px #19445d13; }
+    .legend { min-width: 228px; }
+    .legend-title { margin-bottom: 7px; color: #42566b; font-size: 11px; font-weight: 800; }
+    .scale { display: flex; height: 9px; overflow: hidden; border-radius: 8px; }
+    .scale span { flex: 1; }
+    .scale-labels { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; color: #50667a; font-size: 11px; font-weight: 700; }
+    .map-note { color: #617589; font-size: 11px; }
+    .reading { margin: 19px 34px 0; display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+    .detail, .explainer { min-width: 0; border: 1px solid #e1e8ef; border-radius: 14px; padding: 19px 22px; }
+    .detail { display: grid; grid-template-columns: minmax(145px, 1fr) repeat(2, minmax(105px, .65fr)); gap: 15px; align-items: center; }
+    .detail-kicker { color: #73859a; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+    .detail h2 { margin: 4px 0 3px; font-size: 21px; letter-spacing: -.04em; }
+    .detail p { margin: 0; color: #718196; font-size: 12px; line-height: 1.5; }
+    .detail-stat { padding-left: 17px; border-left: 1px solid #e5ebf1; }
+    .detail-stat span { display: block; color: #718196; font-size: 12px; }
+    .detail-stat strong { display: block; margin-top: 5px; font-size: 22px; letter-spacing: -.04em; }
+    .detail-stat small { font-size: 12px; color: #8593a4; font-weight: 600; }
+    .explainer { display: flex; align-items: center; gap: 14px; background: #f8fafb; }
+    .explainer-icon { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; color: #ae4e45; background: #ffeae5; font-size: 20px; }
+    .explainer strong { font-size: 13px; }
+    .explainer p { margin: 4px 0 0; color: #64778b; font-size: 12px; line-height: 1.55; }
+    .station-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin: 15px 34px 0; }
+    .station-picker span { margin-right: 5px; color: #6f8092; font-size: 12px; font-weight: 750; }
+    .station-picker button { border: 1px solid #dce5ed; border-radius: 20px; padding: 7px 11px; background: #fff; color: #4d6479; font-size: 12px; font-weight: 700; }
+    .station-picker button[aria-pressed="true"] { border-color: #1e687e; background: #e6f3f5; color: #155166; }
+    .footnote { padding: 18px 34px 30px; color: #8a97a6; font-size: 11px; line-height: 1.6; }
+    @media (max-width: 800px) {
+      .reading { grid-template-columns: 1fr; }
+      .toolbar-hint { width: 100%; margin-left: 0; }
+    }
+    @media (max-width: 700px) {
+      header, .intro { padding-left: 18px; padding-right: 18px; }
+      .header-right .source, .meta { display: none; }
+      .intro { align-items: start; padding-top: 22px; }
+      .toolbar { padding: 0 18px 15px; gap: 7px; }
+      .toolbar-label { width: 100%; }
+      .filter { padding: 9px 12px; font-size: 12px; }
+      .region-tools { padding: 0 18px 14px; }
+      .region-tools label { width: 100%; }
+      .region-tools select { flex: 1; }
+      .region-status { width: 100%; }
+      .map-wrap { margin: 0 10px; border-radius: 10px; }
+      .map-heading { top: 8px; left: 8px; max-width: calc(100% - 16px); padding: 6px 8px; font-size: 10px; }
+      .zoom-controls { top: 8px; right: 8px; }
+      .zoom-controls button { min-width: 28px; height: 28px; padding: 0 6px; }
+      .map-heading { max-width: calc(100% - 120px); }
+      .area-label { font-size: 22px; stroke-width: 5px; }
+      .area-label.is-selected { font-size: 25px; }
+      .map-footer { position: static; display: block; padding: 0 10px 10px; }
+      .legend { box-shadow: none; }
+      .map-note { display: none; }
+      .reading { margin: 15px 18px 0; gap: 10px; }
+      .detail { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 15px; }
+      .detail-main { grid-column: 1 / -1; }
+      .detail-stat { padding-left: 10px; }
+      .detail-stat strong { font-size: 18px; }
+      .explainer { padding: 13px 15px; }
+      .station-picker { margin: 13px 18px 0; }
+      .station-picker span { width: 100%; }
+      .footnote { padding: 15px 18px 25px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>제주 안전지도</span></div>
+      <div class="header-right"><span class="source">전체지도 · 연속 기상 위험장</span><span class="sample">실시간 연동 화면 예시</span></div>
+    </header>
+    <section class="intro">
+      <div><h1>날씨의 영향 범위를 한눈에</h1><p>위험 중심에서 번지는 강도와 영향 반경, 여러 현상의 중첩을 제주 전체에서 살펴봅니다.</p></div>
+      <div class="meta">MOCKUP 02 / 03<br>위치와 값은 시뮬레이션 데이터</div>
+    </section>
+    <nav class="toolbar" aria-label="기상 요소 선택">
+      <span class="toolbar-label">표시할 기상 요소</span>
+      <button class="filter" type="button" data-mode="rain" aria-pressed="true">강수 위험장</button>
+      <button class="filter" type="button" data-mode="wind" aria-pressed="false">강풍 위험장</button>
+      <span class="toolbar-hint">시뮬레이션 데이터 · 원의 가장자리까지가 예시 영향 범위</span>
+    </nav>
+    <div class="region-tools">
+      <label for="region-select">읍면동으로 이동</label>
+      <select id="region-select" aria-describedby="region-status"><option value="">제주 전체</option></select>
+      <button class="boundary-toggle" type="button" id="boundary-toggle" aria-pressed="true">경계·읍면 이름 표시</button>
+      <span class="region-status" id="region-status" aria-live="polite">지도에는 읍·면 이름만 표시합니다. 동 이름은 목록에서 선택하세요.</span>
+    </div>
+    <section class="map-wrap" aria-label="제주 전체 연속 기상 위험장 지도">
+      <div class="map-heading"><span class="dot" id="heading-dot"></span><span id="map-title">강수 위험장 · 제주 전체</span></div>
+      <div class="zoom-controls" aria-label="지도 확대 및 축소"><button type="button" id="zoom-in" aria-label="지도 확대">+</button><button type="button" id="zoom-out" aria-label="지도 축소">−</button><button type="button" id="zoom-reset">전체</button></div>
+      <svg id="map" viewBox="0 0 1000 590" role="img" aria-label="제주 전체 지형 위의 강수 위험장 시뮬레이션 지도"></svg>
+      <div class="map-footer">
+        <div class="legend" aria-live="polite"><div class="legend-title" id="legend-title">강수 예시 강도 · mm/h</div><div class="scale" id="legend-scale"></div><div class="scale-labels" id="legend-labels"></div></div>
+        <div class="map-note">동심원 = 중심 강도와 영향 반경 · 색이 겹친 곳 = 영향 중첩</div>
+      </div>
+    </section>
+    <section class="reading" aria-label="선택 지점과 위험장 설명">
+      <div class="detail" aria-live="polite">
+        <div class="detail-main"><div class="detail-kicker">선택한 예시 위험 중심</div><h2 id="point-name"></h2><p id="point-context"></p></div>
+        <div class="detail-stat"><span id="intensity-label">중심 강도</span><strong id="point-intensity"></strong></div>
+        <div class="detail-stat"><span>영향 반경</span><strong id="point-radius"></strong></div>
+      </div>
+      <div class="explainer"><div class="explainer-icon" aria-hidden="true">◎</div><div><strong id="explain-title"></strong><p id="explain-text"></p></div></div>
+    </section>
+    <div class="station-picker" id="station-picker" aria-label="예시 위험 중심 선택"><span>위험 중심 선택</span></div>
+    <div class="footnote">화면 구성 참고: 사용자가 제공한 제주도 행정구역도 이미지. 지리 경계: <a href="https://github.com/raqoon886/Local_HangJeongDong">Local_HangJeongDong 공개 행정동 GeoJSON</a> (추자면 제외). 지도에는 읍·면 이름만 표시하고, 동은 선택 목록에서 찾을 수 있습니다. 경계와 이름은 위치 참고용이며 기상 위험장 산정 경계가 아닙니다. 위험 중심의 위치·강도·반경은 모두 시뮬레이션이며 실제 기상 API와 연결되지 않았습니다.</div>
+  </main>
+  <script src="assets/d3.min.js"></script>
+  <script src="assets/jeju-data.js"></script>
+  <script>
+    (() => {
+      const modes = {
+        rain: {
+          title: '강수 위험장', unit: 'mm/h', colors: ['#cdebed', '#42a9bf', '#f1b46b', '#c2263c'],
+          labels: ['낮음 < 10', '보통 10–30', '높음 ≥ 30'],
+          explanation: '강수 중심에서 바깥쪽으로 예시 강도가 약해집니다. 원이 겹치는 곳은 두 강수 영향권이 만나는 구간입니다.',
+          points: [
+            { id: 'west', name: '서부 해안', place: '한림 부근', lon: 126.30, lat: 33.38, value: 38, radius: 19, color: '#e68055' },
+            { id: 'middle', name: '북부 중산간', place: '애월 부근', lon: 126.51, lat: 33.40, value: 27, radius: 17, color: '#eeb56f' },
+            { id: 'south', name: '남부 내륙', place: '남원 부근', lon: 126.72, lat: 33.31, value: 16, radius: 19, color: '#66aabe' },
+            { id: 'east', name: '동부 해안', place: '성산 부근', lon: 126.88, lat: 33.43, value: 43, radius: 18, color: '#c2263c' }
+          ]
+        },
+        wind: {
+          title: '강풍 위험장', unit: 'm/s', colors: ['#d8e6f4', '#719bd1', '#8b79c3', '#524c99'],
+          labels: ['낮음 < 8', '보통 8–14', '높음 ≥ 14'],
+          explanation: '강풍 중심의 예시 풍속과 영향권을 나타냅니다. 해안과 내륙의 원이 겹치면 중첩 영향 구간으로 읽을 수 있습니다.',
+          points: [
+            { id: 'northwest', name: '북서 해안', place: '한림 부근', lon: 126.35, lat: 33.43, value: 12, radius: 20, color: '#719bd1' },
+            { id: 'north', name: '북부 해안', place: '조천 부근', lon: 126.69, lat: 33.51, value: 16, radius: 18, color: '#8b79c3' },
+            { id: 'eastwind', name: '동부 해안', place: '성산 부근', lon: 126.87, lat: 33.43, value: 19, radius: 23, color: '#524c99' },
+            { id: 'southwest', name: '남서 해안', place: '안덕 부근', lon: 126.35, lat: 33.25, value: 10, radius: 16, color: '#719bd1' }
+          ]
+        }
+      };
+      const collection = window.JEJU_FEATURES;
+      const projection = d3.geoMercator().fitExtent([[42, 104], [958, 485]], collection);
+      const path = d3.geoPath(projection);
+      const svg = d3.select('#map');
+      const defs = svg.append('defs');
+      const landClip = defs.append('clipPath').attr('id', 'land-clip');
+      landClip.selectAll('path').data(collection.features).join('path').attr('d', path);
+      const seaGradient = defs.append('linearGradient').attr('id', 'sea-gradient').attr('x2', '0').attr('y2', '1');
+      seaGradient.append('stop').attr('offset', '0%').attr('stop-color', '#dceff3');
+      seaGradient.append('stop').attr('offset', '100%').attr('stop-color', '#c4e0e9');
+      svg.append('rect').attr('width', 1000).attr('height', 590).attr('fill', 'url(#sea-gradient)');
+      const seaPattern = defs.append('pattern').attr('id', 'sea-lines').attr('width', 30).attr('height', 30).attr('patternUnits', 'userSpaceOnUse');
+      seaPattern.append('path').attr('d', 'M0 29 Q15 22 30 29').attr('fill', 'none').attr('stroke', '#9ecbd8').attr('stroke-width', .7).attr('opacity', .32);
+      svg.append('rect').attr('width', 1000).attr('height', 590).attr('fill', 'url(#sea-lines)');
+      const mapContent = svg.append('g');
+      mapContent.append('rect').attr('width', 1000).attr('height', 590).attr('fill', '#f8f4e9').attr('clip-path', 'url(#land-clip)');
+      const fieldLayer = mapContent.append('g').attr('clip-path', 'url(#land-clip)');
+      const ringLayer = mapContent.append('g').attr('clip-path', 'url(#land-clip)');
+      const boundaryLayer = mapContent.append('g').attr('aria-hidden', 'true').attr('pointer-events', 'none');
+      const boundaryPaths = boundaryLayer.selectAll('path').data(collection.features).join('path')
+        .attr('d', path).attr('fill', 'none').attr('vector-effect', 'non-scaling-stroke');
+      const labelLayer = mapContent.append('g').attr('aria-hidden', 'true').attr('pointer-events', 'none');
+      const labelOffsets = { '한경면': [-4, 10], '한림읍': [-8, -6], '애월읍': [-8, 2], '조천읍': [0, -2], '구좌읍': [6, 0], '우도면': [0, 0], '대정읍': [0, 8], '안덕면': [0, 7], '남원읍': [0, 12], '표선면': [0, 7], '성산읍': [9, 16] };
+      const priorityNames = new Set(['한경면', '애월읍', '구좌읍', '대정읍', '남원읍', '성산읍']);
+      const areaLabels = labelLayer.selectAll('text').data(collection.features.filter(feature => /[읍면]$/.test(feature.properties.name))).join('text')
+        .attr('class', 'area-label').attr('data-name', feature => feature.properties.name)
+        .attr('data-x', feature => path.centroid(feature)[0] + (labelOffsets[feature.properties.name] || [0, 0])[0])
+        .attr('data-y', feature => path.centroid(feature)[1] + (labelOffsets[feature.properties.name] || [0, 0])[1])
+        .text(feature => feature.properties.name);
+      const markerLayer = mapContent.append('g');
+      const regionMarker = mapContent.append('g').attr('class', 'region-marker').style('display', 'none').attr('pointer-events', 'none');
+      regionMarker.append('circle').attr('r', 13).attr('fill', '#fff').attr('fill-opacity', .82).attr('stroke', '#155166').attr('stroke-width', 2);
+      regionMarker.append('path').attr('d', 'M-6 0H6M0-6V6').attr('stroke', '#155166').attr('stroke-width', 2);
+      function keepMarkerSize(scale) {
+        areaLabels.attr('transform', function() {
+          return `translate(${this.dataset.x},${this.dataset.y}) scale(${1 / scale})`;
+        });
+        markerLayer.selectAll('.station').attr('transform', function() {
+          return `translate(${this.dataset.x},${this.dataset.y}) scale(${1 / scale})`;
+        });
+        if (regionMarker.attr('data-x')) {
+          regionMarker.attr('transform', `translate(${regionMarker.attr('data-x')},${regionMarker.attr('data-y')}) scale(${1 / scale})`);
+        }
+        updateAreaLabels(scale);
+      }
+      function updateAreaLabels(scale) {
+        const small = window.matchMedia('(max-width: 700px)').matches;
+        areaLabels
+          .classed('is-selected', feature => `${feature.properties.city}|${feature.properties.name}` === regionSelect.value)
+          .style('display', feature => {
+            if (!showBoundaries) return 'none';
+            if (!small || scale >= 2.2 || priorityNames.has(feature.properties.name) || `${feature.properties.city}|${feature.properties.name}` === regionSelect.value) return null;
+            return 'none';
+          });
+      }
+      const zoom = d3.zoom().scaleExtent([1, 5]).translateExtent([[0, 0], [1000, 590]])
+        .on('zoom', event => { mapContent.attr('transform', event.transform); keepMarkerSize(event.transform.k); });
+      svg.call(zoom);
+      const regionSelect = document.getElementById('region-select');
+      const boundaryToggle = document.getElementById('boundary-toggle');
+      let showBoundaries = true;
+      function updateBoundaries() {
+        boundaryPaths
+          .attr('stroke', feature => `${feature.properties.city}|${feature.properties.name}` === regionSelect.value ? '#173f54' : '#506a79')
+          .attr('stroke-width', feature => `${feature.properties.city}|${feature.properties.name}` === regionSelect.value ? 2.5 : 1)
+          .attr('stroke-opacity', feature => `${feature.properties.city}|${feature.properties.name}` === regionSelect.value ? .95 : .48);
+        boundaryLayer.style('display', showBoundaries ? null : 'none');
+        updateAreaLabels(d3.zoomTransform(svg.node()).k);
+        boundaryToggle.setAttribute('aria-pressed', String(showBoundaries));
+        boundaryToggle.textContent = showBoundaries ? '경계·읍면 이름 표시' : '경계·읍면 이름 숨김';
+      }
+      boundaryToggle.addEventListener('click', () => { showBoundaries = !showBoundaries; updateBoundaries(); });
+      const featuresByKey = new Map();
+      ['제주시', '서귀포시'].forEach(city => {
+        const group = document.createElement('optgroup');
+        group.label = city;
+        collection.features.filter(feature => feature.properties.city === city)
+          .sort((a, b) => a.properties.name.localeCompare(b.properties.name, 'ko'))
+          .forEach(feature => {
+            const key = `${city}|${feature.properties.name}`;
+            featuresByKey.set(key, feature);
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = feature.properties.name;
+            group.appendChild(option);
+          });
+        regionSelect.appendChild(group);
+      });
+      function resetView() {
+        regionSelect.value = '';
+        regionMarker.style('display', 'none');
+        updateBoundaries();
+        document.getElementById('region-status').textContent = '제주 전체 보기 · 경계선은 위치 참고용입니다.';
+        document.getElementById('map-title').textContent = `${modes[mode].title} · 제주 전체`;
+        svg.transition().duration(450).call(zoom.transform, d3.zoomIdentity);
+      }
+      regionSelect.addEventListener('change', () => {
+        const feature = featuresByKey.get(regionSelect.value);
+        if (!feature) { resetView(); return; }
+        const [x, y] = path.centroid(feature);
+        const [[x0, y0], [x1, y1]] = path.bounds(feature);
+        const scale = Math.min(4.5, Math.max(1.7, Math.min(680 / Math.max(1, x1 - x0), 400 / Math.max(1, y1 - y0))));
+        regionMarker.attr('data-x', x).attr('data-y', y).style('display', null);
+        keepMarkerSize(d3.zoomTransform(svg.node()).k);
+        const label = `${feature.properties.city} ${feature.properties.name}`;
+        updateBoundaries();
+        document.getElementById('region-status').textContent = `${label} 중심으로 이동 · 선택 윤곽과 십자 표시는 위치 참고용입니다.`;
+        document.getElementById('map-title').textContent = `${modes[mode].title} · ${feature.properties.name}`;
+        svg.transition().duration(450).call(zoom.transform, d3.zoomIdentity.translate(500, 295).scale(scale).translate(-x, -y));
+      });
+      document.getElementById('zoom-in').addEventListener('click', () => svg.transition().duration(250).call(zoom.scaleBy, 1.5));
+      document.getElementById('zoom-out').addEventListener('click', () => svg.transition().duration(250).call(zoom.scaleBy, 1 / 1.5));
+      document.getElementById('zoom-reset').addEventListener('click', resetView);
+      const kmPixels = (point, km) => {
+        const start = projection([point.lon, point.lat]);
+        const end = projection([point.lon + km / (111.32 * Math.cos(point.lat * Math.PI / 180)), point.lat]);
+        return Math.abs(end[0] - start[0]);
+      };
+      let mode = 'rain';
+      let selected = 'west';
+      function render() {
+        const config = modes[mode];
+        const points = config.points;
+        if (!points.some(p => p.id === selected)) selected = points[0].id;
+        document.querySelectorAll('.filter').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === mode)));
+        document.getElementById('map-title').textContent = `${config.title} · ${regionSelect.value ? featuresByKey.get(regionSelect.value).properties.name : '제주 전체'}`;
+        document.getElementById('heading-dot').style.background = mode === 'rain' ? '#e76e60' : '#7163ac';
+        svg.attr('aria-label', `제주 전체 지형 위의 ${config.title} 시뮬레이션 지도`);
+        defs.selectAll('.field-gradient').remove();
+        points.forEach((point, i) => {
+          const gradient = defs.append('radialGradient').attr('class', 'field-gradient').attr('id', `field-${i}`);
+          const highRain = mode === 'rain' && point.id === 'east';
+          gradient.append('stop').attr('offset', '0%').attr('stop-color', point.color).attr('stop-opacity', highRain ? .98 : .82);
+          gradient.append('stop').attr('offset', '36%').attr('stop-color', point.color).attr('stop-opacity', highRain ? .88 : .64);
+          gradient.append('stop').attr('offset', '67%').attr('stop-color', point.color).attr('stop-opacity', highRain ? .49 : .34);
+          gradient.append('stop').attr('offset', '100%').attr('stop-color', point.color).attr('stop-opacity', 0);
+        });
+        fieldLayer.selectAll('*').remove();
+        ringLayer.selectAll('*').remove();
+        markerLayer.selectAll('*').remove();
+        points.forEach((point, i) => {
+          const [x, y] = projection([point.lon, point.lat]);
+          const radius = kmPixels(point, point.radius);
+          fieldLayer.append('circle').attr('cx', x).attr('cy', y).attr('r', radius).attr('fill', `url(#field-${i})`).style('mix-blend-mode', 'multiply');
+          ringLayer.append('circle').attr('cx', x).attr('cy', y).attr('r', radius * .58).attr('fill', 'none').attr('stroke', point.color).attr('stroke-width', 1.2).attr('stroke-opacity', .5).attr('stroke-dasharray', '4 5');
+          ringLayer.append('circle').attr('cx', x).attr('cy', y).attr('r', radius).attr('fill', 'none').attr('stroke', point.color).attr('stroke-width', 1.4).attr('stroke-opacity', .67).attr('stroke-dasharray', '6 5');
+          const station = markerLayer.append('g').attr('class', `station${point.id === selected ? ' is-selected' : ''}`)
+            .attr('data-x', x).attr('data-y', y).attr('role', 'button').attr('tabindex', 0).attr('data-id', point.id)
+            .attr('aria-label', `${point.name} 예시 중심, ${point.value} ${config.unit}, 영향 반경 ${point.radius} km 선택`)
+            .on('click', () => { selected = point.id; render(); markerLayer.select(`[data-id="${point.id}"]`).node().focus(); })
+            .on('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selected = point.id; render(); markerLayer.select(`[data-id="${point.id}"]`).node().focus(); } });
+          station.append('circle').attr('class', 'hit').attr('r', 23);
+          station.append('circle').attr('class', 'halo').attr('r', 12);
+          station.append('circle').attr('class', 'core').attr('r', 6);
+          station.append('text').attr('class', 'station-label').attr('y', -20).text(point.name);
+        });
+        keepMarkerSize(d3.zoomTransform(svg.node()).k);
+        const active = points.find(point => point.id === selected);
+        document.getElementById('point-name').textContent = active.name;
+        document.getElementById('point-context').textContent = `${active.place} · 시뮬레이션 위치`;
+        document.getElementById('point-intensity').innerHTML = `${active.value} <small>${config.unit}</small>`;
+        document.getElementById('point-radius').innerHTML = `${active.radius} <small>km</small>`;
+        document.getElementById('legend-title').textContent = `${config.title} 예시 강도 · ${config.unit}`;
+        document.getElementById('legend-scale').innerHTML = config.colors.map(color => `<span style="background:${color}"></span>`).join('');
+        document.getElementById('legend-labels').innerHTML = config.labels.map(label => `<span>${label}</span>`).join('');
+        document.getElementById('explain-title').textContent = `${config.title} 읽는 법`;
+        document.getElementById('explain-text').textContent = config.explanation;
+        const picker = document.getElementById('station-picker');
+        picker.querySelectorAll('button').forEach(button => button.remove());
+        points.forEach(point => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = point.name;
+          button.dataset.id = point.id;
+          button.setAttribute('aria-pressed', String(point.id === selected));
+          button.addEventListener('click', () => { selected = point.id; render(); picker.querySelector(`[data-id="${point.id}"]`).focus(); });
+          picker.appendChild(button);
+        });
+      }
+      document.querySelectorAll('.filter').forEach(button => button.addEventListener('click', () => { mode = button.dataset.mode; selected = modes[mode].points[0].id; render(); }));
+      window.addEventListener('resize', () => updateAreaLabels(d3.zoomTransform(svg.node()).k));
+      updateBoundaries();
+      render();
+    })();
+  </script>
+</body>
+</html>
