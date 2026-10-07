@@ -175,6 +175,7 @@ go run ./cmd/etl all          # 격자 → 시설 → 집계 → 더미 위험�
 go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 ```
 - 더미 위험도만 새로: `go run ./cmd/etl dummy-risk`
+- 구급출동 반영: `go run ./cmd/etl ems "<구급출동 CSV 경로>"`
 - 혼잡도 테스트: `go run ./cmd/etl congestion-test` (핫스팟 `data/test/congestion_hotspots.csv`), 해제: `go run ./cmd/etl congestion-test clear`
 - DB 조회용 뷰 `v_cell_risk`: 셀 + 최신 위험도 + 119 주행시간·거리 + geom (`migrations/003_view_cell_risk.sql`). DBeaver 접속: localhost:5433 / jeju / jeju / jeju
 - DB 완전 초기화(스키마 변경 시): `docker compose down -v && docker compose up -d`
@@ -194,6 +195,16 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 테스트 핫스팟: 한라산국립공원(33.3617,126.5292, σ2000m), 서귀포 시내(33.2497,126.5636, σ1800m), 가우시안 감쇠, 0.05 미만 버림 → 217셀
 - `dummy-risk`는 셀별 **최신** 혼잡도를 자동 반영. 실제 수집기가 생기면 `source='live'`로 congestion에 넣기만 하면 됨
 - 지도: 혼잡도는 별도 색 없이 위험 등급 하향으로만 표현 (셀 팝업에 혼잡도 수치만 표시)
+
+## 구급출동 반영 (2026-10-07 추가, 테스트 단계)
+- 원천: 제주특별자치도소방안전본부 구급출동 현황 2021 CSV (사용자 로컬 `~/Downloads/…/구급출동_2021/구급출동_2021.csv`, 58,234행).
+  **환자 정보가 있어 레포·DB에 원본을 넣지 않음.** 사고발생 좌표(`ACDNT_OCRN_LOT/LAT`) → H3 셀·연도별 건수만 `cell_ems_count`에 저장
+- 적재: `go run ./cmd/etl ems "<CSV 경로>"` (같은 연도는 덮어씀, 끝나면 dummy-risk 자동 실행). 2015·2020·교통사고 파일도 같은 형식이면 그대로 가능
+- 2021 결과: 좌표 없음/제주 밖 307, 격자 밖 573(추자도 등), 출동 있는 셀 2,253개, 최다 셀 1,124건, 99백분위 409건
+- 규칙(출동 많으면 위험 ↑): `e = log(1+건수)/log(1+p99)` (0~1), `점수 + 0.4·e·(1−점수)`. 상수 `internal/geo/ems.go`
+- 계산 순서: 주행시간 점수 → 구급출동 상향 → 혼잡도 하향 → 등급
+- `migrations/005_ems_dispatch.sql` (뷰 `v_cell_risk`에 `ems_count` 추가), API `ems_count`, 셀 팝업에 연도별 건수
+- 결과 등급 분포: 1=0, 2=177, 3=1378, 4=999, 5=929
 
 ## 진행 로그
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).

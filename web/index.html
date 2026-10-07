@@ -74,6 +74,7 @@ async function cellPopup(h3) {
     <tr><td>위험도</td><td>${r.score != null ? r.score.toFixed(3) : '-'} (등급 ${r.level ?? '-'} · ${LEVEL_LABELS[r.level] ?? ''})</td></tr>
     <tr><td>출처</td><td>${r.source ?? '-'}</td></tr>
     <tr><td>119 도착</td><td>약 ${fs.nearest_drive_min ?? '-'}분 <span class="muted">(직선 ${fmtDist(fs.nearest_dist_m)})</span></td></tr>
+    <tr><td>구급출동</td><td>${Object.keys(d.ems).length ? Object.entries(d.ems).map(([y, n]) => `${y}년 ${n}건`).join(', ') + ' · 위험도 상향 반영' : '-'}</td></tr>
     <tr><td>혼잡도</td><td>${d.congestion ? d.congestion.value.toFixed(2) + ' (' + d.congestion.source + ') · 위험도 하향 반영' : '-'}</td></tr>
     <tr><td>셀 내 119</td><td>${fs.count_in_cell ?? 0}곳 (인접 포함 ${fs.count_k1 ?? 0}곳)</td></tr>
   </table></div>`;
@@ -118,7 +119,7 @@ async function main() {
       [5, 4, 3, 2, 1].map(l => `<div>${l} · ${LEVEL_LABELS[l]} <span class="muted">${LEVEL_BANDS[l]}</span></div>`).join('') +
       `</div></div>` +
       `<div style="margin-top:6px"><i style="background:#c00;border-radius:50%"></i>119안전센터</div>` +
-      `<div class="muted" style="margin-top:6px">더미: 최근접 119 예상 주행시간<br>(직선거리×1.3 ÷ 40km/h 근사)<br>셀 ${grid.features.length}개 · ${ts ? new Date(ts).toLocaleString('ko-KR') : ''}</div>`;
+      `<div class="muted" style="margin-top:6px">더미: 최근접 119 예상 주행시간<br>(직선거리×1.3 ÷ 40km/h 근사)<br>+ 구급출동 많으면 ↑, 혼잡하면 ↓<br>셀 ${grid.features.length}개 · ${ts ? new Date(ts).toLocaleString('ko-KR') : ''}</div>`;
     return div;
   };
   legend.addTo(map);

@@ -6,6 +6,7 @@
 //	go run ./cmd/etl stats        격자별 시설 집계
 //	go run ./cmd/etl dummy-risk   임의 위험도 (최신 혼잡도가 있으면 반영)
 //	go run ./cmd/etl congestion-test [clear]  테스트 혼잡도 생성(또는 삭제) 후 위험도 재계산
+//	go run ./cmd/etl ems <구급출동 CSV>      셀별 구급출동 건수 적재 후 위험도 재계산
 //	go run ./cmd/etl all          geocode(파일 없을 때만) → grid → facilities → stats → dummy-risk
 package main
 
@@ -31,7 +32,7 @@ const (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "사용법: etl <geocode|grid|facilities|stats|dummy-risk|congestion-test [clear]|all>")
+		fmt.Fprintln(os.Stderr, "사용법: etl <geocode|grid|facilities|stats|dummy-risk|congestion-test [clear]|ems <csv>|all>")
 		os.Exit(2)
 	}
 	ctx := context.Background()
@@ -55,6 +56,11 @@ func main() {
 		must(runStats(ctx, pool))
 	case "dummy-risk":
 		must(runDummyRisk(ctx, pool))
+	case "ems":
+		if len(os.Args) < 3 {
+			log.Fatal("사용법: etl ems <구급출동 CSV 경로>")
+		}
+		must(runEMS(ctx, pool, os.Args[2]))
 	case "congestion-test":
 		must(runCongestionTest(ctx, pool, len(os.Args) > 2 && os.Args[2] == "clear"))
 	case "all":

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"slices"
 	"strconv"
 	"time"
 
@@ -148,28 +149,34 @@ func runStats(ctx context.Context, pool *pgxpool.Pool) error {
 }
 
 // runDummyRisk 는 모델 완성 전까지 쓸 임의 위험도를 넣는다.
-// 점수 = 최근접 119 예상 주행시간을 보간한 값(geo.DriveScore, 0.25~1.0) × 혼잡도 감쇠(geo.AdjustForCongestion).
+// 점수 = 최근접 119 예상 주행시간 보간값(geo.DriveScore, 0.25~1.0)
+//
+//	→ 구급출동 많으면 상향(geo.BoostForEMS) → 혼잡하면 하향(geo.AdjustForCongestion).
+//
 // 등급은 점수에서 계산한다(geo.LevelFromScore). 노이즈 없음, 실행할 때마다 같은 결과.
 func runDummyRisk(ctx context.Context, pool *pgxpool.Pool) error {
 	r, err := pool.Query(ctx, `
-		SELECT c.h3_index, COALESCE(s.nearest_drive_min, 0), COALESCE(g.value, 0)
+		SELECT c.h3_index, COALESCE(s.nearest_drive_min, 0), COALESCE(g.value, 0), COALESCE(e.count, 0)
 		FROM h3_cell c
 		LEFT JOIN cell_facility_stat s ON s.h3_index = c.h3_index AND s.type = $1
 		LEFT JOIN (
 			SELECT DISTINCT ON (h3_index) h3_index, value FROM congestion ORDER BY h3_index, ts DESC
-		) g ON g.h3_index = c.h3_index`, FireStationTyp)
+		) g ON g.h3_index = c.h3_index
+		LEFT JOIN (
+			SELECT h3_index, sum(count) AS count FROM cell_ems_count GROUP BY h3_index
+		) e ON e.h3_index = c.h3_index`, FireStationTyp)
 	if err != nil {
 		return err
 	}
 	type row struct {
-		idx        string
-		min, crowd float64
+		idx             string
+		min, crowd, ems float64
 	}
 	var rows []row
 	maxMin := 0.0
 	for r.Next() {
 		var x row
-		if err := r.Scan(&x.idx, &x.min, &x.crowd); err != nil {
+		if err := r.Scan(&x.idx, &x.min, &x.crowd, &x.ems); err != nil {
 			return err
 		}
 		maxMin = math.Max(maxMin, x.min)
@@ -185,9 +192,23 @@ func runDummyRisk(ctx context.Context, pool *pgxpool.Pool) error {
 	ts := time.Now().UTC().Truncate(time.Second)
 	batch := &pgx.Batch{}
 	batch.Queue(`DELETE FROM risk_score WHERE source = 'dummy'`)
+	// 구급출동 기준건수: 출동이 있는 셀들의 99 백분위
+	var emsCounts []float64
+	for _, x := range rows {
+		if x.ems > 0 {
+			emsCounts = append(emsCounts, x.ems)
+		}
+	}
+	emsRef := 0.0
+	if len(emsCounts) > 0 {
+		slices.Sort(emsCounts)
+		emsRef = emsCounts[int(float64(len(emsCounts)-1)*geo.EMSPercentile)]
+	}
+
 	crowded := 0
 	for _, x := range rows {
-		score := geo.AdjustForCongestion(geo.DriveScore(x.min), x.crowd)
+		score := geo.BoostForEMS(geo.DriveScore(x.min), geo.EMSIntensity(x.ems, emsRef))
+		score = geo.AdjustForCongestion(score, x.crowd)
 		level := geo.LevelFromScore(score)
 		if x.crowd > 0 {
 			crowded++
@@ -198,8 +219,8 @@ func runDummyRisk(ctx context.Context, pool *pgxpool.Pool) error {
 	if err := sendInTx(ctx, pool, batch); err != nil {
 		return fmt.Errorf("dummy-risk 적재: %w", err)
 	}
-	log.Printf("dummy-risk: %d셀, ts=%s, 최대 예상 주행시간 %.1f분, 혼잡도 반영 셀 %d개",
-		len(rows), ts.Format(time.RFC3339), maxMin, crowded)
+	log.Printf("dummy-risk: %d셀, ts=%s, 최대 예상 주행시간 %.1f분, 혼잡도 반영 셀 %d개, 구급출동 반영 셀 %d개(기준 %.0f건)",
+		len(rows), ts.Format(time.RFC3339), maxMin, crowded, len(emsCounts), emsRef)
 	return nil
 }
 
