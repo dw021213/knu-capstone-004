@@ -27,17 +27,13 @@ func CongestionAt(lat, lng float64, spots []Hotspot) float64 {
 	return best
 }
 
-// 혼잡도 반영 규칙: 사람이 많으면(혼잡도 c) 위험도를 낮춘다.
-const (
-	CongestionScoreCut = 0.6 // score × (1 − 0.6·c)
-	CongestionMaxDrop  = 3   // 등급 최대 3단계 하락 (c=1 일 때)
-)
+// CongestionScoreCut: 혼잡도 c 일 때 점수 × (1 − 0.6·c). 사람이 많으면 위험도를 낮춘다.
+// 등급은 깎인 점수에서 다시 계산한다(LevelFromScore).
+const CongestionScoreCut = 0.6
 
-// AdjustForCongestion 은 기본 점수·등급에 혼잡도를 반영한다.
-func AdjustForCongestion(score float64, level int, c float64) (float64, int) {
-	score *= 1 - CongestionScoreCut*c
-	level -= int(math.Round(CongestionMaxDrop * c))
-	return score, max(1, level)
+// AdjustForCongestion 은 점수에 혼잡도를 반영한다.
+func AdjustForCongestion(score, c float64) float64 {
+	return score * (1 - CongestionScoreCut*c)
 }
 
 func haversineM(lat1, lng1, lat2, lng2 float64) float64 {

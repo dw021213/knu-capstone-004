@@ -148,9 +148,8 @@ func runStats(ctx context.Context, pool *pgxpool.Pool) error {
 }
 
 // runDummyRisk 는 모델 완성 전까지 쓸 임의 위험도를 넣는다.
-// 최근접 119 까지 예상 주행시간으로 등급을 매긴다: ≤5분 1, ≤7분 2, ≤10분 3, ≤15분 4, 초과 5.
-// score 는 주행시간 / 최대 주행시간 (0~1). 노이즈 없음, 실행할 때마다 같은 결과.
-// 최신 혼잡도(congestion)가 있으면 사람이 많을수록 위험도를 낮춘다 (geo.AdjustForCongestion).
+// 점수 = 최근접 119 예상 주행시간을 보간한 값(geo.DriveScore, 0.25~1.0) × 혼잡도 감쇠(geo.AdjustForCongestion).
+// 등급은 점수에서 계산한다(geo.LevelFromScore). 노이즈 없음, 실행할 때마다 같은 결과.
 func runDummyRisk(ctx context.Context, pool *pgxpool.Pool) error {
 	r, err := pool.Query(ctx, `
 		SELECT c.h3_index, COALESCE(s.nearest_drive_min, 0), COALESCE(g.value, 0)
@@ -188,7 +187,8 @@ func runDummyRisk(ctx context.Context, pool *pgxpool.Pool) error {
 	batch.Queue(`DELETE FROM risk_score WHERE source = 'dummy'`)
 	crowded := 0
 	for _, x := range rows {
-		score, level := geo.AdjustForCongestion(x.min/maxMin, geo.DriveLevel(x.min), x.crowd)
+		score := geo.AdjustForCongestion(geo.DriveScore(x.min), x.crowd)
+		level := geo.LevelFromScore(score)
 		if x.crowd > 0 {
 			crowded++
 		}

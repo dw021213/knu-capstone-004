@@ -134,12 +134,13 @@ CREATE INDEX ON facility USING GIST (geom);
 - **검증**: `facility` 24행, `count_in_cell` 합계 = 24(격자 밖 시설 제외), `nearest_dist_m` 최대값 ≈ 수 km~10여 km (한라산 정상부)
 
 ### Step 5. 더미 위험도 (`etl dummy-risk`)  ✅
-- [x] **최근접 119 예상 주행시간 기준 등급** (2026-10-07 변경): ≤5분 1, 5~7분 2, 7~10분 3, 10~15분 4, 15분 초과 5
-  - 주행시간 = 직선거리 × 우회계수 1.3 ÷ 40km/h (5분 ≈ 직선 2.56km). 상수·등급 경계는 `internal/geo/drive.go` 한 곳에 있음
-  - `score = 주행시간 / 최대 주행시간`(0~1), 노이즈 없음
-  - `cell_facility_stat.nearest_drive_min` 컬럼 추가 (`migrations/002_drive_time.sql`)
-  - 웹 범례의 구간 표시(`LEVEL_BANDS`)는 drive.go 와 수동으로 맞춰야 함
-- [x] 한 번 실행 = 같은 ts로 전 셀 INSERT (source='dummy')
+- [x] **점수 → 등급 방식** (2026-10-07 최종):
+  - 주행시간 = 직선거리 × 우회계수 1.3 ÷ 40km/h (5분 ≈ 직선 2.56km), `cell_facility_stat.nearest_drive_min` (`migrations/002_drive_time.sql`)
+  - 점수 = 주행시간 구간 보간 `0분 0.25 / 5분 0.40 / 10분 0.60 / 15분 0.80 / 30분+ 1.00` (`geo.DriveScore`)
+  - 혼잡도 c 반영: `점수 × (1 − 0.6·c)` (`geo.AdjustForCongestion`)
+  - 등급 = 점수 0.2 간격 (`geo.LevelFromScore`) → **119 근처도 기본 2등급**, 1등급은 119 근처 + 혼잡일 때만
+  - 지도 색은 등급이 아니라 **점수 그라데이션**(web `COLOR_STOPS`, 각 등급 구간 가운데 0.1/0.3/0.5/0.7/0.9에 기준색)
+  - 상수 위치: `internal/geo/drive.go`, `internal/geo/congestion.go`. 범례 문구(`LEVEL_BANDS`)는 수동으로 맞출 것
 - **검증**: 119에서 먼 곳(한라산 중산간)이 높게 나와야 정상 → 지도에서 매핑 오류 판단 기준
 
 ### Step 6. API (`cmd/server`)  ✅
@@ -183,13 +184,13 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - H3 res8 셀 **3,483개** (경계 걸침 포함, 우도 포함·추자도 없음), 격자 중심 (126.557, 33.382) = 한라산 부근 → 좌표 순서 정상
 - facility 24행, 전부 격자 안, `count_in_cell` 합 24
 - 최대 최근접 119 거리 15.5km (중산간)
-- 더미 위험 등급 분포(주행시간 기준): 1=673, 2=448, 3=618, 4=771, 5=973, 최대 예상 주행시간 30.2분
+- 더미 위험 등급 분포(점수 방식 + 테스트 혼잡도): 1=2, 2=709, 3=1071, 4=813, 5=888
 - API: `/api/grid` 3483 features, bbox(제주시내) 214, `/api/facilities` 24, 잘못된 셀 404, 잘못된 bbox 400
 - 지도: 중산간 붉음 / 119 주변 초록, 셀 클릭 팝업 정상
 
 ## 혼잡도 반영 (2026-10-07 추가, 테스트 단계)
 - 테이블 `congestion(h3_index, ts, value 0~1, source test|live)` — `migrations/004_congestion.sql` (뷰 `v_cell_risk`에 `congestion` 컬럼 추가)
-- 규칙(사람 많으면 위험 ↓): `score × (1 − 0.6·c)`, 등급 `− round(3·c)` (최소 1). 상수는 `internal/geo/congestion.go`
+- 규칙(사람 많으면 위험 ↓): `score × (1 − 0.6·c)` 후 등급을 점수에서 다시 계산. 상수는 `internal/geo/congestion.go`
 - 테스트 핫스팟: 한라산국립공원(33.3617,126.5292, σ2000m), 서귀포 시내(33.2497,126.5636, σ1800m), 가우시안 감쇠, 0.05 미만 버림 → 217셀
 - `dummy-risk`는 셀별 **최신** 혼잡도를 자동 반영. 실제 수집기가 생기면 `source='live'`로 congestion에 넣기만 하면 됨
 - 지도: 혼잡도는 별도 색 없이 위험 등급 하향으로만 표현 (셀 팝업에 혼잡도 수치만 표시)
