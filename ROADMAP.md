@@ -134,14 +134,12 @@ CREATE INDEX ON facility USING GIST (geom);
 - **검증**: `facility` 24행, `count_in_cell` 합계 = 24(격자 밖 시설 제외), `nearest_dist_m` 최대값 ≈ 수 km~10여 km (한라산 정상부)
 
 ### Step 5. 더미 위험도 (`etl dummy-risk`)  ✅
-- [x] **점수 → 등급 방식** (2026-10-07 최종):
-  - 주행시간 = 직선거리 × 우회계수 1.3 ÷ 40km/h (5분 ≈ 직선 2.56km), `cell_facility_stat.nearest_drive_min` (`migrations/002_drive_time.sql`)
-  - 점수 = 주행시간 구간 보간 `0분 0.25 / 5분 0.40 / 10분 0.60 / 15분 0.80 / 30분+ 1.00` (`geo.DriveScore`)
-  - 혼잡도 c 반영: `점수 × (1 − 0.6·c)` (`geo.AdjustForCongestion`)
-  - 등급 = 점수 0.2 간격 (`geo.LevelFromScore`) → **119 근처도 기본 2등급**, 1등급은 119 근처 + 혼잡일 때만
-  - 지도 색은 등급이 아니라 **점수 그라데이션**(web `COLOR_STOPS`, 각 등급 구간 가운데 0.1/0.3/0.5/0.7/0.9에 기준색)
-  - 상수 위치: `internal/geo/drive.go`, `internal/geo/congestion.go`. 범례 문구(`LEVEL_BANDS`)는 수동으로 맞출 것
-- **검증**: 119에서 먼 곳(한라산 중산간)이 높게 나와야 정상 → 지도에서 매핑 오류 판단 기준
+- [x] **점수 → 등급 방식** (2026-10-07 최종, 119 주행시간 기준은 제거됨):
+  - 점수 = 구급출동 기반 `0.25 + 0.75·e` (출동 없으면 0.25 = 2등급, `geo.EMSScore`) → 혼잡도 `× (1 − 0.6·c)` (`geo.AdjustForCongestion`)
+  - 등급 = 점수 0.2 간격 (`geo.LevelFromScore`, `internal/geo/ems.go`). 지도 색은 점수 그라데이션(web `COLOR_STOPS`)
+  - 119 예상 주행시간(`cell_facility_stat.nearest_drive_min`, 직선×1.3÷40km/h)은 **위험도에 안 쓰고 피처로만 보관**, 셀 팝업에 정보로 표시
+  - (이력) 한때 주행시간 구간 보간(0분 0.25 → 30분 1.0)을 기본 점수로 썼으나 사용자 요청으로 제거
+- **검증**: 구급출동 많은 도심(제주시 해안, 서귀포, 모슬포)이 붉고 중산간은 연해야 정상
 
 ### Step 6. API (`cmd/server`)  ✅
 | 메서드 | 경로 | 설명 |
@@ -201,10 +199,10 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   **환자 정보가 있어 레포·DB에 원본을 넣지 않음.** 사고발생 좌표(`ACDNT_OCRN_LOT/LAT`) → H3 셀·연도별 건수만 `cell_ems_count`에 저장
 - 적재: `go run ./cmd/etl ems "<CSV 경로>"` (같은 연도는 덮어씀, 끝나면 dummy-risk 자동 실행). 2015·2020·교통사고 파일도 같은 형식이면 그대로 가능
 - 2021 결과: 좌표 없음/제주 밖 307, 격자 밖 573(추자도 등), 출동 있는 셀 2,253개, 최다 셀 1,124건, 99백분위 409건
-- 규칙(출동 많으면 위험 ↑): `e = log(1+건수)/log(1+p99)` (0~1), `점수 + 0.4·e·(1−점수)`. 상수 `internal/geo/ems.go`
-- 계산 순서: 주행시간 점수 → 구급출동 상향 → 혼잡도 하향 → 등급
+- 규칙(출동 많으면 위험 ↑): `e = log(1+건수)/log(1+p99)` (0~1), `점수 = 0.25 + 0.75·e`. 상수 `internal/geo/ems.go`
+- 계산 순서: 구급출동 점수 → 혼잡도 하향 → 등급
 - `migrations/005_ems_dispatch.sql` (뷰 `v_cell_risk`에 `ems_count` 추가), API `ems_count`, 셀 팝업에 연도별 건수
-- 결과 등급 분포: 1=0, 2=177, 3=1378, 4=999, 5=929
+- 결과 등급 분포(주행시간 제거 후): 1=49, 2=1910, 3=966, 4=435, 5=123
 
 ## 진행 로그
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).
