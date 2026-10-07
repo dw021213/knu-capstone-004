@@ -79,15 +79,34 @@ async function cellPopup(h3) {
   </table></div>`;
 }
 
+// 위험도 격자는 전용 pane 의 캔버스에 그린다. 멀리서 볼 때(줌 ≤ BLUR_MAX_ZOOM)는 이 pane 에만 블러를 걸어
+// 육각형 경계 없이 연속 그라데이션처럼 보이게 하고, 확대하면 블러를 풀고 육각형 테두리를 보여 준다.
+// 블러는 화면 표시만 바꾸며 클릭 판정·데이터에는 영향이 없다.
+const BLUR_MAX_ZOOM = 10;
+map.createPane('risk').style.zIndex = 400;
+const riskRenderer = L.canvas({ pane: 'risk', padding: 0.5 });
+// 119 마커는 블러가 번지지 않게 위쪽의 별도 pane 에 그린다. SVG 라서 마커 밖 클릭은 아래 격자로 전달된다.
+map.createPane('facilities').style.zIndex = 450;
+const facRenderer = L.svg({ pane: 'facilities' });
+
+// 셀 지름(약 0.9km)이 화면에서 몇 px 인지에 비례해 블러 강도를 정한다.
+function blurPx(zoom) {
+  const metersPerPx = 156543.03 * Math.cos(33.4 * Math.PI / 180) / 2 ** zoom;
+  return Math.max(2, Math.min(14, 0.9 * 900 / metersPerPx));
+}
+
 async function main() {
   const [grid, fac] = await Promise.all([
     getJSON('/api/grid'),
     getJSON('/api/facilities?type=fire_station'),
   ]);
 
+  const smooth = () => map.getZoom() <= BLUR_MAX_ZOOM;
   const gridLayer = L.geoJSON(grid, {
+    pane: 'risk',
+    renderer: riskRenderer,
     style: f => ({
-      color: '#555', weight: 0.3,
+      color: '#555', weight: smooth() ? 0 : 0.3,
       fillColor: scoreColor(f.properties.score), fillOpacity: 0.75,
     }),
     onEachFeature: (f, layer) => {
@@ -99,8 +118,16 @@ async function main() {
     },
   }).addTo(map);
 
+  function applyZoomStyle() {
+    map.getPane('risk').style.filter = smooth() ? `blur(${blurPx(map.getZoom()).toFixed(1)}px)` : '';
+    gridLayer.setStyle(f => ({ weight: smooth() ? 0 : 0.3 }));
+  }
+  map.on('zoomend', applyZoomStyle);
+  applyZoomStyle();
+
   const facLayer = L.geoJSON(fac, {
     pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+      pane: 'facilities', renderer: facRenderer,
       radius: 6, color: '#fff', weight: 2, fillColor: '#c00', fillOpacity: 1,
     }),
     onEachFeature: (f, layer) => layer.bindPopup(

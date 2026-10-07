@@ -137,6 +137,7 @@ CREATE INDEX ON facility USING GIST (geom);
 - [x] **점수 → 등급 방식** (2026-10-07 최종, 119 주행시간 기준은 제거됨):
   - 점수 = 구급출동 기반 `0.25 + 0.75·e` (출동 없으면 0.25 = 2등급, `geo.EMSScore`) → 혼잡도 `× (1 − 0.6·c)` (`geo.AdjustForCongestion`)
   - 등급 = 점수 0.2 간격 (`geo.LevelFromScore`, `internal/geo/ems.go`). 지도 색은 점수 그라데이션(web `COLOR_STOPS`)
+  - 지도 표시: 줌 ≤ 10(`BLUR_MAX_ZOOM`)이면 위험도 pane 에 CSS 블러 → 연속 그라데이션, 줌 11+ 은 육각형+테두리. 119 마커는 별도 SVG pane(블러 없음, 격자 클릭 안 막음)
   - 119 예상 주행시간(`cell_facility_stat.nearest_drive_min`, 직선×1.3÷40km/h)은 **위험도에 안 쓰고 피처로만 보관**, 셀 팝업에 정보로 표시
   - (이력) 한때 주행시간 구간 보간(0분 0.25 → 30분 1.0)을 기본 점수로 썼으나 사용자 요청으로 제거
 - **검증**: 구급출동 많은 도심(제주시 해안, 서귀포, 모슬포)이 붉고 중산간은 연해야 정상
