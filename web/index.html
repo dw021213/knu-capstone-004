@@ -52,6 +52,7 @@ async function cellPopup(h3) {
     <tr><td>위험도</td><td>${r.score != null ? r.score.toFixed(3) : '-'} (등급 ${r.level ?? '-'} · ${LEVEL_LABELS[r.level] ?? ''})</td></tr>
     <tr><td>출처</td><td>${r.source ?? '-'}</td></tr>
     <tr><td>119 도착</td><td>약 ${fs.nearest_drive_min ?? '-'}분 <span class="muted">(직선 ${fmtDist(fs.nearest_dist_m)})</span></td></tr>
+    <tr><td>혼잡도</td><td>${d.congestion ? d.congestion.value.toFixed(2) + ' (' + d.congestion.source + ') · 위험도 하향 반영' : '-'}</td></tr>
     <tr><td>셀 내 119</td><td>${fs.count_in_cell ?? 0}곳 (인접 포함 ${fs.count_k1 ?? 0}곳)</td></tr>
   </table></div>`;
 }
@@ -76,6 +77,14 @@ async function main() {
     },
   }).addTo(map);
 
+  // 혼잡도 (0~1): 보라색 진하기. 위험도 격자와 겹치면 읽기 어려워서 기본은 꺼 둠.
+  const crowdLayer = L.geoJSON(
+    { type: 'FeatureCollection', features: grid.features.filter(f => f.properties.congestion > 0) },
+    {
+      interactive: false,
+      style: f => ({ stroke: false, fillColor: '#6a3d9a', fillOpacity: 0.7 * f.properties.congestion }),
+    });
+
   const facLayer = L.geoJSON(fac, {
     pointToLayer: (f, latlng) => L.circleMarker(latlng, {
       radius: 6, color: '#fff', weight: 2, fillColor: '#c00', fillOpacity: 1,
@@ -84,7 +93,7 @@ async function main() {
       `<b>${f.properties.name}</b><br>${f.properties.address}<br><span class="muted">H3 ${f.properties.h3}</span>`),
   }).addTo(map);
 
-  L.control.layers(null, { '위험도 격자 (H3 res8)': gridLayer, '119안전센터': facLayer }, { collapsed: false }).addTo(map);
+  L.control.layers(null, { '위험도 격자 (H3 res8)': gridLayer, '혼잡도 (테스트)': crowdLayer, '119안전센터': facLayer }, { collapsed: false }).addTo(map);
 
   const ts = grid.features.find(f => f.properties.ts)?.properties.ts;
   const legend = L.control({ position: 'bottomright' });

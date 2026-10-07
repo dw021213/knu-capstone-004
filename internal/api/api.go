@@ -32,11 +32,15 @@ func (h *Handler) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-// 셀별 최신 위험도 + 119 최근접 거리·예상 주행시간. $1~$4 가 NULL 이면 전체.
+// 셀별 최신 위험도·혼잡도 + 119 최근접 거리·예상 주행시간. $1~$4 가 NULL 이면 전체.
 const gridSQL = `
 WITH latest AS (
   SELECT DISTINCT ON (h3_index) h3_index, score, level, ts
   FROM risk_score
+  ORDER BY h3_index, ts DESC
+), crowd AS (
+  SELECT DISTINCT ON (h3_index) h3_index, value
+  FROM congestion
   ORDER BY h3_index, ts DESC
 )
 SELECT json_build_object(
@@ -51,12 +55,14 @@ SELECT json_build_object(
       'ts', r.ts,
       'fire_station_dist_m', round(s.nearest_dist_m::numeric),
       'fire_station_drive_min', round(s.nearest_drive_min::numeric, 1),
-      'fire_station_k1', s.count_k1
+      'fire_station_k1', s.count_k1,
+      'congestion', round(g.value::numeric, 2)
     )
   )), '[]'::json)
 )
 FROM h3_cell c
 LEFT JOIN latest r ON r.h3_index = c.h3_index
+LEFT JOIN crowd g ON g.h3_index = c.h3_index
 LEFT JOIN cell_facility_stat s ON s.h3_index = c.h3_index AND s.type = 'fire_station'
 WHERE $1::float8 IS NULL OR c.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)`
 
@@ -105,6 +111,8 @@ SELECT json_build_object(
   'center', json_build_array(ST_X(c.center), ST_Y(c.center)),
   'risk', (SELECT json_build_object('score', score, 'level', level, 'ts', ts, 'source', source)
            FROM risk_score WHERE h3_index = c.h3_index ORDER BY ts DESC LIMIT 1),
+  'congestion', (SELECT json_build_object('value', round(value::numeric, 2), 'ts', ts, 'source', source)
+                 FROM congestion WHERE h3_index = c.h3_index ORDER BY ts DESC LIMIT 1),
   'facilities', (SELECT COALESCE(json_object_agg(type, json_build_object(
                    'count_in_cell', count_in_cell, 'count_k1', count_k1,
                    'nearest_dist_m', round(nearest_dist_m::numeric),

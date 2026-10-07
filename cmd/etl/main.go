@@ -4,7 +4,8 @@
 //	go run ./cmd/etl grid         제주 경계 → H3 res8 격자
 //	go run ./cmd/etl facilities   좌표 CSV → facility
 //	go run ./cmd/etl stats        격자별 시설 집계
-//	go run ./cmd/etl dummy-risk   임의 위험도
+//	go run ./cmd/etl dummy-risk   임의 위험도 (최신 혼잡도가 있으면 반영)
+//	go run ./cmd/etl congestion-test [clear]  테스트 혼잡도 생성(또는 삭제) 후 위험도 재계산
 //	go run ./cmd/etl all          geocode(파일 없을 때만) → grid → facilities → stats → dummy-risk
 package main
 
@@ -30,7 +31,7 @@ const (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "사용법: etl <geocode|grid|facilities|stats|dummy-risk|all>")
+		fmt.Fprintln(os.Stderr, "사용법: etl <geocode|grid|facilities|stats|dummy-risk|congestion-test [clear]|all>")
 		os.Exit(2)
 	}
 	ctx := context.Background()
@@ -54,6 +55,8 @@ func main() {
 		must(runStats(ctx, pool))
 	case "dummy-risk":
 		must(runDummyRisk(ctx, pool))
+	case "congestion-test":
+		must(runCongestionTest(ctx, pool, len(os.Args) > 2 && os.Args[2] == "clear"))
 	case "all":
 		if _, err := os.Stat(GeocodedPath); os.IsNotExist(err) {
 			must(runGeocode(ctx, false))

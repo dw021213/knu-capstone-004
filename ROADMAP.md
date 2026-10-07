@@ -174,6 +174,7 @@ go run ./cmd/etl all          # 격자 → 시설 → 집계 → 더미 위험�
 go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 ```
 - 더미 위험도만 새로: `go run ./cmd/etl dummy-risk`
+- 혼잡도 테스트: `go run ./cmd/etl congestion-test` (핫스팟 `data/test/congestion_hotspots.csv`), 해제: `go run ./cmd/etl congestion-test clear`
 - DB 조회용 뷰 `v_cell_risk`: 셀 + 최신 위험도 + 119 주행시간·거리 + geom (`migrations/003_view_cell_risk.sql`). DBeaver 접속: localhost:5433 / jeju / jeju / jeju
 - DB 완전 초기화(스키마 변경 시): `docker compose down -v && docker compose up -d`
 - Claude 데스크톱 미리보기: `.claude/launch.json`의 `jeju-risk-server`
@@ -185,6 +186,13 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 더미 위험 등급 분포(주행시간 기준): 1=673, 2=448, 3=618, 4=771, 5=973, 최대 예상 주행시간 30.2분
 - API: `/api/grid` 3483 features, bbox(제주시내) 214, `/api/facilities` 24, 잘못된 셀 404, 잘못된 bbox 400
 - 지도: 중산간 붉음 / 119 주변 초록, 셀 클릭 팝업 정상
+
+## 혼잡도 반영 (2026-10-07 추가, 테스트 단계)
+- 테이블 `congestion(h3_index, ts, value 0~1, source test|live)` — `migrations/004_congestion.sql` (뷰 `v_cell_risk`에 `congestion` 컬럼 추가)
+- 규칙(사람 많으면 위험 ↓): `score × (1 − 0.6·c)`, 등급 `− round(3·c)` (최소 1). 상수는 `internal/geo/congestion.go`
+- 테스트 핫스팟: 한라산국립공원(33.3617,126.5292, σ2000m), 서귀포 시내(33.2497,126.5636, σ1800m), 가우시안 감쇠, 0.05 미만 버림 → 217셀
+- `dummy-risk`는 셀별 **최신** 혼잡도를 자동 반영. 실제 수집기가 생기면 `source='live'`로 congestion에 넣기만 하면 됨
+- 지도: "혼잡도 (테스트)" 레이어(보라, 기본 꺼짐), 셀 팝업에 혼잡도 표시
 
 ## 진행 로그
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).

@@ -150,23 +150,27 @@ func runStats(ctx context.Context, pool *pgxpool.Pool) error {
 // runDummyRisk 는 모델 완성 전까지 쓸 임의 위험도를 넣는다.
 // 최근접 119 까지 예상 주행시간으로 등급을 매긴다: ≤5분 1, ≤7분 2, ≤10분 3, ≤15분 4, 초과 5.
 // score 는 주행시간 / 최대 주행시간 (0~1). 노이즈 없음, 실행할 때마다 같은 결과.
+// 최신 혼잡도(congestion)가 있으면 사람이 많을수록 위험도를 낮춘다 (geo.AdjustForCongestion).
 func runDummyRisk(ctx context.Context, pool *pgxpool.Pool) error {
 	r, err := pool.Query(ctx, `
-		SELECT c.h3_index, COALESCE(s.nearest_drive_min, 0)
+		SELECT c.h3_index, COALESCE(s.nearest_drive_min, 0), COALESCE(g.value, 0)
 		FROM h3_cell c
-		LEFT JOIN cell_facility_stat s ON s.h3_index = c.h3_index AND s.type = $1`, FireStationTyp)
+		LEFT JOIN cell_facility_stat s ON s.h3_index = c.h3_index AND s.type = $1
+		LEFT JOIN (
+			SELECT DISTINCT ON (h3_index) h3_index, value FROM congestion ORDER BY h3_index, ts DESC
+		) g ON g.h3_index = c.h3_index`, FireStationTyp)
 	if err != nil {
 		return err
 	}
 	type row struct {
-		idx string
-		min float64
+		idx        string
+		min, crowd float64
 	}
 	var rows []row
 	maxMin := 0.0
 	for r.Next() {
 		var x row
-		if err := r.Scan(&x.idx, &x.min); err != nil {
+		if err := r.Scan(&x.idx, &x.min, &x.crowd); err != nil {
 			return err
 		}
 		maxMin = math.Max(maxMin, x.min)
@@ -182,14 +186,20 @@ func runDummyRisk(ctx context.Context, pool *pgxpool.Pool) error {
 	ts := time.Now().UTC().Truncate(time.Second)
 	batch := &pgx.Batch{}
 	batch.Queue(`DELETE FROM risk_score WHERE source = 'dummy'`)
+	crowded := 0
 	for _, x := range rows {
+		score, level := geo.AdjustForCongestion(x.min/maxMin, geo.DriveLevel(x.min), x.crowd)
+		if x.crowd > 0 {
+			crowded++
+		}
 		batch.Queue(`INSERT INTO risk_score (h3_index, ts, score, level, source)
-			VALUES ($1, $2, $3, $4, 'dummy')`, x.idx, ts, x.min/maxMin, geo.DriveLevel(x.min))
+			VALUES ($1, $2, $3, $4, 'dummy')`, x.idx, ts, score, level)
 	}
 	if err := sendInTx(ctx, pool, batch); err != nil {
 		return fmt.Errorf("dummy-risk 적재: %w", err)
 	}
-	log.Printf("dummy-risk: %d셀, ts=%s, 최대 예상 주행시간 %.1f분", len(rows), ts.Format(time.RFC3339), maxMin)
+	log.Printf("dummy-risk: %d셀, ts=%s, 최대 예상 주행시간 %.1f분, 혼잡도 반영 셀 %d개",
+		len(rows), ts.Format(time.RFC3339), maxMin, crowded)
 	return nil
 }
 
