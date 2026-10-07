@@ -32,7 +32,7 @@ func (h *Handler) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-// 셀별 최신 위험도 + 119 최근접 거리. $1~$4 가 NULL 이면 전체.
+// 셀별 최신 위험도 + 119 최근접 거리·예상 주행시간. $1~$4 가 NULL 이면 전체.
 const gridSQL = `
 WITH latest AS (
   SELECT DISTINCT ON (h3_index) h3_index, score, level, ts
@@ -50,6 +50,7 @@ SELECT json_build_object(
       'level', r.level,
       'ts', r.ts,
       'fire_station_dist_m', round(s.nearest_dist_m::numeric),
+      'fire_station_drive_min', round(s.nearest_drive_min::numeric, 1),
       'fire_station_k1', s.count_k1
     )
   )), '[]'::json)
@@ -106,7 +107,8 @@ SELECT json_build_object(
            FROM risk_score WHERE h3_index = c.h3_index ORDER BY ts DESC LIMIT 1),
   'facilities', (SELECT COALESCE(json_object_agg(type, json_build_object(
                    'count_in_cell', count_in_cell, 'count_k1', count_k1,
-                   'nearest_dist_m', round(nearest_dist_m::numeric))), '{}'::json)
+                   'nearest_dist_m', round(nearest_dist_m::numeric),
+                   'nearest_drive_min', round(nearest_drive_min::numeric, 1))), '{}'::json)
                  FROM cell_facility_stat WHERE h3_index = c.h3_index)
 )
 FROM h3_cell c WHERE c.h3_index = $1`

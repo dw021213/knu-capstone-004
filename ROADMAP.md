@@ -134,7 +134,11 @@ CREATE INDEX ON facility USING GIST (geom);
 - **검증**: `facility` 24행, `count_in_cell` 합계 = 24(격자 밖 시설 제외), `nearest_dist_m` 최대값 ≈ 수 km~10여 km (한라산 정상부)
 
 ### Step 5. 더미 위험도 (`etl dummy-risk`)  ✅
-- [x] `score = nearest_dist / max_dist` (노이즈 없음, 2026-10-07 랜덤 0.3 제거), `level = ceil(score*5)` (최소 1)
+- [x] **최근접 119 예상 주행시간 기준 등급** (2026-10-07 변경): ≤5분 1, 5~7분 2, 7~10분 3, 10~15분 4, 15분 초과 5
+  - 주행시간 = 직선거리 × 우회계수 1.3 ÷ 40km/h (5분 ≈ 직선 2.56km). 상수·등급 경계는 `internal/geo/drive.go` 한 곳에 있음
+  - `score = 주행시간 / 최대 주행시간`(0~1), 노이즈 없음
+  - `cell_facility_stat.nearest_drive_min` 컬럼 추가 (`migrations/002_drive_time.sql`)
+  - 웹 범례의 구간 표시(`LEVEL_BANDS`)는 drive.go 와 수동으로 맞춰야 함
 - [x] 한 번 실행 = 같은 ts로 전 셀 INSERT (source='dummy')
 - **검증**: 119에서 먼 곳(한라산 중산간)이 높게 나와야 정상 → 지도에서 매핑 오류 판단 기준
 
@@ -177,7 +181,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - H3 res8 셀 **3,483개** (경계 걸침 포함, 우도 포함·추자도 없음), 격자 중심 (126.557, 33.382) = 한라산 부근 → 좌표 순서 정상
 - facility 24행, 전부 격자 안, `count_in_cell` 합 24
 - 최대 최근접 119 거리 15.5km (중산간)
-- 더미 위험 등급 분포(노이즈 제거 후): 1=900, 2=1181, 3=807, 4=505, 5=90
+- 더미 위험 등급 분포(주행시간 기준): 1=673, 2=448, 3=618, 4=771, 5=973, 최대 예상 주행시간 30.2분
 - API: `/api/grid` 3483 features, bbox(제주시내) 214, `/api/facilities` 24, 잘못된 셀 404, 잘못된 bbox 400
 - 지도: 중산간 붉음 / 119 주변 초록, 셀 클릭 팝업 정상
 
@@ -186,9 +190,10 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   Nominatim 1건 테스트 성공(제주 중앙로 342 → 33.4911, 126.5368). **다음: Step 0의 docker-compose부터.**
 - 2026-10-07: git 저장소 생성, 첫 커밋. 격자 = Uber H3 육각 격자임을 명시.
 - 2026-10-07: Step 0~7 완료 → **1차 목표 달성**. Nominatim 부정확 문제로 overrides CSV 도입(20곳 검증, 4곳 APPROX).
-  **다음 후보**: APPROX 4곳 좌표 확정 / 다른 시설(CCTV·편의점·경찰서) 데이터 확보 / 실시간 수집기(기상청 API) 설계 / 프론트 담당과 API 형식 합의.
+  **다음 후보**: 주행시간을 실제 도로망(OSRM + OSM 제주 도로)으로 교체 / APPROX 4곳 좌표 확정 / 다른 시설(CCTV·편의점·경찰서) 데이터 확보 / 실시간 수집기(기상청 API) 설계 / 프론트 담당과 API 형식 합의.
 
 ## 이후 확장 메모 (1차 이후)
+- 주행시간 정밀화: OSRM(Docker) + Geofabrik south-korea.osm.pbf(약 200MB)에서 제주만 잘라 셀 중심→최근접 119 실제 주행시간 계산. `geo.DriveMinutes` 호출부만 교체
 - 시설 추가: `facility.type`만 바꿔 `etl facilities` 재사용 (CSV 스키마 통일: type,name,address,lat,lng)
 - 실시간 수집: `internal/collector/` + `robfig/cron/v3`. 기상청 단기예보는 5km 격자(nx,ny) → `h3_cell`에 nx,ny 매핑 컬럼 추가
 - 모델 연동: 모델이 `risk_score`에 `source='model'`로 INSERT만 하면 API/지도는 그대로 동작
