@@ -13,7 +13,7 @@
       box-shadow: 0 1px 4px rgba(0,0,0,.25); font-size: 13px; line-height: 1.5;
     }
     .panel h4 { margin: 0 0 6px; font-size: 14px; }
-    .legend i { display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; border-radius: 2px; }
+    .legend i { display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
     .muted { color: #666; font-size: 12px; }
     .popup table { border-collapse: collapse; }
     .popup td { padding: 1px 6px 1px 0; }
@@ -24,8 +24,8 @@
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// 위험 등급 1~5 (초록 → 빨강)
-const LEVEL_COLORS = { 1: '#1a9850', 2: '#91cf60', 3: '#fee08b', 4: '#fc8d59', 5: '#d73027' };
+// 위험 등급 1~5 (연한 크림 → 노랑 → 주황 → 빨강, 한 계열)
+const LEVEL_COLORS = { 1: '#fffbe5', 2: '#ffeeb3', 3: '#fee08b', 4: '#fc8d59', 5: '#d73027' };
 const LEVEL_LABELS = { 1: '매우 낮음', 2: '낮음', 3: '보통', 4: '높음', 5: '매우 높음' };
 
 const map = L.map('map', { preferCanvas: true }).setView([33.38, 126.55], 10);
@@ -63,7 +63,7 @@ async function main() {
   const gridLayer = L.geoJSON(grid, {
     style: f => ({
       color: '#555', weight: 0.3,
-      fillColor: LEVEL_COLORS[f.properties.level] || '#ccc', fillOpacity: 0.55,
+      fillColor: LEVEL_COLORS[f.properties.level] || '#ccc', fillOpacity: 0.75,
     }),
     onEachFeature: (f, layer) => {
       layer.on('click', async e => {
