@@ -134,7 +134,7 @@ CREATE INDEX ON facility USING GIST (geom);
 - **검증**: `facility` 24행, `count_in_cell` 합계 = 24(격자 밖 시설 제외), `nearest_dist_m` 최대값 ≈ 수 km~10여 km (한라산 정상부)
 
 ### Step 5. 더미 위험도 (`etl dummy-risk`)  ✅
-- [x] `score = 0.7 * (nearest_dist / max_dist) + 0.3 * rand`, `level = ceil(score*5)` (최소 1)
+- [x] `score = nearest_dist / max_dist` (노이즈 없음, 2026-10-07 랜덤 0.3 제거), `level = ceil(score*5)` (최소 1)
 - [x] 한 번 실행 = 같은 ts로 전 셀 INSERT (source='dummy')
 - **검증**: 119에서 먼 곳(한라산 중산간)이 높게 나와야 정상 → 지도에서 매핑 오류 판단 기준
 
@@ -177,7 +177,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - H3 res8 셀 **3,483개** (경계 걸침 포함, 우도 포함·추자도 없음), 격자 중심 (126.557, 33.382) = 한라산 부근 → 좌표 순서 정상
 - facility 24행, 전부 격자 안, `count_in_cell` 합 24
 - 최대 최근접 119 거리 15.5km (중산간)
-- 더미 위험 등급 분포: 1=411, 2=1350, 3=1203, 4=478, 5=41
+- 더미 위험 등급 분포(노이즈 제거 후): 1=900, 2=1181, 3=807, 4=505, 5=90
 - API: `/api/grid` 3483 features, bbox(제주시내) 214, `/api/facilities` 24, 잘못된 셀 404, 잘못된 bbox 400
 - 지도: 중산간 붉음 / 119 주변 초록, 셀 클릭 팝업 정상
 

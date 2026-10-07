@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"math/rand/v2"
 	"strconv"
 	"time"
 
@@ -147,7 +146,8 @@ func runStats(ctx context.Context, pool *pgxpool.Pool) error {
 }
 
 // runDummyRisk 는 모델 완성 전까지 쓸 임의 위험도를 넣는다.
-// 119 에서 멀수록 높게 나오도록 해서, 지도에서 격자·시설 매핑이 맞는지 눈으로 검증할 수 있게 한다.
+// 점수 = 최근접 119 거리 / 최대 거리 (노이즈 없음, 실행할 때마다 같은 결과).
+// 119 에서 멀수록 높게 나오므로 지도에서 격자·시설 매핑이 맞는지 눈으로 검증할 수 있다.
 func runDummyRisk(ctx context.Context, pool *pgxpool.Pool) error {
 	r, err := pool.Query(ctx, `
 		SELECT c.h3_index, COALESCE(s.nearest_dist_m, 0)
@@ -181,7 +181,7 @@ func runDummyRisk(ctx context.Context, pool *pgxpool.Pool) error {
 	batch := &pgx.Batch{}
 	batch.Queue(`DELETE FROM risk_score WHERE source = 'dummy'`)
 	for _, x := range rows {
-		score := 0.7*(x.dist/maxDist) + 0.3*rand.Float64()
+		score := x.dist / maxDist
 		level := int(math.Ceil(score * 5))
 		level = max(1, min(5, level))
 		batch.Queue(`INSERT INTO risk_score (h3_index, ts, score, level, source)
