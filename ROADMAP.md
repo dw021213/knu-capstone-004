@@ -174,6 +174,7 @@ go run ./cmd/etl all          # 격자 → 시설 → 집계 → 더미 위험�
 go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 ```
 - 더미 위험도만 새로: `go run ./cmd/etl dummy-risk`
+- DB 조회용 뷰 `v_cell_risk`: 셀 + 최신 위험도 + 119 주행시간·거리 + geom (`migrations/003_view_cell_risk.sql`). DBeaver 접속: localhost:5433 / jeju / jeju / jeju
 - DB 완전 초기화(스키마 변경 시): `docker compose down -v && docker compose up -d`
 - Claude 데스크톱 미리보기: `.claude/launch.json`의 `jeju-risk-server`
 
