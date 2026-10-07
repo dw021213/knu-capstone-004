@@ -33,9 +33,12 @@
   `PolygonToCellsExperimental(..., ContainmentOverlapping)` 사용. 바다 셀이 일부 포함되는 건 1차 목표에선 허용.
 - **원본 데이터 오류 수정함**: 대정119안전센터 주소 `제주시 대정읍` → `서귀포시 대정읍` (`data/raw/fire_stations_jeju.csv`에 반영).
   연동센터 FAX `046-…`도 오타로 보이나 무관해서 그대로 둠.
-- 주소의 `(노형동)` 같은 괄호는 지오코딩 전에 제거. Nominatim 실패 시 → `"<센터명>"` → `"제주 <도로명>"` 순으로 재시도,
-  그래도 실패면 `lat,lng`를 비워 두고 수동 입력.
-- Nominatim 결과는 건물 단위가 아닐 수 있음(도로 중심 등). 지도에서 눈으로 확인 후 이상한 건 CSV에서 직접 수정.
+- **Nominatim은 제주 도로명주소에 부정확**: "일주서로/일주동로"처럼 섬을 도는 도로는 도로 대표점으로 매칭돼 수 km 틀림
+  (중문·대정이 같은 좌표로 나오고, 안덕은 4km 어긋났음). 그래서 `category=highway` 결과는 거부하고,
+  **검증된 좌표는 `data/raw/geocode_overrides.csv`에 넣어 우선 적용**한다 (출처 컬럼에 Google Plus Code / OSM 노드 기록).
+- **좌표 확인이 필요한 곳 4곳**(overrides의 source가 `APPROX`): 연동, 동홍, 영어교육도시, 한경.
+  카카오맵 등에서 확인 후 overrides CSV 수정 → `go run ./cmd/etl geocode && go run ./cmd/etl all`.
+- 수동 보정 절차: overrides CSV 편집 → `etl geocode` → `etl all`. (processed CSV를 직접 고쳐도 되지만 overrides가 이력이 남아 권장)
 
 ---
 
@@ -99,43 +102,43 @@ CREATE INDEX ON facility USING GIST (geom);
 
 ## 단계별 체크리스트
 
-### Step 0. 환경  ✅ 일부 완료
+### Step 0. 환경  ✅
 - [x] Go 설치 (brew, go1.27.1 darwin/arm64)
 - [x] `go mod init jejurisk`, 의존성 추가 (gin, pgx/v5, h3-go/v4, orb)
 - [x] Docker Desktop 실행 (Server 29.7.2, aarch64)
-- [ ] `docker-compose.yml` 작성 → `docker compose up -d` → `psql`/`docker exec`로 `SELECT postgis_version();` 확인
+- [x] `docker-compose.yml` 작성 → `docker compose up -d` → `psql`/`docker exec`로 `SELECT postgis_version();` 확인
 - [x] `CLAUDE.md`, `.env.example`, `.gitignore` 작성
 - [x] `git init -b main` + 첫 커밋
 
-### Step 1. 원천 데이터  ✅ 일부 완료
+### Step 1. 원천 데이터  ✅
 - [x] `data/raw/fire_stations_jeju.csv` (24곳, 주소만 있음)
 - [x] `data/raw/kostat_provinces.json` (제주 = `code 39`)
-- [ ] `etl geocode` → `data/processed/fire_stations_geocoded.csv`
+- [x] `etl geocode` → `data/processed/fire_stations_geocoded.csv`
   - **검증**: 24곳 모두 lat 33.1~33.6 / lng 126.1~127.0 범위 안, 실패 0건(또는 수동 보정)
 
-### Step 2. 스키마
-- [ ] `migrations/001_init.sql` (위 스키마)
+### Step 2. 스키마  ✅
+- [x] `migrations/001_init.sql` (위 스키마)
 - **검증**: `\dt`에 테이블 4개
 
-### Step 3. 격자 (`etl grid`)
-- [ ] 경계 GeoJSON → `h3.GeoPolygon` (MultiPolygon 파트별) → `PolygonToCellsExperimental(ContainmentOverlapping, res 8)`
-- [ ] 셀 경계/중심 → `pgx.CopyFrom` (또는 batch)로 `h3_cell` 적재, 재실행 시 TRUNCATE 후 적재
+### Step 3. 격자 (`etl grid`)  ✅
+- [x] 경계 GeoJSON → `h3.GeoPolygon` (MultiPolygon 파트별) → `PolygonToCellsExperimental(ContainmentOverlapping, res 8)`
+- [x] 셀 경계/중심 → `pgx.CopyFrom` (또는 batch)로 `h3_cell` 적재, 재실행 시 TRUNCATE 후 적재
 - **검증**: 셀 수 약 2,500~3,500. 극단값이면 좌표 순서부터 의심
 
-### Step 4. 시설 (`etl facilities`, `etl stats`)
-- [ ] geocoded CSV → `facility` UPSERT (type='fire_station'), `h3_index` 채움
-- [ ] `cell_facility_stat` 계산은 SQL로:
+### Step 4. 시설 (`etl facilities`, `etl stats`)  ✅
+- [x] geocoded CSV → `facility` UPSERT (type='fire_station'), `h3_index` 채움
+- [x] `cell_facility_stat` 계산은 SQL로:
   - `count_in_cell`: GROUP BY h3_index
   - `count_k1`: Go에서 `GridDisk(cell,1)` 또는 SQL `ST_DWithin`으로 근사 (택1, Go 쪽 권장)
   - `nearest_dist_m`: `ORDER BY f.geom <-> c.center LIMIT 1` + `ST_Distance(::geography)`
 - **검증**: `facility` 24행, `count_in_cell` 합계 = 24(격자 밖 시설 제외), `nearest_dist_m` 최대값 ≈ 수 km~10여 km (한라산 정상부)
 
-### Step 5. 더미 위험도 (`etl dummy-risk`)
-- [ ] `score = 0.7 * (nearest_dist / max_dist) + 0.3 * rand`, `level = ceil(score*5)` (최소 1)
-- [ ] 한 번 실행 = 같은 ts로 전 셀 INSERT (source='dummy')
+### Step 5. 더미 위험도 (`etl dummy-risk`)  ✅
+- [x] `score = 0.7 * (nearest_dist / max_dist) + 0.3 * rand`, `level = ceil(score*5)` (최소 1)
+- [x] 한 번 실행 = 같은 ts로 전 셀 INSERT (source='dummy')
 - **검증**: 119에서 먼 곳(한라산 중산간)이 높게 나와야 정상 → 지도에서 매핑 오류 판단 기준
 
-### Step 6. API (`cmd/server`)
+### Step 6. API (`cmd/server`)  ✅
 | 메서드 | 경로 | 설명 |
 |---|---|---|
 | GET | `/api/health` | DB ping |
@@ -146,12 +149,12 @@ CREATE INDEX ON facility USING GIST (geom);
 - GeoJSON은 PostGIS `json_build_object` + `ST_AsGeoJSON`로 DB에서 완성 → `ctx.Data(200, "application/geo+json", raw)`
 - **검증**: `curl localhost:8080/api/grid | jq '.features | length'` = 셀 수
 
-### Step 7. 지도 (`web/index.html`)
-- [ ] Leaflet + OSM 타일, 중심 [33.38, 126.55] zoom 10
-- [ ] `/api/grid` → level 1~5 색상(초록→빨강), 투명도 0.5
-- [ ] `/api/facilities` → 마커 + 팝업(센터명, 주소)
-- [ ] 셀 클릭 → 팝업(h3, score, level, 최근접 119 거리)
-- [ ] 범례
+### Step 7. 지도 (`web/index.html`)  ✅
+- [x] Leaflet + OSM 타일, 중심 [33.38, 126.55] zoom 10
+- [x] `/api/grid` → level 1~5 색상(초록→빨강), 투명도 0.5
+- [x] `/api/facilities` → 마커 + 팝업(센터명, 주소)
+- [x] 셀 클릭 → 팝업(h3, score, level, 최근접 119 거리)
+- [x] 범례
 - **검증**: 브라우저(Claude 내장 브라우저)로 열어 육각형이 제주 위에 있는지, 마커가 셀과 맞는지, 중산간이 붉은지 확인
 
 ### 완료 기준 (Definition of Done)
@@ -160,17 +163,30 @@ README 대신 이 파일 하단 "실행 방법"에 명령어 정리.
 
 ---
 
-## 실행 방법 (완성 후 채울 것)
+## 실행 방법
 ```bash
-docker compose up -d
-go run ./cmd/etl all
-go run ./cmd/server
+docker compose up -d          # PostGIS (localhost:5433), 최초 기동 시 migrations/ 자동 적용
+go run ./cmd/etl all          # 격자 → 시설 → 집계 → 더미 위험도 (geocoded CSV 없으면 지오코딩부터)
+go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 ```
+- 더미 위험도만 새로: `go run ./cmd/etl dummy-risk`
+- DB 완전 초기화(스키마 변경 시): `docker compose down -v && docker compose up -d`
+- Claude 데스크톱 미리보기: `.claude/launch.json`의 `jeju-risk-server`
+
+### 검증 결과 (2026-10-07)
+- H3 res8 셀 **3,483개** (경계 걸침 포함, 우도 포함·추자도 없음), 격자 중심 (126.557, 33.382) = 한라산 부근 → 좌표 순서 정상
+- facility 24행, 전부 격자 안, `count_in_cell` 합 24
+- 최대 최근접 119 거리 15.5km (중산간)
+- 더미 위험 등급 분포: 1=411, 2=1350, 3=1203, 4=478, 5=41
+- API: `/api/grid` 3483 features, bbox(제주시내) 214, `/api/facilities` 24, 잘못된 셀 404, 잘못된 bbox 400
+- 지도: 중산간 붉음 / 119 주변 초록, 셀 클릭 팝업 정상
 
 ## 진행 로그
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).
   Nominatim 1건 테스트 성공(제주 중앙로 342 → 33.4911, 126.5368). **다음: Step 0의 docker-compose부터.**
 - 2026-10-07: git 저장소 생성, 첫 커밋. 격자 = Uber H3 육각 격자임을 명시.
+- 2026-10-07: Step 0~7 완료 → **1차 목표 달성**. Nominatim 부정확 문제로 overrides CSV 도입(20곳 검증, 4곳 APPROX).
+  **다음 후보**: APPROX 4곳 좌표 확정 / 다른 시설(CCTV·편의점·경찰서) 데이터 확보 / 실시간 수집기(기상청 API) 설계 / 프론트 담당과 API 형식 합의.
 
 ## 이후 확장 메모 (1차 이후)
 - 시설 추가: `facility.type`만 바꿔 `etl facilities` 재사용 (CSV 스키마 통일: type,name,address,lat,lng)

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>제주 위험도 지도</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    body { font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+    .panel {
+      background: #fff; padding: 10px 12px; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.25); font-size: 13px; line-height: 1.5;
+    }
+    .panel h4 { margin: 0 0 6px; font-size: 14px; }
+    .legend i { display: inline-block; width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; border-radius: 2px; }
+    .muted { color: #666; font-size: 12px; }
+    .popup table { border-collapse: collapse; }
+    .popup td { padding: 1px 6px 1px 0; }
+    .popup td:first-child { color: #666; }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// 위험 등급 1~5 (초록 → 빨강)
+const LEVEL_COLORS = { 1: '#1a9850', 2: '#91cf60', 3: '#fee08b', 4: '#fc8d59', 5: '#d73027' };
+const LEVEL_LABELS = { 1: '매우 낮음', 2: '낮음', 3: '보통', 4: '높음', 5: '매우 높음' };
+
+const map = L.map('map', { preferCanvas: true }).setView([33.38, 126.55], 10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  attribution: '&copy; OpenStreetMap contributors',
+}).addTo(map);
+
+const fmtDist = m => m == null ? '-' : (m >= 1000 ? (m / 1000).toFixed(1) + ' km' : m + ' m');
+
+async function getJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(url + ' → HTTP ' + res.status);
+  return res.json();
+}
+
+async function cellPopup(h3) {
+  const d = await getJSON('/api/cells/' + h3);
+  const fs = d.facilities.fire_station || {};
+  const r = d.risk || {};
+  return `<div class="popup"><b>H3 ${d.h3}</b><table>
+    <tr><td>위험도</td><td>${r.score != null ? r.score.toFixed(3) : '-'} (등급 ${r.level ?? '-'} · ${LEVEL_LABELS[r.level] ?? ''})</td></tr>
+    <tr><td>출처</td><td>${r.source ?? '-'}</td></tr>
+    <tr><td>최근접 119</td><td>${fmtDist(fs.nearest_dist_m)}</td></tr>
+    <tr><td>셀 내 119</td><td>${fs.count_in_cell ?? 0}곳 (인접 포함 ${fs.count_k1 ?? 0}곳)</td></tr>
+  </table></div>`;
+}
+
+async function main() {
+  const [grid, fac] = await Promise.all([
+    getJSON('/api/grid'),
+    getJSON('/api/facilities?type=fire_station'),
+  ]);
+
+  const gridLayer = L.geoJSON(grid, {
+    style: f => ({
+      color: '#555', weight: 0.3,
+      fillColor: LEVEL_COLORS[f.properties.level] || '#ccc', fillOpacity: 0.55,
+    }),
+    onEachFeature: (f, layer) => {
+      layer.on('click', async e => {
+        L.popup().setLatLng(e.latlng).setContent('불러오는 중…').openOn(map);
+        try { L.popup().setLatLng(e.latlng).setContent(await cellPopup(f.properties.h3)).openOn(map); }
+        catch (err) { L.popup().setLatLng(e.latlng).setContent(String(err)).openOn(map); }
+      });
+    },
+  }).addTo(map);
+
+  const facLayer = L.geoJSON(fac, {
+    pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+      radius: 6, color: '#fff', weight: 2, fillColor: '#c00', fillOpacity: 1,
+    }),
+    onEachFeature: (f, layer) => layer.bindPopup(
+      `<b>${f.properties.name}</b><br>${f.properties.address}<br><span class="muted">H3 ${f.properties.h3}</span>`),
+  }).addTo(map);
+
+  L.control.layers(null, { '위험도 격자 (H3 res8)': gridLayer, '119안전센터': facLayer }, { collapsed: false }).addTo(map);
+
+  const ts = grid.features.find(f => f.properties.ts)?.properties.ts;
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = () => {
+    const div = L.DomUtil.create('div', 'panel legend');
+    div.innerHTML = '<h4>위험 등급</h4>' +
+      [5, 4, 3, 2, 1].map(l => `<div><i style="background:${LEVEL_COLORS[l]}"></i>${l} · ${LEVEL_LABELS[l]}</div>`).join('') +
+      `<div style="margin-top:6px"><i style="background:#c00;border-radius:50%"></i>119안전센터</div>` +
+      `<div class="muted" style="margin-top:6px">셀 ${grid.features.length}개 · 더미 위험도<br>${ts ? new Date(ts).toLocaleString('ko-KR') : ''}</div>`;
+    return div;
+  };
+  legend.addTo(map);
+}
+
+main().catch(err => {
+  const div = document.createElement('div');
+  div.className = 'panel';
+  div.style.cssText = 'position:absolute;top:10px;left:50px;z-index:1000;color:#c00';
+  div.textContent = '데이터 로드 실패: ' + err.message + ' (서버와 DB가 떠 있는지 확인)';
+  document.body.appendChild(div);
+});
+</script>
+</body>
+</html>
