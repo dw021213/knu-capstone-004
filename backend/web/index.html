@@ -22,6 +22,9 @@
     .popup td { padding: 1px 6px 1px 0; }
     .popup td:first-child { color: #666; }
     .controls label { display: block; cursor: pointer; }
+    .controls .slot { margin: 6px 0 4px 18px; }
+    .controls select, .controls button { font: inherit; }
+    .controls input[type=range] { width: 160px; vertical-align: middle; }
   </style>
 </head>
 <body>
@@ -67,7 +70,9 @@ async function getJSON(url) {
 }
 
 // 표시 모드: combined = 종합 위험도(도로 교통사고 모델 80% + 고립도 20%), dummy = 백엔드 테스트용 더미
-const state = { mode: 'combined', isolation: true, meta: null };
+const state = { mode: 'combined', isolation: true, meta: null, condition: null, hour: null };
+const slotQuery = () => `?condition=${state.condition}&hour=${state.hour}`;
+const condLabel = k => state.meta?.conditions.find(c => c.key === k)?.label ?? k;
 const NO_DATA_COLOR = '#bdbdbd';
 
 // 셀 색에 쓰는 0~1 값. 종합 위험도는 셀 간 백분위(0~100)를 0~1 로. null 이면 "자료 없음".
@@ -81,8 +86,17 @@ const LEVEL_NAME = l => ({ 5: '매우 높음', 4: '높음', 3: '보통', 2: '낮
 const swatch = v => `<i style="display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-1px;margin-right:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2);background:${v == null ? NO_DATA_COLOR : scoreColor(v)}"></i>`;
 const fmtPop = v => v == null ? '자료 없음 (0명으로 계산)' : `${Math.round(v).toLocaleString('ko-KR')}`;
 
+// 팝업용 0~23시 순위 막대 (현재 시간대 강조)
+function hourlyBars(hourly) {
+  if (!state.isolation || !hourly?.length || hourly[0].percentile == null) return '';
+  const bars = hourly.map(x => `<div title="${x.hour}시 · 백분위 ${x.percentile}" style="flex:1;height:${Math.max(2, x.percentile * 0.32)}px;background:${scoreColor(x.percentile / 100)};outline:${x.hour === state.hour ? '1px solid #333' : 'none'}"></div>`).join('');
+  return `<div class="muted" style="margin-top:6px">시간대별 순위 (${condLabel(state.condition)})</div>
+    <div style="display:flex;align-items:flex-end;gap:1px;height:34px">${bars}</div>
+    <div class="muted" style="display:flex;justify-content:space-between"><span>0시</span><span>12시</span><span>23시</span></div>`;
+}
+
 async function cellPopup(h3) {
-  const d = await getJSON('/api/cells/' + h3);
+  const d = await getJSON('/api/cells/' + h3 + slotQuery());
   const fs = d.facilities.fire_station || {};
   const fireRows = `
     <tr><td>119 도착</td><td>약 ${fs.nearest_drive_min ?? '-'}분 <span class="muted">(직선 ${fmtDist(fs.nearest_dist_m)})</span></td></tr>
@@ -104,9 +118,9 @@ async function cellPopup(h3) {
     return `<div class="popup"><b>H3 ${d.h3}</b><table>
       ${riskRows}
       <tr><td>교통사고(도로)</td><td>${t?.percentile != null ? `백분위 ${t.percentile.toFixed(1)}` : '도로 자료 없음'}</td></tr>
-      <tr><td>유동인구</td><td>${fmtPop(d.population?.value)} <span class="muted">(고립도 ${iso != null ? iso.toFixed(2) : '-'})</span></td></tr>
+      <tr><td>유동인구</td><td>${fmtPop(d.population?.value)} <span class="muted">(${condLabel(state.condition)} ${state.hour}시, 고립도 ${iso != null ? iso.toFixed(2) : '-'})</span></td></tr>
       ${fireRows}
-    </table><div class="muted" style="margin-top:4px">${r.version ?? ''} · 셀 간 상대 순위, 사고 확률 아님<br>유동인구는 2015 도민 분포를 현재로 가정</div></div>`;
+    </table>${hourlyBars(d.hourly)}<div class="muted" style="margin-top:4px">${r.version ?? ''} · 셀 간 상대 순위, 사고 확률 아님<br>유동인구는 2015-01 도민 시간대별 분포를 현재로 가정</div></div>`;
   }
 
   const r = d.dummy || {};
@@ -136,12 +150,14 @@ function blurPx(zoom) {
 }
 
 async function main() {
-  const [grid, fac, meta] = await Promise.all([
-    getJSON('/api/grid'),
-    getJSON('/api/facilities?type=fire_station'),
-    getJSON('/api/risk/meta'),
-  ]);
+  const meta = await getJSON('/api/risk/meta');
   state.meta = meta;
+  state.condition = meta.default_slot.condition;
+  state.hour = meta.default_slot.hour;
+  const [grid, fac] = await Promise.all([
+    getJSON('/api/grid' + slotQuery()),
+    getJSON('/api/facilities?type=fire_station'),
+  ]);
 
   const smooth = () => map.getZoom() <= BLUR_MAX_ZOOM;
   const styleOf = f => {
@@ -198,7 +214,7 @@ async function main() {
         `</div></div>` +
         `<div><i style="background:${NO_DATA_COLOR}"></i>도로 자료 없음</div>` + fire +
         `<div class="muted" style="margin-top:6px">${state.isolation
-          ? `교통사고(도로) 80% + 고립도 20%<br>도로자료 ${traffic?.snapshot_date ?? '-'} · 유동인구 2015 도민(현재로 가정)`
+          ? `교통사고(도로) 80% + 고립도 20% · <b>${condLabel(state.condition)} ${state.hour}시</b><br>도로자료 ${traffic?.snapshot_date ?? '-'} · 유동인구 2015-01 도민 시간대별(현재로 가정)`
           : `교통사고(도로) 100% · 유동인구 끔<br>도로자료 ${traffic?.snapshot_date ?? '-'}`}<br>사고 확률 아님 · ${meta.version}</div>`;
     } else {
       div.innerHTML = '<h4>위험도 (더미)</h4>' + bar +
@@ -215,19 +231,57 @@ async function main() {
     div.innerHTML = `<h4>표시</h4>
       <label><input type="radio" name="mode" value="combined" checked> 종합 위험도</label>
       <label style="margin-left:18px"><input type="checkbox" id="isolation" checked> 유동인구(고립도) 반영</label>
+      <div class="slot" id="slot">
+        <select id="condition">${meta.conditions.map(c => `<option value="${c.key}">${c.label}</option>`).join('')}</select>
+        <button type="button" id="now" title="현재 한국 시각 기준">지금</button><br>
+        <input type="range" id="hour" min="0" max="23" step="1"> <b id="hour-label"></b>
+      </div>
       <label><input type="radio" name="mode" value="dummy"> 더미 (테스트)</label>`;
     L.DomEvent.disableClickPropagation(div);
     return div;
   };
   controls.addTo(map);
   const isoBox = document.getElementById('isolation');
-  const redraw = () => { map.closePopup(); gridLayer.setStyle(styleOf); renderLegend(); };
+  const condSel = document.getElementById('condition');
+  const hourIn = document.getElementById('hour');
+  const hourLabel = document.getElementById('hour-label');
+  const syncSlotUI = () => {
+    condSel.value = state.condition;
+    hourIn.value = state.hour;
+    hourLabel.textContent = `${state.hour}시`;
+    const off = state.mode !== 'combined' || !state.isolation;  // 유동인구를 끄면 시간대가 결과에 영향 없음
+    condSel.disabled = hourIn.disabled = document.getElementById('now').disabled = off;
+  };
+  const redraw = () => { map.closePopup(); gridLayer.setStyle(styleOf); renderLegend(); syncSlotUI(); };
+  // 조건·시간대가 바뀌면 그 슬롯의 격자를 다시 받는다 (요청이 겹치면 마지막 것만 반영)
+  let seq = 0;
+  async function reloadSlot() {
+    const my = ++seq;
+    syncSlotUI();
+    const data = await getJSON('/api/grid' + slotQuery());
+    if (my !== seq) return;
+    map.closePopup();
+    gridLayer.clearLayers();
+    gridLayer.addData(data);
+    applyZoomStyle();
+    renderLegend();
+  }
   document.querySelectorAll('input[name=mode]').forEach(el => el.addEventListener('change', () => {
     state.mode = el.value;
     isoBox.disabled = state.mode !== 'combined';
     redraw();
   }));
   isoBox.addEventListener('change', () => { state.isolation = isoBox.checked; redraw(); });
+  condSel.addEventListener('change', () => { state.condition = condSel.value; reloadSlot(); });
+  hourIn.addEventListener('input', () => { hourLabel.textContent = `${hourIn.value}시`; });
+  hourIn.addEventListener('change', () => { state.hour = +hourIn.value; reloadSlot(); });
+  document.getElementById('now').addEventListener('click', async () => {
+    const m = await getJSON('/api/risk/meta');
+    state.condition = m.default_slot.condition;
+    state.hour = m.default_slot.hour;
+    reloadSlot();
+  });
+  syncSlotUI();
   renderLegend();
 }
 

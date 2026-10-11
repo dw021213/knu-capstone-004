@@ -20,9 +20,12 @@
 | 구성 | 자료 | 비고 |
 |---|---|---|
 | 교통사고 | ML 팀 **도로 전용 CatBoost** (`jeju_h3_r8_road_catboost_20260914_v1`, 도로자료 2026-09-14) | 차로·제한속도·교차로 등 도로 특성 19개 입력. 도로 있는 2,200셀만 점수 있음 |
-| 고립도 | 2015-12 제주도민 250m 격자 유동인구 | 2015 분포를 현재로 가정, 관광객 미포함 |
+| 고립도 | 2015-01 제주도민 250m 격자 **시간대별** 유동인구 (조건 8종 × 0~23시) | 2015 분포를 현재로 가정, 관광객 미포함 |
 
-- **날짜·시간에 따라 바뀌지 않는 고정 점수**다 (도로 자료나 유동인구 자료가 바뀔 때만 갱신).
+- **교통사고(도로) 점수는 고정**이고, **고립도는 조건·시간대에 따라 바뀐다.**
+  - 조건(`condition`): `all` 전체, `weekday` 평일, `holiday` 휴일, `preholiday` 휴일전날, `clear` 맑음, `cloudy` 흐림, `rain` 비, `snow` 눈
+  - 시간대(`hour`): 0~23
+  - 안 주면 **현재 한국 시각** 기준(토·일=휴일, 금=휴일전날, 그 외=평일 / 현재 시). 공휴일·실제 날씨는 아직 자동 반영 안 됨
 - **유동인구 켜기/끄기**: 응답에 두 버전이 다 들어 있다. 다시 호출할 필요 없이 쓰는 필드만 바꾸면 된다.
 
   | 유동인구(고립도) | 색에 쓸 필드 | 등급 |
@@ -38,12 +41,14 @@
 | # | 호출 | 언제 | 필수 |
 |---|---|---|---|
 | ① | `GET /api/risk/meta` | 페이지 처음 열 때 | ✅ |
-| ② | `GET /api/grid` | 처음 지도 그릴 때 | ✅ |
-| ③ | `GET /api/cells/{h3}` | 셀 클릭할 때 | ✅ |
+| ② | `GET /api/grid?condition={조건}&hour={시간}` | 처음 지도 그릴 때, 조건·시간 바꿀 때 | ✅ |
+| ③ | `GET /api/cells/{h3}?condition={조건}&hour={시간}` | 셀 클릭할 때 | ✅ |
 | ④ | `GET /api/facilities?type={시설종류}` | 119 마커 그릴 때 | 선택 |
 
 | 자리 | 형식 | 어디서 얻나 | 예 |
 |---|---|---|---|
+| `{조건}` | 위 8개 중 하나 (생략 가능) | 사용자 선택. 처음엔 ①의 `default_slot.condition` | `weekday` |
+| `{시간}` | 0~23 (생략 가능) | 사용자 선택. 처음엔 ①의 `default_slot.hour` | `21` |
 | `{h3}` | 15자리 문자열 | 클릭한 셀의 `properties.h3` (숫자로 바꾸지 말 것) | `8830d1cf3bfffff` |
 | `{시설종류}` | 문자열 | 현재는 `fire_station`(119안전센터) 하나 | `fire_station` |
 
@@ -74,9 +79,22 @@
   ],
   "hazards_planned": ["traffic", "disaster", "crime"],
   "population": {
-    "source": "2015-12 제주도민 250m 격자 유동인구 (성연령 합계, …)",
-    "assumption": "2015년 제주도민 유동인구 분포를 현재 패턴으로 가정 (관광객 미포함)"
+    "source": "제주도민 250m 격자 시간대별 유동인구",
+    "std_ym": "2015-01",
+    "assumption": "2015년 1월 제주도민 시간대별 유동인구 분포를 현재 패턴으로 가정 (관광객 미포함)"
   },
+  "conditions": [
+    { "key": "all", "label": "전체", "group": "all" },
+    { "key": "weekday", "label": "평일", "group": "day" },
+    { "key": "holiday", "label": "휴일", "group": "day" },
+    { "key": "preholiday", "label": "휴일전날", "group": "day" },
+    { "key": "clear", "label": "맑음", "group": "weather" },
+    { "key": "cloudy", "label": "흐림", "group": "weather" },
+    { "key": "rain", "label": "비", "group": "weather" },
+    { "key": "snow", "label": "눈", "group": "weather" }
+  ],
+  "hours": { "min": 0, "max": 23 },
+  "default_slot": { "condition": "weekday", "hour": 21, "rule": "condition·hour 를 안 주면 현재 한국 시각: …" },
   "levels": [
     { "level": 5, "label": "매우 높음", "min_percentile": 90 },
     { "level": 4, "label": "높음",     "min_percentile": 70 },
@@ -95,20 +113,23 @@
 | 필드 | 쓰는 곳 |
 |---|---|
 | `legend` | 범례 제목 |
+| `conditions`, `hours` | 조건 선택 목록, 시간 슬라이더 범위 |
+| `default_slot` | 처음 보여줄 조건·시간 (현재 한국 시각 기준) |
 | `levels` | 등급 이름·경계 (백분위 기준) |
 | `hazards[].snapshot_date`, `population.assumption` | 범례 아래 출처·가정 표기 |
 | `version` | 화면 하단 버전 표기 |
 
 ---
 
-## ② `GET /api/grid` — 격자 + 위험도
+## ② `GET /api/grid?condition={조건}&hour={시간}` — 격자 + 위험도
 
-처음 지도 그릴 때 한 번 호출. **H3 육각형 3,651개(추자도 포함)의 도형과 위험도**를 GeoJSON FeatureCollection 으로 준다.
+처음 지도 그릴 때, 그리고 조건·시간을 바꿀 때 호출. **H3 육각형 3,651개(추자도 포함)의 도형과 그 조건·시간대의 위험도**를 GeoJSON FeatureCollection 으로 준다.
 
 ```json
 {
   "type": "FeatureCollection",
-  "risk": { "version": "combined_v1", "legend": "제주 셀 간 상대 위험 순위" },
+  "risk": { "version": "combined_v1", "legend": "제주 셀 간 상대 위험 순위",
+            "condition": "weekday", "hour": 21, "auto_slot": false },
   "features": [
     {
       "type": "Feature",
@@ -152,25 +173,29 @@
 | `isolation` | 고립도 0~1 (1 = 가장 한산) | 상세 패널 |
 | `traffic_percentile` | 교통사고(도로) 모델 백분위 0~100 | 상세 패널 |
 | `has_road` | 이 셀에 도로 자료가 있는지 | `false` 면 "도로 자료 없음" |
-| `population` | 2015 도민 유동인구 합 (없으면 null = 0명으로 계산) | 상세 패널 |
+| `population` | 그 조건·시간대 유동인구 합 (없으면 null = 0명으로 계산) | 상세 패널 |
 | `fire_station_*` | 가장 가까운 119 거리(m)·예상 주행시간(분, 근사)·인접 119 수 | 툴팁 참고 정보 |
 | `dummy_score`, `dummy_level`, `ems_count`, `congestion` | 백엔드 테스트용 값 | **사용하지 않음** |
 
 - 육각형은 **시계 방향(CW)** 으로 내려준다. d3-geo 규칙에 맞춘 것이므로 `turf.rewind` 등으로 **뒤집지 말 것**
 - (선택) `?bbox={최소경도},{최소위도},{최대경도},{최대위도}` 로 범위 셀만 받을 수 있다. 지금 규모에선 필요 없음
-- 고정 점수라 한 번 받은 응답은 페이지에서 계속 써도 된다
+- 같은 조건·시간 응답은 항상 같다(2015 패턴 기반). 한 번 받은 슬롯은 캐시해도 된다
+- `risk.auto_slot` 이 true 면 조건·시간을 안 줘서 현재 시각 기준으로 정해졌다는 뜻
 
 ---
 
-## ③ `GET /api/cells/{h3}` — 셀 상세
+## ③ `GET /api/cells/{h3}?condition={조건}&hour={시간}` — 셀 상세
 
-셀을 클릭했을 때 호출. 툴팁·상세 패널용.
+셀을 클릭했을 때 호출. 툴팁·상세 패널용. ②와 같은 조건·시간을 넘긴다.
 
 ```json
 {
   "h3": "8830d1cf3bfffff",
   "center": [126.48847562978672, 33.48915416135943],
   "risk": {
+    "condition": "weekday",
+    "hour": 18,
+    "auto_slot": false,
     "score": 0.7901818,
     "percentile": 96.407455,
     "level": 5,
@@ -192,7 +217,11 @@
       "snapshot_date": "2026-09-14"
     }
   },
-  "population": { "value": 33018.2, "n_250m": 9, "source": "2015-12 제주도민 250m 격자 유동인구 (…)" },
+  "hourly": [
+    { "hour": 0, "percentile": 96.36, "level": 5, "isolation": 0.0, "population": 1601.2 },
+    "… 0~23시 24개 (같은 조건)"
+  ],
+  "population": { "value": 3766.5, "condition": "weekday", "hour": 18, "std_ym": "2015-01", "file": "…_평일_20150131.csv" },
   "facilities": {
     "fire_station": { "count_in_cell": 0, "count_k1": 1, "nearest_dist_m": 840, "nearest_drive_min": 1.6 }
   },
@@ -208,7 +237,8 @@
 | `risk.hazard`, `risk.isolation` | 구성 요소 → "위해도 0.988 × 0.8 + 고립도 0.000 × 0.2" 같은 설명 | 상세 패널 |
 | `risk.hazard_percentile`, `risk.hazard_level` | 유동인구를 끈 순위·등급 | 유동인구 끔일 때 |
 | `hazards.traffic.percentile` | 교통사고(도로) 모델 순위. 재난·범죄가 들어오면 `hazards.disaster`, `hazards.crime` 이 추가됨 | 상세 패널 |
-| `population.value` | 유동인구 (없으면 `population` 자체가 null) | 상세 패널 |
+| `hourly[]` | 같은 조건의 0~23시 순위·등급·유동인구 | 시간대별 그래프 |
+| `population.value` | 그 조건·시간대 유동인구 (없으면 `population` 자체가 null) | 상세 패널 |
 | `facilities.fire_station.*` | 119 정보 | 참고 |
 | `dummy`, `ems`, `congestion` | 백엔드 테스트용 | **사용하지 않음** |
 
@@ -239,6 +269,8 @@
 |---|---|---|
 | 없는 셀 ID | 404 | `{"error":"격자에 없는 셀"}` |
 | bbox 형식 오류 | 400 | `{"error":"bbox=minLng,minLat,maxLng,maxLat"}` |
+| 조건 오류 | 400 | `{"error":"condition 은 all|weekday|holiday|preholiday|clear|cloudy|rain|snow"}` |
+| 시간 오류 | 400 | `{"error":"hour 는 0~23"}` |
 | DB 오류 | 500 | `{"error":"…"}` |
 
 ---
@@ -249,8 +281,8 @@
 2. 범례는 **"제주 셀 간 상대 위험 순위"** (①의 `legend`). **"사고 확률", "안전" 으로 표시하지 않는다.**
    - percentile 90 = 셀들 중 상위 10% 라는 뜻이지 사고 확률 90% 가 아니다.
 3. `risk_percentile` 이 **null 인 셀은 "도로 자료 없음"** (회색 등)으로 표시한다. 0점·안전으로 칠하지 않는다.
-4. **날짜별·실시간 예측으로 설명하지 않는다.** 도로 자료(2026-09-14)와 유동인구 분포 기준의 고정 점수다.
-5. 출처 표기: "교통사고(도로자료 2026-09-14) 80% + 고립도(2015 도민 유동인구, 현재로 가정) 20%"
+4. **실시간 관측으로 설명하지 않는다.** 도로 자료(2026-09-14) + 2015-01 시간대별 유동인구 패턴 기반이다.
+5. 출처 표기: "교통사고(도로자료 2026-09-14) 80% + 고립도(2015-01 도민 시간대별 유동인구, 현재로 가정) 20%"
 
 백엔드 확인용 지도(`http://localhost:8080`)는 다음 색을 쓴다. 맞출 필요는 없지만 참고용.
 
@@ -276,8 +308,9 @@ const API = 'http://localhost:8080';
 const meta = await d3.json(`${API}/api/risk/meta`);
 // 범례 제목 = meta.legend, 등급 = meta.levels
 
-// ② 격자 + 위험도 (한 번)
-const grid = await d3.json(`${API}/api/grid`);
+// ② 격자 + 위험도 (처음은 현재 시각 기준 슬롯)
+let condition = meta.default_slot.condition, hour = meta.default_slot.hour;
+const grid = await d3.json(`${API}/api/grid?condition=${condition}&hour=${hour}`);
 const projection = d3.geoMercator().fitSize([width, height], grid);  // ← 팀원 투영
 const color = teamColorScale;                                        // ← 팀원 색 스케일 (입력: 0~100)
 const NO_DATA = '#bdbdbd';
@@ -301,9 +334,18 @@ paint();
 // 토글: 다시 호출하지 않고 색만 다시 칠한다
 toggle.on('change', e => { usePopulation = e.target.checked; paint(); });
 
+// 조건·시간 변경: 그 슬롯의 격자를 다시 받아 색만 갱신 (도형은 같음)
+async function changeSlot(newCondition, newHour) {
+  condition = newCondition; hour = newHour;
+  const g = await d3.json(`${API}/api/grid?condition=${condition}&hour=${hour}`);
+  const byH3 = new Map(g.features.map(f => [f.properties.h3, f.properties]));
+  cells.each(d => { d.properties = byH3.get(d.properties.h3); });
+  paint();
+}
+
 // ③ 셀 클릭: 상세
 cells.on('click', async (event, d) => {
-  const cell = await d3.json(`${API}/api/cells/${d.properties.h3}`);
+  const cell = await d3.json(`${API}/api/cells/${d.properties.h3}?condition=${condition}&hour=${hour}`);
   if (cell.risk?.percentile == null) {
     // "도로 자료 없음 (안전하다는 뜻 아님)"
   } else {

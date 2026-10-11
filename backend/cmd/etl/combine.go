@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,36 +12,27 @@ import (
 	"jejurisk/internal/risk"
 )
 
-// runCombine 은 위험 모델 점수(hazard_score)와 유동인구(cell_population)로 최종 위험도(risk_combined)를 계산한다.
-// 규칙은 internal/risk 참고. road-risk·population 적재 뒤 자동 실행되고, 단독 실행도 된다.
+// runCombine 은 위험 모델 점수(hazard_score)와 시간대별 유동인구(cell_population_hourly)로
+// 조건 × 시간대마다 최종 위험도(risk_combined)를 계산한다. 규칙은 internal/risk 참고.
+// road-risk·population 적재 뒤 자동 실행되고, 단독 실행도 된다.
 //
 //	go run ./cmd/etl combine
 func runCombine(ctx context.Context, pool *pgxpool.Pool) error {
-	type cell struct {
-		h3   string
-		pop  float64
-		pcts map[string]float64
-	}
-	r, err := pool.Query(ctx, `SELECT c.h3_index, COALESCE(p.population, 0) FROM h3_cell c
-		LEFT JOIN cell_population p ON p.h3_index = c.h3_index ORDER BY c.h3_index`)
+	cells, err := queryStrings(ctx, pool, `SELECT h3_index FROM h3_cell ORDER BY h3_index`)
 	if err != nil {
 		return err
 	}
-	cells, err := pgx.CollectRows(r, func(row pgx.CollectableRow) (cell, error) {
-		c := cell{pcts: map[string]float64{}}
-		return c, row.Scan(&c.h3, &c.pop)
-	})
-	if err != nil {
-		return err
-	}
-	byH3 := make(map[string]*cell, len(cells))
-	pops := make([]float64, len(cells))
-	for i := range cells {
-		byH3[cells[i].h3] = &cells[i]
-		pops[i] = cells[i].pop
+	idx := make(map[string]int, len(cells))
+	for i, h := range cells {
+		idx[h] = i
 	}
 
-	r, err = pool.Query(ctx, `SELECT h3_index, hazard, percentile FROM hazard_score WHERE available AND percentile IS NOT NULL`)
+	// 위해도 (조건·시간 무관)
+	pcts := make([]map[string]float64, len(cells))
+	for i := range pcts {
+		pcts[i] = map[string]float64{}
+	}
+	r, err := pool.Query(ctx, `SELECT h3_index, hazard, percentile FROM hazard_score WHERE available AND percentile IS NOT NULL`)
 	if err != nil {
 		return err
 	}
@@ -51,71 +43,129 @@ func runCombine(ctx context.Context, pool *pgxpool.Pool) error {
 		if err := r.Scan(&h3, &hz, &p); err != nil {
 			return err
 		}
-		if c := byH3[h3]; c != nil {
-			c.pcts[hz] = p
+		if i, ok := idx[h3]; ok {
+			pcts[i][hz] = p
 			nHazard[hz]++
 		}
 	}
 	if err := r.Err(); err != nil {
 		return err
 	}
-
-	// 고립도는 전체 셀 기준 순위 (인구 자료 없는 셀 = 0명 = 가장 한산)
-	iso := risk.Isolation(pops)
-
-	type result struct {
-		hazard, score *float64
-		used          []string
-	}
-	results := make([]result, len(cells))
+	hazard := make([]*float64, len(cells))
+	used := make([][]string, len(cells))
 	var scored []int
-	var scores, hazards []float64
-	for i, c := range cells {
-		h, used, ok := risk.Hazard(c.pcts)
-		results[i].used = used
-		if !ok {
-			continue // 위험 모델 자료 없음 → 최종 위험도 없음 ("자료 없음")
+	var hazardVals []float64
+	for i := range cells {
+		h, u, ok := risk.Hazard(pcts[i])
+		used[i] = u
+		if used[i] == nil {
+			used[i] = []string{}
 		}
-		s := risk.Combine(h, iso[i])
-		results[i].hazard, results[i].score = &h, &s
-		scored = append(scored, i)
-		scores = append(scores, s)
-		hazards = append(hazards, h)
+		if ok {
+			hazard[i] = &h
+			scored = append(scored, i)
+			hazardVals = append(hazardVals, h)
+		}
 	}
-	ranks := risk.PercentRanks(scores)
-	hRanks := risk.PercentRanks(hazards) // 유동인구(고립도)를 끈 경우의 순위
+	// 유동인구를 끈 경우의 순위·등급 (모든 조건·시간대에 같은 값)
+	hPct := make(map[int]float64, len(scored))
+	for k, rk := range risk.PercentRanks(hazardVals) {
+		hPct[scored[k]] = rk * 100
+	}
 
-	batch := &pgx.Batch{}
-	batch.Queue(`TRUNCATE risk_combined`)
-	pctOf := make(map[int]float64, len(scored))
-	hPctOf := make(map[int]float64, len(scored))
-	for k, i := range scored {
-		pctOf[i] = ranks[k] * 100
-		hPctOf[i] = hRanks[k] * 100
+	// 시간대별 유동인구: (조건, 시간) → 셀 순서대로 인구 (없으면 0명)
+	type slot struct {
+		cond string
+		hour int
 	}
+	pops := map[slot][]float64{}
+	for _, c := range risk.Conditions {
+		for h := 0; h < 24; h++ {
+			pops[slot{c.Key, h}] = make([]float64, len(cells))
+		}
+	}
+	r, err = pool.Query(ctx, `SELECT h3_index, condition, hour, population FROM cell_population_hourly`)
+	if err != nil {
+		return err
+	}
+	nPop := 0
+	for r.Next() {
+		var h3, cond string
+		var hour int16
+		var p float64
+		if err := r.Scan(&h3, &cond, &hour, &p); err != nil {
+			return err
+		}
+		if v, ok := pops[slot{cond, int(hour)}]; ok {
+			if i, ok := idx[h3]; ok {
+				v[i] = p
+				nPop++
+			}
+		}
+	}
+	if err := r.Err(); err != nil {
+		return err
+	}
+	if nPop == 0 {
+		log.Printf("combine: 시간대별 유동인구가 없어 고립도를 모두 같은 값으로 계산 (먼저 `etl population`)")
+	}
+
+	now := time.Now()
+	var rows [][]any
 	levels := map[int]int{}
-	for i, c := range cells {
-		res := results[i]
-		var pct, level, hPct, hLevel any
-		if p, ok := pctOf[i]; ok {
-			l := risk.Level(p)
-			pct, level = p, l
-			levels[l]++
-			hPct, hLevel = hPctOf[i], risk.Level(hPctOf[i])
+	for _, c := range risk.Conditions {
+		for h := 0; h < 24; h++ {
+			iso := risk.Isolation(pops[slot{c.Key, h}])
+			scores := make([]float64, len(scored))
+			for k, i := range scored {
+				scores[k] = risk.Combine(*hazard[i], iso[i])
+			}
+			pct := make(map[int]float64, len(scored))
+			for k, rk := range risk.PercentRanks(scores) {
+				pct[scored[k]] = rk * 100
+			}
+			for i, h3 := range cells {
+				var score, p, lvl, hp, hl any
+				if hazard[i] != nil {
+					s := risk.Combine(*hazard[i], iso[i])
+					l := risk.Level(pct[i])
+					score, p, lvl = float32(s), float32(pct[i]), int16(l)
+					hp, hl = float32(hPct[i]), int16(risk.Level(hPct[i]))
+					if c.Key == "all" && h == 12 {
+						levels[l]++
+					}
+				}
+				var hz any
+				if hazard[i] != nil {
+					hz = float32(*hazard[i])
+				}
+				rows = append(rows, []any{h3, c.Key, int16(h), hz, float32(iso[i]), score, p, lvl, hp, hl, used[i], now})
+			}
 		}
-		used := res.used
-		if used == nil {
-			used = []string{}
-		}
-		batch.Queue(`INSERT INTO risk_combined
-			(h3_index, hazard, isolation, score, percentile, level, hazard_percentile, hazard_level, hazards_used)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			c.h3, res.hazard, iso[i], res.score, pct, level, hPct, hLevel, used)
 	}
-	if err := sendInTx(ctx, pool, batch); err != nil {
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `TRUNCATE risk_combined`); err != nil {
+		return err
+	}
+	n, err := tx.CopyFrom(ctx, pgx.Identifier{"risk_combined"},
+		[]string{"h3_index", "condition", "hour", "hazard", "isolation", "score", "percentile", "level",
+			"hazard_percentile", "hazard_level", "hazards_used", "computed_at"},
+		pgx.CopyFromRows(rows))
+	if err != nil {
 		return fmt.Errorf("risk_combined 적재: %w", err)
 	}
-	log.Printf("combine: %s (위해도 %.1f + 고립도 %.1f) 위험 모델 %v → 최종 위험도 %d셀, 자료 없음 %d셀, 등급 분포 %v",
-		risk.Version, risk.WeightHazard, risk.WeightIsolation, nHazard, len(scored), len(cells)-len(scored), levels)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	if _, err := pool.Exec(ctx, `ANALYZE risk_combined`); err != nil {
+		return err
+	}
+	log.Printf("combine: %s (위해도 %.1f + 고립도 %.1f) 위험 모델 %v → %d행 (조건 %d × 24시간 × 셀 %d), 위험도 있는 셀 %d, 등급 분포(전체·12시) %v",
+		risk.Version, risk.WeightHazard, risk.WeightIsolation, nHazard, n, len(risk.Conditions), len(cells), len(scored), levels)
 	return nil
 }

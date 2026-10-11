@@ -39,6 +39,33 @@ func (h *Handler) health(c *gin.Context) {
 
 const riskLegend = "제주 셀 간 상대 위험 순위"
 
+// slotOf 는 ?condition=&hour= 를 읽는다. 없으면 현재 한국 시각 기준(요일 구분, 현재 시간대).
+// 잘못된 값이면 400 을 쓰고 ok=false.
+func slotOf(c *gin.Context) (condition string, hour int, auto bool, ok bool) {
+	condition, hour = risk.DefaultSlot(time.Now())
+	auto = true
+	if v := c.Query("condition"); v != "" {
+		if _, found := risk.ConditionByKey(v); !found {
+			keys := make([]string, 0, len(risk.Conditions))
+			for _, k := range risk.Conditions {
+				keys = append(keys, k.Key)
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": "condition 은 " + strings.Join(keys, "|")})
+			return "", 0, false, false
+		}
+		condition, auto = v, false
+	}
+	if v := c.Query("hour"); v != "" {
+		h, err := strconv.Atoi(v)
+		if err != nil || h < 0 || h > 23 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "hour 는 0~23"})
+			return "", 0, false, false
+		}
+		hour, auto = h, false
+	}
+	return condition, hour, auto, true
+}
+
 // GET /api/risk/meta — 최종 위험도 계산 방식, 들어간 위험 모델, 유동인구 출처, 등급 구간, 제한사항
 func (h *Handler) riskMeta(c *gin.Context) {
 	type hazardInfo struct {
@@ -66,11 +93,12 @@ func (h *Handler) riskMeta(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	var popSource *string
-	if err := h.DB.QueryRow(c, `SELECT source FROM cell_population LIMIT 1`).Scan(&popSource); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	var popStdYM *string
+	if err := h.DB.QueryRow(c, `SELECT min(std_ym) FROM population_source`).Scan(&popStdYM); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	defCond, defHour := risk.DefaultSlot(time.Now())
 	var computedAt *time.Time
 	if err := h.DB.QueryRow(c, `SELECT max(computed_at) FROM risk_combined`).Scan(&computedAt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -84,20 +112,27 @@ func (h *Handler) riskMeta(c *gin.Context) {
 		"version":         risk.Version,
 		"computed_at":     computedAt,
 		"legend":          riskLegend,
-		"formula":         "최종 = 0.8 × 위해도(가용 위험 모델 백분위 평균) + 0.2 × 고립도(1 − 유동인구 백분위)",
+		"formula":         "최종 = 0.8 × 위해도(가용 위험 모델 백분위 평균) + 0.2 × 고립도(1 − 그 조건·시간대 유동인구 백분위)",
 		"weights":         gin.H{"hazard": risk.WeightHazard, "isolation": risk.WeightIsolation},
 		"hazards":         hazards,
 		"hazards_planned": risk.Hazards,
 		"population": gin.H{
-			"source":     popSource,
-			"assumption": "2015년 제주도민 유동인구 분포를 현재 패턴으로 가정 (관광객 미포함)",
+			"source":     "제주도민 250m 격자 시간대별 유동인구",
+			"std_ym":     popStdYM,
+			"assumption": "2015년 1월 제주도민 시간대별 유동인구 분포를 현재 패턴으로 가정 (관광객 미포함)",
+		},
+		"conditions": risk.Conditions,
+		"hours":      gin.H{"min": 0, "max": 23},
+		"default_slot": gin.H{
+			"condition": defCond, "hour": defHour,
+			"rule": "condition·hour 를 안 주면 현재 한국 시각: 토·일=holiday, 금=preholiday, 그 외=weekday (공휴일·날씨 미반영)",
 		},
 		"levels":           levels,
 		"no_data":          "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_* 가 null. 안전으로 표시하지 않는다",
 		"isolation_toggle": "유동인구(고립도) 반영: risk_percentile·risk_level / 끔(위해도만): hazard_percentile·hazard_level",
 		"notes": []string{
 			"risk_percentile 은 셀 간 상대 순위이며 사고 확률이 아니다",
-			"날짜·시간에 따라 바뀌는 예측이 아니라 현재 도로 자료와 유동인구 분포 기준의 고정 점수다",
+			"위해도(도로 모델)는 고정, 고립도만 유동인구 조건·시간대에 따라 바뀐다. 실시간 관측이 아니라 2015-01 패턴이다",
 		},
 	})
 }
@@ -117,7 +152,8 @@ WITH dummy AS (
 )
 SELECT json_build_object(
   'type', 'FeatureCollection',
-  'risk', json_build_object('version', $5::text, 'legend', $6::text),
+  'risk', json_build_object('version', $5::text, 'legend', $6::text,
+                            'condition', $7::text, 'hour', $8::int, 'auto_slot', $9::boolean),
   'features', COALESCE(json_agg(json_build_object(
     'type', 'Feature',
     -- D3(d3-geo)는 바깥 고리가 시계 방향이어야 해서 CW 로 내보낸다. Leaflet 은 방향과 무관.
@@ -145,18 +181,22 @@ SELECT json_build_object(
   )), '[]'::json)
 )
 FROM h3_cell c
-LEFT JOIN risk_combined rc ON rc.h3_index = c.h3_index
+LEFT JOIN risk_combined rc ON rc.h3_index = c.h3_index AND rc.condition = $7 AND rc.hour = $8
 LEFT JOIN hazard_score ht ON ht.h3_index = c.h3_index AND ht.hazard = 'traffic'
-LEFT JOIN cell_population p ON p.h3_index = c.h3_index
+LEFT JOIN cell_population_hourly p ON p.h3_index = c.h3_index AND p.condition = $7 AND p.hour = $8
 LEFT JOIN dummy d ON d.h3_index = c.h3_index
 LEFT JOIN crowd g ON g.h3_index = c.h3_index
 LEFT JOIN ems e ON e.h3_index = c.h3_index
 LEFT JOIN cell_facility_stat s ON s.h3_index = c.h3_index AND s.type = 'fire_station'
 WHERE $1::float8 IS NULL OR c.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)`
 
-// GET /api/grid?bbox=minLng,minLat,maxLng,maxLat
+// GET /api/grid?condition=weekday&hour=21&bbox=minLng,minLat,maxLng,maxLat
 func (h *Handler) grid(c *gin.Context) {
-	args := []any{nil, nil, nil, nil, risk.Version, riskLegend}
+	cond, hour, auto, ok := slotOf(c)
+	if !ok {
+		return
+	}
+	args := []any{nil, nil, nil, nil, risk.Version, riskLegend, cond, hour, auto}
 	if s := c.Query("bbox"); s != "" {
 		parts := strings.Split(s, ",")
 		if len(parts) != 4 {
@@ -198,17 +238,27 @@ SELECT json_build_object(
   'h3', c.h3_index,
   'center', json_build_array(ST_X(c.center), ST_Y(c.center)),
   'risk', (SELECT json_build_object(
+             'condition', condition, 'hour', hour, 'auto_slot', $5::boolean,
              'score', score, 'percentile', percentile, 'level', level,
              'hazard', hazard, 'isolation', isolation, 'hazards_used', hazards_used,
              'hazard_percentile', hazard_percentile, 'hazard_level', hazard_level,
              'version', $2::text, 'computed_at', computed_at)
-           FROM risk_combined WHERE h3_index = c.h3_index),
+           FROM risk_combined WHERE h3_index = c.h3_index AND condition = $3 AND hour = $4),
+  -- 같은 조건의 0~23시 순위 (시간대별 그래프용)
+  'hourly', (SELECT COALESCE(json_agg(json_build_object(
+               'hour', rc.hour, 'percentile', round(rc.percentile::numeric, 2), 'level', rc.level,
+               'isolation', round(rc.isolation::numeric, 4), 'population', round(p.population::numeric, 1)) ORDER BY rc.hour), '[]'::json)
+             FROM risk_combined rc
+             LEFT JOIN cell_population_hourly p USING (h3_index, condition, hour)
+             WHERE rc.h3_index = c.h3_index AND rc.condition = $3),
   'hazards', (SELECT COALESCE(json_object_agg(hs.hazard, json_build_object(
                 'label', hm.label, 'percentile', hs.percentile, 'score', hs.score,
                 'available', hs.available, 'dataset_id', hm.dataset_id, 'snapshot_date', hm.snapshot_date)), '{}'::json)
               FROM hazard_score hs JOIN hazard_meta hm USING (hazard) WHERE hs.h3_index = c.h3_index),
-  'population', (SELECT json_build_object('value', round(population::numeric, 1), 'n_250m', n_250m, 'source', source)
-                 FROM cell_population WHERE h3_index = c.h3_index),
+  'population', (SELECT json_build_object('value', round(p.population::numeric, 1), 'condition', p.condition, 'hour', p.hour,
+                                         'std_ym', ps.std_ym, 'file', ps.file)
+                 FROM cell_population_hourly p JOIN population_source ps USING (condition)
+                 WHERE p.h3_index = c.h3_index AND p.condition = $3 AND p.hour = $4),
   'facilities', (SELECT COALESCE(json_object_agg(type, json_build_object(
                    'count_in_cell', count_in_cell, 'count_k1', count_k1,
                    'nearest_dist_m', round(nearest_dist_m::numeric),
@@ -223,10 +273,14 @@ SELECT json_build_object(
 )
 FROM h3_cell c WHERE c.h3_index = $1`
 
-// GET /api/cells/:h3
+// GET /api/cells/:h3?condition=&hour=
 func (h *Handler) cell(c *gin.Context) {
+	cond, hour, auto, ok := slotOf(c)
+	if !ok {
+		return
+	}
 	var raw []byte
-	err := h.DB.QueryRow(c, cellSQL, c.Param("h3"), risk.Version).Scan(&raw)
+	err := h.DB.QueryRow(c, cellSQL, c.Param("h3"), risk.Version, cond, hour, auto).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "격자에 없는 셀"})
 		return

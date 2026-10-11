@@ -246,6 +246,14 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 지도: "종합 위험도"(기본) / "더미 (테스트)" 모드, 도로 자료 없음 회색, 팝업에 구성(위해도×0.8 + 고립도×0.2)
 - **유동인구 켜기/끄기** (2026-10-12): `risk_combined.hazard_percentile·hazard_level`(위해도만의 순위·등급, `migrations/007_hazard_only_rank.sql`)을 함께 저장.
   API 는 두 버전을 다 내려주고(`risk_*` = 켬, `hazard_*` = 끔) 지도는 "유동인구(고립도) 반영" 체크박스로 전환. 끄면 1,843셀 색 변화, 450셀 등급 변화
+- **시간대별 유동인구** (2026-10-12): 월 단위(2015-12 성연령별) → `~/Downloads/제주특별자치도_시간대별_제주도민_250그리드단위_유동인구현황_20150131`
+  (2015-01, 조건 8종 전체·평일·휴일·휴일전날·맑음·흐림·비·눈 × 0~23시). `etl population <폴더>` → `cell_population_hourly`(53.9만 행),
+  `etl combine` → `risk_combined (h3, condition, hour)` 70만 행(12초). 고립도 순위는 슬롯별, 위해도는 고정. `migrations/008_hourly_population.sql`
+  - API: `/api/grid?condition=&hour=`, `/api/cells/:h3?condition=&hour=`(+ `hourly` 24개), `/api/risk/meta`(conditions·default_slot). 생략 시 현재 한국 시각(토·일 휴일, 금 휴일전날, 그 외 평일)
+  - 지도: 조건 선택 + "지금" + 시간 슬라이더, 팝업에 0~23시 순위 막대
+  - **관찰: 시간대 효과가 작음** — 정오 대비 등급 변경 셀 3시 148 / 0시 112 / 21시 72 / 15시 16 (전체 2,200 중), 조건별(12시) 눈 48·휴일 18·비 8.
+    고립도를 **슬롯마다 상대 순위**로 매기므로 "밤엔 어디나 한산"한 절대 변화가 사라지고, 붐비는 곳 순서는 시간대가 바뀌어도 거의 같기 때문
+    → 밤에 전체적으로 위험해지게 하려면 고립도를 전 슬롯 공통 기준(절대 인구)으로 매기고 등급을 고정 점수 경계로 바꾸는 방식 검토 필요
 - 재난·범죄 모델 추가 방법: `hazard_meta`/`hazard_score` 에 hazard='disaster'|'crime' 로 적재하는 ETL 추가 → `etl combine`. API·지도는 수정 없이 반영(`hazards.*`)
 
 ## 진행 로그
