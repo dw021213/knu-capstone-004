@@ -205,6 +205,11 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - `migrations/005_ems_dispatch.sql` (뷰 `v_cell_risk`에 `ems_count` 추가), API `ems_count`, 셀 팝업에 연도별 건수
 - 결과 등급 분포(주행시간 제거 후): 1=49, 2=1910, 3=966, 4=435, 5=123
 
+## 프론트 연동 (2026-10-11)
+- 팀원 프론트는 D3.js. 연동 가이드: `docs/FRONTEND_API.md` (엔드포인트 스키마, D3 최소 예제, 자주 막히는 곳)
+- CORS: `gin-contrib/cors`, `CORS_ORIGINS`(쉼표 구분) 없으면 모든 origin 허용(개발용)
+- `/api/grid` 폴리곤을 `ST_ForcePolygonCW`로 **시계 방향** 출력 (d3-geo 요구사항. DB 원본은 CCW 그대로)
+
 ## 진행 로그
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).
   Nominatim 1건 테스트 성공(제주 중앙로 342 → 33.4911, 126.5368). **다음: Step 0의 docker-compose부터.**

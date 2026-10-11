@@ -7,7 +7,9 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
 	"jejurisk/internal/api"
@@ -22,6 +24,7 @@ func main() {
 	defer pool.Close()
 
 	r := gin.Default()
+	r.Use(corsMiddleware())
 	(&api.Handler{DB: pool}).Register(r.Group("/api"))
 	r.StaticFile("/", "web/index.html")
 
@@ -33,4 +36,18 @@ func main() {
 	if err := r.Run(addr); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// corsMiddleware 는 다른 주소에서 도는 프론트(D3 등)가 API 를 호출할 수 있게 한다.
+// CORS_ORIGINS="http://localhost:5173,https://team.example.com" 처럼 지정하고, 없으면 개발용으로 모두 허용.
+func corsMiddleware() gin.HandlerFunc {
+	cfg := cors.Config{AllowMethods: []string{"GET", "HEAD", "OPTIONS"}}
+	if v := strings.TrimSpace(os.Getenv("CORS_ORIGINS")); v != "" {
+		for _, o := range strings.Split(v, ",") {
+			cfg.AllowOrigins = append(cfg.AllowOrigins, strings.TrimSpace(o))
+		}
+	} else {
+		cfg.AllowAllOrigins = true
+	}
+	return cors.New(cfg)
 }

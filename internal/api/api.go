@@ -49,7 +49,8 @@ SELECT json_build_object(
   'type', 'FeatureCollection',
   'features', COALESCE(json_agg(json_build_object(
     'type', 'Feature',
-    'geometry', ST_AsGeoJSON(c.geom, 6)::json,
+    -- D3(d3-geo)는 바깥 고리가 시계 방향이어야 해서 CW 로 내보낸다. Leaflet 은 방향과 무관.
+    'geometry', ST_AsGeoJSON(ST_ForcePolygonCW(c.geom), 6)::json,
     'properties', json_build_object(
       'h3', c.h3_index,
       'score', round(r.score::numeric, 3),
