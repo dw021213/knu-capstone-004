@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"slices"
 	"strconv"
 	"time"
@@ -16,17 +17,15 @@ import (
 	"jejurisk/internal/geo"
 )
 
-// runGrid 는 제주 경계를 덮는 H3 res8 셀을 h3_cell 에 다시 채운다.
-// 셀이 바뀌면 집계·위험도도 무효라서 CASCADE 로 함께 비운다.
+// runGrid 는 H3 res8 셀로 h3_cell 을 다시 채운다.
+// 셀 목록은 교통사고 모델과 같은 3,651개(GridCellsPath)를 쓰고, 파일이 없으면 제주 경계를 덮는 셀을 계산한다.
+// 셀이 바뀌면 집계·위험도도 무효라서 CASCADE 로 함께 비운다(이후 facilities·stats·ems 등을 다시 실행).
 func runGrid(ctx context.Context, pool *pgxpool.Pool) error {
-	mp, err := geo.LoadBoundary(BoundaryPath, BoundaryKey, BoundaryValue)
+	cells, src, err := gridCells()
 	if err != nil {
 		return err
 	}
-	cells, err := geo.PolygonToCells(mp, H3Res)
-	if err != nil {
-		return err
-	}
+	log.Printf("grid: 셀 출처 %s", src)
 
 	batch := &pgx.Batch{}
 	batch.Queue(`TRUNCATE h3_cell CASCADE`)
@@ -233,4 +232,28 @@ func queryStrings(ctx context.Context, pool *pgxpool.Pool, sql string) ([]string
 		return nil, err
 	}
 	return pgx.CollectRows(r, pgx.RowTo[string])
+}
+
+func gridCells() ([]h3.Cell, string, error) {
+	rows, err := readCSV(GridCellsPath)
+	if os.IsNotExist(err) {
+		mp, err := geo.LoadBoundary(BoundaryPath, BoundaryKey, BoundaryValue)
+		if err != nil {
+			return nil, "", err
+		}
+		cells, err := geo.PolygonToCells(mp, H3Res)
+		return cells, BoundaryPath + " (경계 polyfill)", err
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	cells := make([]h3.Cell, 0, len(rows))
+	for _, r := range rows {
+		c := h3.Cell(h3.IndexFromString(r["h3"]))
+		if !c.IsValid() || c.Resolution() != H3Res {
+			return nil, "", fmt.Errorf("%s: 잘못된 H3 res%d 셀 %q", GridCellsPath, H3Res, r["h3"])
+		}
+		cells = append(cells, c)
+	}
+	return cells, GridCellsPath, nil
 }
