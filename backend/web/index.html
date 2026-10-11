@@ -76,22 +76,46 @@ const cellValue = p => state.mode === 'model'
   ? (p.model_percentile == null ? null : p.model_percentile / 100)
   : p.score;
 
+// 교통사고 모델 백분위 → 그날 상대 위험 구간 (범례의 상위 10%·30%·중간·하위 30%·10% 와 같은 경계)
+function modelBand(p) {
+  if (p >= 90) return '매우 높음';
+  if (p >= 70) return '높음';
+  if (p >= 30) return '보통';
+  if (p >= 10) return '낮음';
+  return '매우 낮음';
+}
+const swatch = v => `<i style="display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-1px;margin-right:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2);background:${scoreColor(v)}"></i>`;
+
 async function cellPopup(h3) {
-  const q = state.mode === 'model' && state.date ? `?date=${state.date}` : '';
-  const d = await getJSON('/api/cells/' + h3 + q);
+  const isModel = state.mode === 'model';
+  const d = await getJSON('/api/cells/' + h3 + (isModel && state.date ? `?date=${state.date}` : ''));
   const fs = d.facilities.fire_station || {};
-  const r = d.risk || {};
-  const m = d.model;
-  const modelRow = state.mode !== 'model' ? '' : m
-    ? `<tr><td>교통사고 모델</td><td><b>백분위 ${m.percentile.toFixed(1)}</b> (${m.date} ${100 - m.percentile < 0.1 ? '최상위' : `상위 ${(100 - m.percentile).toFixed(1)}%`})<br><span class="muted">${m.version} · 상대 순위, 사고 확률 아님</span></td></tr>`
-    : `<tr><td>교통사고 모델</td><td>데이터 없음</td></tr>`;
-  return `<div class="popup"><b>H3 ${d.h3}</b><table>
-    ${modelRow}
-    <tr><td>더미 위험도</td><td>${r.score != null ? r.score.toFixed(3) : '-'} (등급 ${r.level ?? '-'} · ${LEVEL_LABELS[r.level] ?? ''})</td></tr>
+  const fireRows = `
     <tr><td>119 도착</td><td>약 ${fs.nearest_drive_min ?? '-'}분 <span class="muted">(직선 ${fmtDist(fs.nearest_dist_m)})</span></td></tr>
+    <tr><td>셀 내 119</td><td>${fs.count_in_cell ?? 0}곳 (인접 포함 ${fs.count_k1 ?? 0}곳)</td></tr>`;
+
+  // 교통사고 모델 모드: 모델이 산출한 그날 위험도만 보여 준다(더미 값은 숨김). 색은 지도와 같은 백분위 기준.
+  if (isModel) {
+    const m = d.model;
+    const top = m ? 100 - m.percentile : null;
+    const riskRow = m
+      ? `<tr><td>위험도</td><td>${swatch(m.percentile / 100)}<b>${modelBand(m.percentile)}</b> · ${top < 0.1 ? '최상위' : `상위 ${top.toFixed(1)}%`}</td></tr>
+         <tr><td>백분위</td><td>${m.percentile.toFixed(1)} <span class="muted">(그날 3,651셀 중 순위)</span></td></tr>
+         <tr><td>모델 점수</td><td>${m.score.toFixed(4)} <span class="muted">(날짜 간 비교용 아님)</span></td></tr>`
+      : `<tr><td>위험도</td><td>데이터 없음</td></tr>`;
+    return `<div class="popup"><b>H3 ${d.h3}</b> <span class="muted">${state.date}</span><table>
+      ${riskRow}
+      ${fireRows}
+    </table><div class="muted" style="margin-top:4px">교통사고 모델 ${m?.version ?? ''} · 선택 날짜의 상대 위험 순위, 사고 확률 아님</div></div>`;
+  }
+
+  const r = d.risk || {};
+  return `<div class="popup"><b>H3 ${d.h3}</b><table>
+    <tr><td>위험도</td><td>${r.score != null ? swatch(r.score) + r.score.toFixed(3) : '-'} (등급 ${r.level ?? '-'} · ${LEVEL_LABELS[r.level] ?? ''})</td></tr>
+    <tr><td>출처</td><td>더미(테스트 값)</td></tr>
     <tr><td>구급출동</td><td>${Object.keys(d.ems).length ? Object.entries(d.ems).map(([y, n]) => `${y}년 ${n}건`).join(', ') : '-'}</td></tr>
     <tr><td>혼잡도</td><td>${d.congestion ? d.congestion.value.toFixed(2) + ' (' + d.congestion.source + ')' : '-'}</td></tr>
-    <tr><td>셀 내 119</td><td>${fs.count_in_cell ?? 0}곳 (인접 포함 ${fs.count_k1 ?? 0}곳)</td></tr>
+    ${fireRows}
   </table></div>`;
 }
 
@@ -166,7 +190,7 @@ async function main() {
     const fire = `<div style="margin-top:6px"><i style="background:#c00;border-radius:50%"></i>119안전센터</div>`;
     if (state.mode === 'model') {
       div.innerHTML = `<h4>${meta.legend}</h4>` + bar +
-        ['상위 10%', '상위 30%', '중간', '하위 30%', '하위 10%'].map(t => `<div>${t}</div>`).join('') +
+        ['매우 높음 · 상위 10%', '높음 · 상위 30%', '보통', '낮음 · 하위 30%', '매우 낮음 · 하위 10%'].map(t => `<div>${t}</div>`).join('') +
         `</div></div>` + fire +
         `<div class="muted" style="margin-top:6px">${state.date} · ${meta.version}<br>2011~2021 과거 점수 · 사고 확률 아님<br>같은 순위라도 날짜 간 절대 위험은 다름</div>`;
     } else {
