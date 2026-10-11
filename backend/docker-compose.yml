@@ -1,0 +1,22 @@
+services:
+  db:
+    image: imresamu/postgis:17-3.5
+    container_name: jeju-risk-db
+    environment:
+      POSTGRES_USER: jeju
+      POSTGRES_PASSWORD: jeju
+      POSTGRES_DB: jeju
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 최초 기동(볼륨이 비어 있을 때)에만 실행됨. 스키마 변경 후엔 `docker compose down -v`
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jeju -d jeju"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:
