@@ -21,6 +21,9 @@
     .popup table { border-collapse: collapse; }
     .popup td { padding: 1px 6px 1px 0; }
     .popup td:first-child { color: #666; }
+    .controls label { display: block; cursor: pointer; }
+    .controls input[type=date] { margin-top: 4px; font: inherit; }
+    .controls input[type=date]:disabled { opacity: .4; }
   </style>
 </head>
 <body>
@@ -65,16 +68,29 @@ async function getJSON(url) {
   return res.json();
 }
 
+// 표시 모드: dummy = 더미 위험도(구급출동·혼잡도), model = 교통사고 ML 모델의 선택 날짜 상대 순위
+const state = { mode: 'dummy', date: null, meta: null };
+
+// 셀 색에 쓰는 0~1 값. 모델은 백분위(0~100)를 0~1 로.
+const cellValue = p => state.mode === 'model'
+  ? (p.model_percentile == null ? null : p.model_percentile / 100)
+  : p.score;
+
 async function cellPopup(h3) {
-  const d = await getJSON('/api/cells/' + h3);
+  const q = state.mode === 'model' && state.date ? `?date=${state.date}` : '';
+  const d = await getJSON('/api/cells/' + h3 + q);
   const fs = d.facilities.fire_station || {};
   const r = d.risk || {};
+  const m = d.model;
+  const modelRow = state.mode !== 'model' ? '' : m
+    ? `<tr><td>교통사고 모델</td><td><b>백분위 ${m.percentile.toFixed(1)}</b> (${m.date} ${100 - m.percentile < 0.1 ? '최상위' : `상위 ${(100 - m.percentile).toFixed(1)}%`})<br><span class="muted">${m.version} · 상대 순위, 사고 확률 아님</span></td></tr>`
+    : `<tr><td>교통사고 모델</td><td>데이터 없음</td></tr>`;
   return `<div class="popup"><b>H3 ${d.h3}</b><table>
-    <tr><td>위험도</td><td>${r.score != null ? r.score.toFixed(3) : '-'} (등급 ${r.level ?? '-'} · ${LEVEL_LABELS[r.level] ?? ''})</td></tr>
-    <tr><td>출처</td><td>${r.source ?? '-'}</td></tr>
+    ${modelRow}
+    <tr><td>더미 위험도</td><td>${r.score != null ? r.score.toFixed(3) : '-'} (등급 ${r.level ?? '-'} · ${LEVEL_LABELS[r.level] ?? ''})</td></tr>
     <tr><td>119 도착</td><td>약 ${fs.nearest_drive_min ?? '-'}분 <span class="muted">(직선 ${fmtDist(fs.nearest_dist_m)})</span></td></tr>
-    <tr><td>구급출동</td><td>${Object.keys(d.ems).length ? Object.entries(d.ems).map(([y, n]) => `${y}년 ${n}건`).join(', ') + ' · 위험도 상향 반영' : '-'}</td></tr>
-    <tr><td>혼잡도</td><td>${d.congestion ? d.congestion.value.toFixed(2) + ' (' + d.congestion.source + ') · 위험도 하향 반영' : '-'}</td></tr>
+    <tr><td>구급출동</td><td>${Object.keys(d.ems).length ? Object.entries(d.ems).map(([y, n]) => `${y}년 ${n}건`).join(', ') : '-'}</td></tr>
+    <tr><td>혼잡도</td><td>${d.congestion ? d.congestion.value.toFixed(2) + ' (' + d.congestion.source + ')' : '-'}</td></tr>
     <tr><td>셀 내 119</td><td>${fs.count_in_cell ?? 0}곳 (인접 포함 ${fs.count_k1 ?? 0}곳)</td></tr>
   </table></div>`;
 }
@@ -96,10 +112,13 @@ function blurPx(zoom) {
 }
 
 async function main() {
-  const [grid, fac] = await Promise.all([
+  const [grid, fac, meta] = await Promise.all([
     getJSON('/api/grid'),
     getJSON('/api/facilities?type=fire_station'),
+    fetch('/api/model-risk/meta').then(r => r.ok ? r.json() : null),
   ]);
+  state.meta = meta;
+  state.date = meta?.date_end ?? null;
 
   const smooth = () => map.getZoom() <= BLUR_MAX_ZOOM;
   const gridLayer = L.geoJSON(grid, {
@@ -107,7 +126,7 @@ async function main() {
     renderer: riskRenderer,
     style: f => ({
       color: '#555', weight: smooth() ? 0 : 0.3,
-      fillColor: scoreColor(f.properties.score), fillOpacity: 0.75,
+      fillColor: scoreColor(cellValue(f.properties)), fillOpacity: 0.75,
     }),
     onEachFeature: (f, layer) => {
       layer.on('click', async e => {
@@ -117,6 +136,7 @@ async function main() {
       });
     },
   }).addTo(map);
+  let gridData = grid;
 
   function applyZoomStyle() {
     map.getPane('risk').style.filter = smooth() ? `blur(${blurPx(map.getZoom()).toFixed(1)}px)` : '';
@@ -136,19 +156,68 @@ async function main() {
 
   L.control.layers(null, { '위험도 격자 (H3 res8)': gridLayer, '119안전센터': facLayer }, { collapsed: false }).addTo(map);
 
-  const ts = grid.features.find(f => f.properties.ts)?.properties.ts;
+  // 범례: 모드에 따라 문구가 바뀐다. 모델은 인수인계서 권장 문구("선택 날짜의 상대 위험 순위")를 쓴다.
   const legend = L.control({ position: 'bottomright' });
-  legend.onAdd = () => {
-    const div = L.DomUtil.create('div', 'panel legend');
-    div.innerHTML = '<h4>위험도</h4>' +
-      `<div class="scale"><div class="bar" style="background:${GRADIENT_CSS}"></div><div class="ticks">` +
-      [5, 4, 3, 2, 1].map(l => `<div>${l} · ${LEVEL_LABELS[l]}</div>`).join('') +
-      `</div></div>` +
-      `<div style="margin-top:6px"><i style="background:#c00;border-radius:50%"></i>119안전센터</div>` +
-      `<div class="muted" style="margin-top:6px">더미: 구급출동(2021) 많을수록 ↑<br>혼잡하면 ↓ · 기본 2등급<br>셀 ${grid.features.length}개 · ${ts ? new Date(ts).toLocaleString('ko-KR') : ''}</div>`;
+  legend.onAdd = () => L.DomUtil.create('div', 'panel legend');
+  legend.addTo(map);
+  function renderLegend() {
+    const div = legend.getContainer();
+    const bar = `<div class="scale"><div class="bar" style="background:${GRADIENT_CSS}"></div><div class="ticks">`;
+    const fire = `<div style="margin-top:6px"><i style="background:#c00;border-radius:50%"></i>119안전센터</div>`;
+    if (state.mode === 'model') {
+      div.innerHTML = `<h4>${meta.legend}</h4>` + bar +
+        ['상위 10%', '상위 30%', '중간', '하위 30%', '하위 10%'].map(t => `<div>${t}</div>`).join('') +
+        `</div></div>` + fire +
+        `<div class="muted" style="margin-top:6px">${state.date} · ${meta.version}<br>2011~2021 과거 점수 · 사고 확률 아님<br>같은 순위라도 날짜 간 절대 위험은 다름</div>`;
+    } else {
+      const ts = gridData.features.find(f => f.properties.ts)?.properties.ts;
+      div.innerHTML = '<h4>위험도</h4>' + bar +
+        [5, 4, 3, 2, 1].map(l => `<div>${l} · ${LEVEL_LABELS[l]}</div>`).join('') +
+        `</div></div>` + fire +
+        `<div class="muted" style="margin-top:6px">더미: 구급출동(2021) 많을수록 ↑<br>혼잡하면 ↓ · 기본 2등급<br>셀 ${gridData.features.length}개 · ${ts ? new Date(ts).toLocaleString('ko-KR') : ''}</div>`;
+    }
+  }
+
+  // 모드·날짜 선택
+  const controls = L.control({ position: 'topleft' });
+  controls.onAdd = () => {
+    const div = L.DomUtil.create('div', 'panel controls');
+    div.innerHTML = `<h4>표시</h4>
+      <label><input type="radio" name="mode" value="dummy" checked> 더미 위험도</label>
+      <label><input type="radio" name="mode" value="model" ${meta ? '' : 'disabled'}> 교통사고 모델 (날짜별)</label>
+      <input type="date" id="model-date" ${meta ? `min="${meta.date_start}" max="${meta.date_end}" value="${state.date}"` : ''} disabled>
+      ${meta ? '' : '<div class="muted">모델 점수 미적재</div>'}`;
+    L.DomEvent.disableClickPropagation(div);
     return div;
   };
-  legend.addTo(map);
+  controls.addTo(map);
+  const dateInput = document.getElementById('model-date');
+
+  async function reload() {
+    const q = state.mode === 'model' ? `?date=${state.date}` : '';
+    try {
+      gridData = await getJSON('/api/grid' + q);
+    } catch (err) {
+      alert(`${state.date}: 데이터 없음 (${meta.date_start} ~ ${meta.date_end})`);
+      return;
+    }
+    map.closePopup();
+    gridLayer.clearLayers();
+    gridLayer.addData(gridData);
+    applyZoomStyle();
+    renderLegend();
+  }
+  document.querySelectorAll('input[name=mode]').forEach(el => el.addEventListener('change', () => {
+    state.mode = el.value;
+    dateInput.disabled = state.mode !== 'model';
+    reload();
+  }));
+  dateInput.addEventListener('change', () => {
+    if (!dateInput.value) return;
+    state.date = dateInput.value;
+    reload();
+  });
+  renderLegend();
 }
 
 main().catch(err => {

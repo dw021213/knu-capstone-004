@@ -10,8 +10,8 @@
 
 ## 엔드포인트
 
-### `GET /api/grid` — 위험도 격자 (FeatureCollection, Polygon 3,483개)
-쿼리: `bbox=minLng,minLat,maxLng,maxLat` (생략 시 전체)
+### `GET /api/grid` — 위험도 격자 (FeatureCollection, Polygon 3,651개, 추자도 포함)
+쿼리: `bbox=minLng,minLat,maxLng,maxLat` (생략 시 전체), `date=YYYY-MM-DD` (교통사고 모델 점수 포함, 아래 참고)
 
 ```json
 {
@@ -19,7 +19,7 @@
   "geometry": { "type": "Polygon", "coordinates": [[[126.52, 33.49], ...]] },
   "properties": {
     "h3": "8830d1cf3bfffff",       // H3 res8 셀 ID (다른 API 와 연결 키)
-    "score": 0.579,                // 위험도 0~1 (색은 이걸로)
+    "score": 0.579,                // 더미 위험도 0~1 (구급출동·혼잡도 기반 테스트 값)
     "level": 3,                    // 위험 등급 1~5 (score 0.2 간격)
     "ts": "2026-10-07T12:04:11+00:00",
     "ems_count": 1124,             // 구급출동 건수 (없으면 null)
@@ -31,10 +31,41 @@
 }
 ```
 
+쿼리 `date=YYYY-MM-DD` 를 붙이면 그날 **교통사고 모델 점수**가 properties 에 추가되고, 최상위에 `model` 정보가 붙는다.
+
+```json
+{ "type": "FeatureCollection",
+  "model": { "date": "2021-08-01", "version": "backend_catboost_13_v3", "legend": "선택 날짜의 상대 위험 순위" },
+  "features": [ { "properties": { "...": "...", "model_score": 0.764, "model_percentile": 100.0 } } ] }
+```
+date 없이 호출하면 `model` 과 `model_*` 는 null.
+
+### `GET /api/model-risk/meta` — 교통사고 모델 정보
+```json
+{ "version": "backend_catboost_13_v3", "model_version": "catboost_app13_v3",
+  "date_start": "2011-01-01", "date_end": "2021-12-31", "rows": 14669718, "cells_per_day": 3651,
+  "legend": "선택 날짜의 상대 위험 순위", "score_note": "...", "limitations": ["..."] }
+```
+날짜 선택기의 min/max 와 범례 문구를 여기서 가져온다.
+
+### `GET /api/model-risk?date=YYYY-MM-DD` — 그날 모델 점수만 (경계 없는 가벼운 목록)
+```json
+{ "version": "backend_catboost_13_v3", "date": "2021-08-01", "legend": "선택 날짜의 상대 위험 순위",
+  "cells": [ { "h3": "8830d02011fffff", "score": 0.0081, "percentile": 51.616 }, ... 3,651개 ] }
+```
+경계(geometry)는 처음에 `/api/grid` 로 한 번 받아 두고, 날짜를 바꿀 때는 이것만 받아 `h3` 로 매칭하면 빠르다.
+
+**교통사고 모델 표시 규칙 (ML 담당 인수인계서)**
+- 색은 `percentile`(0~100) 로. `score` 는 날짜 간 비교용이 아님
+- 범례는 **"선택 날짜의 상대 위험 순위"**. "사고 확률"·"안전" 으로 표시하지 않기 (percentile 90 = 그날 상위 10%, 사고 확률 90% 아님)
+- 2011-01-01 ~ 2021-12-31 **과거 점수**. 오늘 날짜를 과거 같은 월·일에 연결해 최신 예측처럼 보여주지 않기
+- 범위 밖 날짜는 **404 `{"error":"데이터 없음","available":{...}}`** — 0점으로 채우지 말고 "데이터 없음" 표시
+
 ### `GET /api/facilities?type=fire_station` — 시설 점 (FeatureCollection, Point)
 properties: `id, type, name, address, h3`
 
-### `GET /api/cells/:h3` — 셀 상세 (클릭 팝업용, 일반 JSON)
+### `GET /api/cells/:h3?date=YYYY-MM-DD` — 셀 상세 (클릭 팝업용, 일반 JSON)
+date 가 있으면 `"model": { "date", "score", "percentile", "version" }` 이 추가된다(없으면 null).
 ```json
 {
   "h3": "8830d1cf3bfffff",

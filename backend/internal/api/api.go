@@ -22,6 +22,8 @@ func (h *Handler) Register(r gin.IRouter) {
 	r.GET("/grid", h.grid)
 	r.GET("/facilities", h.facilities)
 	r.GET("/cells/:h3", h.cell)
+	r.GET("/model-risk", h.modelDay)
+	r.GET("/model-risk/meta", h.modelMeta)
 }
 
 func (h *Handler) health(c *gin.Context) {
@@ -33,6 +35,7 @@ func (h *Handler) health(c *gin.Context) {
 }
 
 // 셀별 최신 위험도·혼잡도·구급출동 건수 + 119 최근접 거리·예상 주행시간. $1~$4 가 NULL 이면 전체.
+// $5(date)가 있으면 그날 교통사고 모델 점수(model_score, model_percentile)를 붙인다.
 const gridSQL = `
 WITH latest AS (
   SELECT DISTINCT ON (h3_index) h3_index, score, level, ts
@@ -47,6 +50,10 @@ WITH latest AS (
 )
 SELECT json_build_object(
   'type', 'FeatureCollection',
+  'model', CASE WHEN $5::date IS NULL THEN NULL ELSE json_build_object(
+    'date', $5::date,
+    'version', (SELECT export_version FROM model_risk_meta LIMIT 1),
+    'legend', '선택 날짜의 상대 위험 순위') END,
   'features', COALESCE(json_agg(json_build_object(
     'type', 'Feature',
     -- D3(d3-geo)는 바깥 고리가 시계 방향이어야 해서 CW 로 내보낸다. Leaflet 은 방향과 무관.
@@ -60,7 +67,9 @@ SELECT json_build_object(
       'fire_station_drive_min', round(s.nearest_drive_min::numeric, 1),
       'fire_station_k1', s.count_k1,
       'congestion', round(g.value::numeric, 2),
-      'ems_count', e.count
+      'ems_count', e.count,
+      'model_score', m.risk_score,
+      'model_percentile', round(m.risk_percentile::numeric, 3)
     )
   )), '[]'::json)
 )
@@ -69,11 +78,19 @@ LEFT JOIN latest r ON r.h3_index = c.h3_index
 LEFT JOIN crowd g ON g.h3_index = c.h3_index
 LEFT JOIN ems e ON e.h3_index = c.h3_index
 LEFT JOIN cell_facility_stat s ON s.h3_index = c.h3_index AND s.type = 'fire_station'
+LEFT JOIN model_risk_daily m ON m.h3_index = c.h3_index AND m.date = $5::date
 WHERE $1::float8 IS NULL OR c.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)`
 
-// GET /api/grid?bbox=minLng,minLat,maxLng,maxLat
+// GET /api/grid?bbox=minLng,minLat,maxLng,maxLat&date=YYYY-MM-DD
 func (h *Handler) grid(c *gin.Context) {
-	var args [4]any
+	d, ok := h.modelDate(c)
+	if !ok {
+		return
+	}
+	var args [5]any
+	if d != nil {
+		args[4] = *d
+	}
 	if s := c.Query("bbox"); s != "" {
 		parts := strings.Split(s, ",")
 		if len(parts) != 4 {
@@ -120,6 +137,10 @@ SELECT json_build_object(
                  FROM congestion WHERE h3_index = c.h3_index ORDER BY ts DESC LIMIT 1),
   'ems', (SELECT COALESCE(json_object_agg(year, count), '{}'::json)
           FROM cell_ems_count WHERE h3_index = c.h3_index),
+  'model', (SELECT json_build_object('date', date, 'score', risk_score,
+                     'percentile', round(risk_percentile::numeric, 3),
+                     'version', (SELECT export_version FROM model_risk_meta LIMIT 1))
+            FROM model_risk_daily WHERE h3_index = c.h3_index AND date = $2::date),
   'facilities', (SELECT COALESCE(json_object_agg(type, json_build_object(
                    'count_in_cell', count_in_cell, 'count_k1', count_k1,
                    'nearest_dist_m', round(nearest_dist_m::numeric),
@@ -128,10 +149,18 @@ SELECT json_build_object(
 )
 FROM h3_cell c WHERE c.h3_index = $1`
 
-// GET /api/cells/:h3
+// GET /api/cells/:h3?date=YYYY-MM-DD (date 가 있으면 그날 모델 점수 포함)
 func (h *Handler) cell(c *gin.Context) {
+	d, ok := h.modelDate(c)
+	if !ok {
+		return
+	}
+	var date any
+	if d != nil {
+		date = *d
+	}
 	var raw []byte
-	err := h.DB.QueryRow(c, cellSQL, c.Param("h3")).Scan(&raw)
+	err := h.DB.QueryRow(c, cellSQL, c.Param("h3"), date).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "격자에 없는 셀"})
 		return

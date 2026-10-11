@@ -216,6 +216,19 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 커밋 작성자 이메일을 `107867881+MinhwanO@users.noreply.github.com` 으로 변경(공개 레포라 gmail 비공개)
 - DB 볼륨 `back_pgdata` → `jeju-risk_pgdata` 로 복사(데이터 유지). `back_pgdata` 는 확인 후 삭제 가능
 
+## 교통사고 ML 모델 연동 (2026-10-11)
+- 받은 자료: `~/Documents/대학교/종프/교통사고ML_최종전달_20261011/01_백엔드/` (레포에 안 넣음, 234MB). 인수인계서 `01_백엔드_인수인계서.md`
+  - 2011-01-01~2021-12-31 **과거 점수**(실시간 아님), 4,018일 × 3,651셀 = 14,669,718행, 버전 `backend_catboost_13_v3`
+  - `risk_score` 는 사고 확률 아님(상대 순위용), `risk_percentile` 0~100 = 그날 순위 → **색은 percentile, 범례 "선택 날짜의 상대 위험 순위"**
+- 격자를 모델과 같은 **3,651셀**로 통일(`data/raw/h3_cells_model_v3.csv`, 추자도 포함). 이전 3,483셀과 3,437셀 겹침
+  - 바꾼 뒤 facilities·stats·ems·congestion-test 재실행 → 구급출동 격자 밖 573→2건, 출동 있는 셀 2,306개
+- 적재: `go run ./cmd/etl model-risk "<…/01_백엔드>"` → `model_risk_daily`(PK date,h3) + `model_risk_meta`(버전·metadata.json 원문)
+  - SHA-256, 총 행 수, 날짜별 3,651행, 중복, h3 연결, 날짜 범위 검증. 실패 시 롤백. 17초, DB +1.4GB, 날짜 1개 조회 ~1ms
+- API: `/api/model-risk/meta`, `/api/model-risk?date=`, `/api/grid?date=`(model_score·model_percentile), `/api/cells/:h3?date=`
+  - 범위 밖 날짜 404 "데이터 없음"(0으로 채우지 않음), 형식 오류 400
+- 지도: 좌상단 "표시" 패널(더미 위험도 / 교통사고 모델 날짜별 + 날짜 선택), 모델 모드 범례·팝업 문구는 인수인계서 권장대로
+- 다음 후보: 모델 점수와 실시간 요소(기상·혼잡도) 결합 방식 팀 합의 / 실시간 예측용 피처 생성(최신 사고 이력 공급 필요)
+
 ## 진행 로그
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).
   Nominatim 1건 테스트 성공(제주 중앙로 342 → 33.4911, 126.5368). **다음: Step 0의 docker-compose부터.**
