@@ -14,11 +14,15 @@ import (
 )
 
 type Handler struct {
-	DB *pgxpool.Pool
+	DB         *pgxpool.Pool
+	Crowd      *CrowdClient
+	Population *PopulationClient
 }
 
 func (h *Handler) Register(r gin.IRouter) {
 	r.GET("/health", h.health)
+	r.GET("/congestion/live", h.liveCongestion)
+	r.GET("/population/live", h.population)
 	r.GET("/grid", h.grid)
 	r.GET("/facilities", h.facilities)
 	r.GET("/cells/:h3", h.cell)

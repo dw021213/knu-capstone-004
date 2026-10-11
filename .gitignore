@@ -1,0 +1,8 @@
+.env
+.env.local
+pipeline/output/
+__pycache__/
+
+# Local ML delivery (large files)
+교통사고ML_최종전달_20261011/
+교통사고ML_최종전달_20261011/

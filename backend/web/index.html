@@ -24,6 +24,9 @@
     .controls label { display: block; cursor: pointer; }
     .controls input[type=date] { margin-top: 4px; font: inherit; }
     .controls input[type=date]:disabled { opacity: .4; }
+    @media (max-width: 650px) {
+      .leaflet-control.legend { margin-bottom: 260px; max-height: 100px; overflow-y: auto; max-width: 180px; }
+    }
   </style>
 </head>
 <body>
@@ -242,6 +245,60 @@ async function main() {
     reload();
   });
   renderLegend();
+
+  const population = L.control({ position: 'bottomleft' });
+  let populationCircle;
+  let populationRevision = 0;
+  population.onAdd = () => {
+    const div = L.DomUtil.create('div', 'panel');
+    div.style.maxWidth = '330px';
+    div.innerHTML = '<h4>주변 실시간 인구 · SKT</h4><div style="margin-bottom:8px">📍 파란 핀을 드래그하거나 지도를 클릭하세요.</div><input id="pop-lng" type="hidden" value="126.7324712"><input id="pop-lat" type="hidden" value="33.4982282"><label>반경(m) <input id="pop-radius" type="number" min="50" max="5000" value="1450" style="width:75px"></label> <button id="pop-load">인구 조회</button><div id="pop-result" style="margin-top:6px">핀 위치의 인구를 조회하세요.</div><div class="muted">모델은 선택한 과거 날짜, 인구는 현재 집계 기준.<br>주변 인구는 산책로 보행자 수와 다를 수 있습니다.</div>';
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.disableScrollPropagation(div);
+    return div;
+  };
+  population.addTo(map);
+  const populationPin = L.marker([33.4982282, 126.7324712], {
+    draggable: true, autoPan: true, title: '인구 조회 위치 · 드래그해서 이동',
+    alt: '인구 조회 위치 핀', zIndexOffset: 1000
+  }).addTo(map);
+  populationPin.bindTooltip('드래그해서 조회 위치 이동', {direction:'top'});
+  populationCircle = L.circle(populationPin.getLatLng(), {radius:1450, color:'#2563eb', fillOpacity:0.06, interactive:false}).addTo(map);
+  function movePopulationPin(latlng) {
+    populationRevision++;
+    populationPin.setLatLng(latlng);
+    populationCircle.setLatLng(latlng);
+    document.getElementById('pop-lng').value = latlng.lng.toFixed(6);
+    document.getElementById('pop-lat').value = latlng.lat.toFixed(6);
+    document.getElementById('pop-result').textContent = '조회 위치 변경됨 · 인구 조회를 눌러주세요.';
+  }
+  map.on('click', e => movePopulationPin(e.latlng));
+  populationPin.on('drag', e => movePopulationPin(e.target.getLatLng()));
+  document.getElementById('pop-radius').addEventListener('input', e => {
+    populationRevision++;
+    const radius = Number(e.target.value);
+    if (Number.isFinite(radius) && radius >= 50 && radius <= 5000) populationCircle.setRadius(radius);
+    document.getElementById('pop-result').textContent = '조회 반경 변경됨 · 인구 조회를 눌러주세요.';
+  });
+  document.getElementById('pop-load').addEventListener('click', async () => {
+    const button = document.getElementById('pop-load');
+    const output = document.getElementById('pop-result');
+    button.disabled = true; output.textContent = '조회 중…';
+    const revision = populationRevision;
+    try {
+      const params = new URLSearchParams({lng: document.getElementById('pop-lng').value, lat: document.getElementById('pop-lat').value, radius: document.getElementById('pop-radius').value});
+      const response = await fetch('/api/population/live?' + params);
+      const data = await response.json();
+      if (revision !== populationRevision) return;
+      if (!response.ok) throw new Error(data.error || '조회 실패');
+      const observed = new Date(data.observed_at);
+      const old = Date.now() - observed.getTime() > 30 * 60 * 1000;
+      const lines = [`반경 ${data.radius_m.toLocaleString()}m · 전체 ${data.total.toLocaleString()}명`, `도민 ${data.residents.toLocaleString()}명 · 관광객 ${data.visitors.toLocaleString()}명`, `집계: ${observed.toLocaleString('ko-KR', {timeZone:'Asia/Seoul'})}${old ? ' · 오래된 집계' : ''}`, data.cached ? '캐시 응답 (최대 5분)' : '플랫폼에서 새로 조회'];
+      output.replaceChildren(...lines.map(text => {const line = document.createElement('div'); line.textContent = text; return line;}));
+      populationCircle.setLatLng([data.lat, data.lng]).setRadius(data.radius_m);
+    } catch(err) {if (revision === populationRevision) output.textContent = '인구 확인 불가: ' + err.message;}
+    finally {button.disabled = false;}
+  });
 }
 
 main().catch(err => {

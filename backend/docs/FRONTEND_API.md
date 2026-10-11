@@ -309,3 +309,20 @@ svg.selectAll('circle.fire').data(fac.features).join('circle')
 
 - `GET /api/health` — 서버·DB 상태 확인 (`{"status":"ok"}`)
 - 응답의 `score`, `level`, `ems_count`, `congestion`, `risk`, `ems` — 백엔드 테스트용 더미 값. 실시간 위험도가 붙으면 이 자리를 대체할 예정
+
+
+## SKT 실시간 혼잡도 (2026-10-11)
+`GET /api/congestion/live?poiId=2769058`: 모델 날짜와 독립적인 현재 장소 혼잡도.
+응답: poiId, poiName, rltm[] (congestion: 명/㎡, congestionLevel: 1~4, datetime: KST YYYYMMDDHHmmss), fetched_at, cached, source, unit.
+키는 서버 SKT_APP_KEY 또는 프로젝트 루트 .env.local에서 읽는다. 기본 장소는 아쿠아플라넷제주(2769058). 다른 지원 장소는 서버 SKT_POI_IDS에 쉼표로 추가한다.
+버튼 클릭 시 조회, 성공 응답은 1시간 캐시. KST 일일 로컬 한도 10회(실패 포함), 디스크에 보관. 다른 프로그램의 동일 키 호출은 집계하지 못하고 다중 서버 한도 관리가 아니다.
+400: 미허용 장소, 429: 한도, 503: 설정/저장 실패, 502: SKT 오류/결측. 오류는 0명으로 바꾸지 않는다.
+지도 좌하단 패널에서 모델 지도와 함께 확인. 90분 이상 오래된 관측은 표시한다. 모델 점수를 조정하거나 H3 전체로 밀도를 확산하지 않는다.
+
+한도는 `SKT_DAILY_LIMIT`로 설정(기본 10). 실제 계정 무료 할당량에 맞춰 설정해야 한다.
+
+
+## 제주 실시간 주변 인구
+`GET /api/population/live?lng=126.7324712&lat=33.4982282&radius=1450`
+반환: lng, lat, radius_m, residents(도민), visitors(관광객), total, observed_at(KST 집계 시각), fetched_at, cached, source, history(원본 시간별 IN_POP/OUT_POP/TIME).
+동일 조건은5분 메모리 캐시. lng126~127.1/lat33~34.2/radius50~5000m 서비스 입력 제한. 400입력 오류/502원천 조회 또는 결측 오류/503미설정. 자동 폴링 없음. 원천은 제주관광빅데이터플랫폼 내부 proxy API, User-Agent 외 로그인/키/쿠키 불필요로 검증. 역사적 모델 점수와 별도로 표시하며 길 위 보행자 수로 해석하지 않는다.
