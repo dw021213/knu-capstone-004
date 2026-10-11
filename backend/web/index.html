@@ -67,12 +67,14 @@ async function getJSON(url) {
 }
 
 // 표시 모드: combined = 종합 위험도(도로 교통사고 모델 80% + 고립도 20%), dummy = 백엔드 테스트용 더미
-const state = { mode: 'combined', meta: null };
+const state = { mode: 'combined', isolation: true, meta: null };
 const NO_DATA_COLOR = '#bdbdbd';
 
 // 셀 색에 쓰는 0~1 값. 종합 위험도는 셀 간 백분위(0~100)를 0~1 로. null 이면 "자료 없음".
+// 유동인구(고립도)를 끄면 위해도만의 순위(hazard_percentile)를 쓴다.
+const combinedPct = p => state.isolation ? p.risk_percentile : p.hazard_percentile;
 const cellValue = p => state.mode === 'combined'
-  ? (p.risk_percentile == null ? null : p.risk_percentile / 100)
+  ? (combinedPct(p) == null ? null : combinedPct(p) / 100)
   : p.dummy_score;
 
 const LEVEL_NAME = l => ({ 5: '매우 높음', 4: '높음', 3: '보통', 2: '낮음', 1: '매우 낮음' })[l] ?? '-';
@@ -90,9 +92,14 @@ async function cellPopup(h3) {
     const r = d.risk || {};
     const t = d.hazards.traffic;
     const iso = r.isolation;
-    const riskRows = r.percentile != null
-      ? `<tr><td>위험도</td><td>${swatch(r.percentile / 100)}<b>${LEVEL_NAME(r.level)}</b> · ${100 - r.percentile < 0.1 ? '최상위' : `상위 ${(100 - r.percentile).toFixed(1)}%`}</td></tr>
-         <tr><td>구성</td><td>위해도 ${r.hazard.toFixed(3)} × 0.8 + 고립도 ${iso.toFixed(3)} × 0.2 = <b>${r.score.toFixed(3)}</b></td></tr>`
+    const pct = state.isolation ? r.percentile : r.hazard_percentile;
+    const lvl = state.isolation ? r.level : r.hazard_level;
+    const formula = state.isolation
+      ? `위해도 ${r.hazard?.toFixed(3)} × 0.8 + 고립도 ${iso?.toFixed(3)} × 0.2 = <b>${r.score?.toFixed(3)}</b>`
+      : `위해도 ${r.hazard?.toFixed(3)} <span class="muted">(유동인구 끔)</span>`;
+    const riskRows = pct != null
+      ? `<tr><td>위험도</td><td>${swatch(pct / 100)}<b>${LEVEL_NAME(lvl)}</b> · ${100 - pct < 0.1 ? '최상위' : `상위 ${(100 - pct).toFixed(1)}%`}</td></tr>
+         <tr><td>구성</td><td>${formula}</td></tr>`
       : `<tr><td>위험도</td><td>${swatch(null)}<b>도로 자료 없음</b> <span class="muted">(안전하다는 뜻 아님)</span></td></tr>`;
     return `<div class="popup"><b>H3 ${d.h3}</b><table>
       ${riskRows}
@@ -190,7 +197,9 @@ async function main() {
         ['매우 높음 · 상위 10%', '높음 · 상위 30%', '보통', '낮음 · 하위 30%', '매우 낮음 · 하위 10%'].map(t => `<div>${t}</div>`).join('') +
         `</div></div>` +
         `<div><i style="background:${NO_DATA_COLOR}"></i>도로 자료 없음</div>` + fire +
-        `<div class="muted" style="margin-top:6px">교통사고(도로) 80% + 고립도 20%<br>도로자료 ${traffic?.snapshot_date ?? '-'} · 유동인구 2015 도민(현재로 가정)<br>사고 확률 아님 · ${meta.version}</div>`;
+        `<div class="muted" style="margin-top:6px">${state.isolation
+          ? `교통사고(도로) 80% + 고립도 20%<br>도로자료 ${traffic?.snapshot_date ?? '-'} · 유동인구 2015 도민(현재로 가정)`
+          : `교통사고(도로) 100% · 유동인구 끔<br>도로자료 ${traffic?.snapshot_date ?? '-'}`}<br>사고 확률 아님 · ${meta.version}</div>`;
     } else {
       div.innerHTML = '<h4>위험도 (더미)</h4>' + bar +
         [5, 4, 3, 2, 1].map(l => `<div>${l} · ${LEVEL_LABELS[l]}</div>`).join('') +
@@ -205,17 +214,20 @@ async function main() {
     const div = L.DomUtil.create('div', 'panel controls');
     div.innerHTML = `<h4>표시</h4>
       <label><input type="radio" name="mode" value="combined" checked> 종합 위험도</label>
+      <label style="margin-left:18px"><input type="checkbox" id="isolation" checked> 유동인구(고립도) 반영</label>
       <label><input type="radio" name="mode" value="dummy"> 더미 (테스트)</label>`;
     L.DomEvent.disableClickPropagation(div);
     return div;
   };
   controls.addTo(map);
+  const isoBox = document.getElementById('isolation');
+  const redraw = () => { map.closePopup(); gridLayer.setStyle(styleOf); renderLegend(); };
   document.querySelectorAll('input[name=mode]').forEach(el => el.addEventListener('change', () => {
     state.mode = el.value;
-    map.closePopup();
-    gridLayer.setStyle(styleOf);
-    renderLegend();
+    isoBox.disabled = state.mode !== 'combined';
+    redraw();
   }));
+  isoBox.addEventListener('change', () => { state.isolation = isoBox.checked; redraw(); });
   renderLegend();
 }
 

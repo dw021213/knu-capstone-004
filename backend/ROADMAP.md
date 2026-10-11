@@ -244,6 +244,8 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 테이블: `hazard_meta`, `hazard_score(h3,hazard)`, `cell_population`, `risk_combined` (`migrations/006_hazard_risk.sql`), 뷰 `v_cell_risk` 갱신
 - API: `/api/risk/meta`, `/api/grid`(risk_*·hazard·isolation·traffic_percentile·has_road·population, 더미는 dummy_*), `/api/cells/:h3`(risk·hazards·population). 날짜 파라미터 없음
 - 지도: "종합 위험도"(기본) / "더미 (테스트)" 모드, 도로 자료 없음 회색, 팝업에 구성(위해도×0.8 + 고립도×0.2)
+- **유동인구 켜기/끄기** (2026-10-12): `risk_combined.hazard_percentile·hazard_level`(위해도만의 순위·등급, `migrations/007_hazard_only_rank.sql`)을 함께 저장.
+  API 는 두 버전을 다 내려주고(`risk_*` = 켬, `hazard_*` = 끔) 지도는 "유동인구(고립도) 반영" 체크박스로 전환. 끄면 1,843셀 색 변화, 450셀 등급 변화
 - 재난·범죄 모델 추가 방법: `hazard_meta`/`hazard_score` 에 hazard='disaster'|'crime' 로 적재하는 ETL 추가 → `etl combine`. API·지도는 수정 없이 반영(`hazards.*`)
 
 ## 진행 로그

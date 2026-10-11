@@ -69,7 +69,7 @@ func runCombine(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	results := make([]result, len(cells))
 	var scored []int
-	var scores []float64
+	var scores, hazards []float64
 	for i, c := range cells {
 		h, used, ok := risk.Hazard(c.pcts)
 		results[i].used = used
@@ -80,30 +80,37 @@ func runCombine(ctx context.Context, pool *pgxpool.Pool) error {
 		results[i].hazard, results[i].score = &h, &s
 		scored = append(scored, i)
 		scores = append(scores, s)
+		hazards = append(hazards, h)
 	}
 	ranks := risk.PercentRanks(scores)
+	hRanks := risk.PercentRanks(hazards) // 유동인구(고립도)를 끈 경우의 순위
 
 	batch := &pgx.Batch{}
 	batch.Queue(`TRUNCATE risk_combined`)
 	pctOf := make(map[int]float64, len(scored))
+	hPctOf := make(map[int]float64, len(scored))
 	for k, i := range scored {
 		pctOf[i] = ranks[k] * 100
+		hPctOf[i] = hRanks[k] * 100
 	}
 	levels := map[int]int{}
 	for i, c := range cells {
 		res := results[i]
-		var pct, level any
+		var pct, level, hPct, hLevel any
 		if p, ok := pctOf[i]; ok {
 			l := risk.Level(p)
 			pct, level = p, l
 			levels[l]++
+			hPct, hLevel = hPctOf[i], risk.Level(hPctOf[i])
 		}
 		used := res.used
 		if used == nil {
 			used = []string{}
 		}
-		batch.Queue(`INSERT INTO risk_combined (h3_index, hazard, isolation, score, percentile, level, hazards_used)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)`, c.h3, res.hazard, iso[i], res.score, pct, level, used)
+		batch.Queue(`INSERT INTO risk_combined
+			(h3_index, hazard, isolation, score, percentile, level, hazard_percentile, hazard_level, hazards_used)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			c.h3, res.hazard, iso[i], res.score, pct, level, hPct, hLevel, used)
 	}
 	if err := sendInTx(ctx, pool, batch); err != nil {
 		return fmt.Errorf("risk_combined 적재: %w", err)

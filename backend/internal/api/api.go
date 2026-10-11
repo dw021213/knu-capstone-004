@@ -92,8 +92,9 @@ func (h *Handler) riskMeta(c *gin.Context) {
 			"source":     popSource,
 			"assumption": "2015년 제주도민 유동인구 분포를 현재 패턴으로 가정 (관광객 미포함)",
 		},
-		"levels":  levels,
-		"no_data": "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_* 가 null. 안전으로 표시하지 않는다",
+		"levels":           levels,
+		"no_data":          "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_* 가 null. 안전으로 표시하지 않는다",
+		"isolation_toggle": "유동인구(고립도) 반영: risk_percentile·risk_level / 끔(위해도만): hazard_percentile·hazard_level",
 		"notes": []string{
 			"risk_percentile 은 셀 간 상대 순위이며 사고 확률이 아니다",
 			"날짜·시간에 따라 바뀌는 예측이 아니라 현재 도로 자료와 유동인구 분포 기준의 고정 점수다",
@@ -127,6 +128,8 @@ SELECT json_build_object(
       'risk_percentile', round(rc.percentile::numeric, 2),
       'risk_level', rc.level,
       'hazard', round(rc.hazard::numeric, 4),
+      'hazard_percentile', round(rc.hazard_percentile::numeric, 2),
+      'hazard_level', rc.hazard_level,
       'isolation', round(rc.isolation::numeric, 4),
       'traffic_percentile', round(ht.percentile::numeric, 2),
       'has_road', ht.available,
@@ -197,6 +200,7 @@ SELECT json_build_object(
   'risk', (SELECT json_build_object(
              'score', score, 'percentile', percentile, 'level', level,
              'hazard', hazard, 'isolation', isolation, 'hazards_used', hazards_used,
+             'hazard_percentile', hazard_percentile, 'hazard_level', hazard_level,
              'version', $2::text, 'computed_at', computed_at)
            FROM risk_combined WHERE h3_index = c.h3_index),
   'hazards', (SELECT COALESCE(json_object_agg(hs.hazard, json_build_object(

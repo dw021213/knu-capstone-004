@@ -23,6 +23,12 @@
 | 고립도 | 2015-12 제주도민 250m 격자 유동인구 | 2015 분포를 현재로 가정, 관광객 미포함 |
 
 - **날짜·시간에 따라 바뀌지 않는 고정 점수**다 (도로 자료나 유동인구 자료가 바뀔 때만 갱신).
+- **유동인구 켜기/끄기**: 응답에 두 버전이 다 들어 있다. 다시 호출할 필요 없이 쓰는 필드만 바꾸면 된다.
+
+  | 유동인구(고립도) | 색에 쓸 필드 | 등급 |
+  |---|---|---|
+  | 켬 (기본) | `risk_percentile` | `risk_level` |
+  | 끔 (교통사고 모델만) | `hazard_percentile` | `hazard_level` |
 - 도로 자료가 없는 셀(1,451개, 우도·추자도 포함)은 위험도가 **null** → "도로 자료 없음"으로 표시.
 
 ---
@@ -113,6 +119,8 @@
         "risk_percentile": 75.4,
         "risk_level": 4,
         "hazard": 0.7664,
+        "hazard_percentile": 76.63,
+        "hazard_level": 4,
         "isolation": 0.2321,
         "traffic_percentile": 76.64,
         "has_road": true,
@@ -140,6 +148,7 @@
 | `risk_level` | 등급 1~5 (①의 `levels` 경계) | 범주형 색·라벨을 쓸 때 |
 | `risk_score` | 최종 점수 0~1 | 부가 표시 |
 | `hazard` | 위해도 0~1 (위험 모델 백분위 평균) | 상세 패널 |
+| `hazard_percentile`, `hazard_level` | **유동인구를 끈** 위험도 순위·등급 (위해도만) | 유동인구 끔일 때 색 |
 | `isolation` | 고립도 0~1 (1 = 가장 한산) | 상세 패널 |
 | `traffic_percentile` | 교통사고(도로) 모델 백분위 0~100 | 상세 패널 |
 | `has_road` | 이 셀에 도로 자료가 있는지 | `false` 면 "도로 자료 없음" |
@@ -168,6 +177,8 @@
     "hazard": 0.9877273,
     "isolation": 0,
     "hazards_used": ["traffic"],
+    "hazard_percentile": 98.77,
+    "hazard_level": 5,
     "version": "combined_v1",
     "computed_at": "2026-10-11T16:58:56.452967+00:00"
   },
@@ -195,6 +206,7 @@
 |---|---|---|
 | **`risk.percentile`**, `risk.level` | 최종 위험도 순위·등급 (자료 없으면 `score`·`percentile`·`level`·`hazard` 가 null) | **위험도 표시** (예: 96.4 → "상위 3.6%") |
 | `risk.hazard`, `risk.isolation` | 구성 요소 → "위해도 0.988 × 0.8 + 고립도 0.000 × 0.2" 같은 설명 | 상세 패널 |
+| `risk.hazard_percentile`, `risk.hazard_level` | 유동인구를 끈 순위·등급 | 유동인구 끔일 때 |
 | `hazards.traffic.percentile` | 교통사고(도로) 모델 순위. 재난·범죄가 들어오면 `hazards.disaster`, `hazards.crime` 이 추가됨 | 상세 패널 |
 | `population.value` | 유동인구 (없으면 `population` 자체가 null) | 상세 패널 |
 | `facilities.fire_station.*` | 119 정보 | 참고 |
@@ -270,13 +282,24 @@ const projection = d3.geoMercator().fitSize([width, height], grid);  // ← 팀�
 const color = teamColorScale;                                        // ← 팀원 색 스케일 (입력: 0~100)
 const NO_DATA = '#bdbdbd';
 
+let usePopulation = true;   // 유동인구(고립도) 켜기/끄기
+const pct = d => usePopulation ? d.properties.risk_percentile : d.properties.hazard_percentile;
+
 const cells = svg.selectAll('path.cell')
   .data(grid.features, d => d.properties.h3)
   .join('path')
     .attr('class', 'cell')
-    .attr('d', d3.geoPath(projection))
-    .attr('fill', d => d.properties.risk_percentile == null ? NO_DATA : color(d.properties.risk_percentile))
-    .attr('fill-opacity', d => d.properties.risk_percentile == null ? 0.35 : 0.8);
+    .attr('d', d3.geoPath(projection));
+
+function paint() {
+  cells
+    .attr('fill', d => pct(d) == null ? NO_DATA : color(pct(d)))
+    .attr('fill-opacity', d => pct(d) == null ? 0.35 : 0.8);
+}
+paint();
+
+// 토글: 다시 호출하지 않고 색만 다시 칠한다
+toggle.on('change', e => { usePopulation = e.target.checked; paint(); });
 
 // ③ 셀 클릭: 상세
 cells.on('click', async (event, d) => {
