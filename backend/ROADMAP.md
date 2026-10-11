@@ -172,8 +172,11 @@ README 대신 이 파일 하단 "실행 방법"에 명령어 정리.
 ```bash
 docker compose up -d          # PostGIS (localhost:5433), 최초 기동 시 migrations/ 자동 적용
 go run ./cmd/etl all          # 격자 → 시설 → 집계 → 더미 위험도 (geocoded CSV 없으면 지오코딩부터)
+go run ./cmd/etl road-risk "<교통사고ML_도로전용_…_백엔드전달 폴더>"           # 교통사고(도로) 모델 → combine
+go run ./cmd/etl population "<…_250그리드단위_유동인구현황_20151231 폴더>"     # 유동인구 → combine
 go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 ```
+- 최종 위험도만 다시 계산: `go run ./cmd/etl combine` (가중치 `internal/risk/risk.go`)
 - 더미 위험도만 새로: `go run ./cmd/etl dummy-risk`
 - 구급출동 반영: `go run ./cmd/etl ems "<구급출동 CSV 경로>"`
 - 혼잡도 테스트: `go run ./cmd/etl congestion-test` (핫스팟 `data/test/congestion_hotspots.csv`), 해제: `go run ./cmd/etl congestion-test clear`
@@ -216,18 +219,32 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 커밋 작성자 이메일을 `107867881+MinhwanO@users.noreply.github.com` 으로 변경(공개 레포라 gmail 비공개)
 - DB 볼륨 `back_pgdata` → `jeju-risk_pgdata` 로 복사(데이터 유지). `back_pgdata` 는 확인 후 삭제 가능
 
-## 교통사고 ML 모델 연동 (2026-10-11)
-- 받은 자료: `~/Documents/대학교/종프/교통사고ML_최종전달_20261011/01_백엔드/` (레포에 안 넣음, 234MB). 인수인계서 `01_백엔드_인수인계서.md`
-  - 2011-01-01~2021-12-31 **과거 점수**(실시간 아님), 4,018일 × 3,651셀 = 14,669,718행, 버전 `backend_catboost_13_v3`
-  - `risk_score` 는 사고 확률 아님(상대 순위용), `risk_percentile` 0~100 = 그날 순위 → **색은 percentile, 범례 "선택 날짜의 상대 위험 순위"**
-- 격자를 모델과 같은 **3,651셀**로 통일(`data/raw/h3_cells_model_v3.csv`, 추자도 포함). 이전 3,483셀과 3,437셀 겹침
-  - 바꾼 뒤 facilities·stats·ems·congestion-test 재실행 → 구급출동 격자 밖 573→2건, 출동 있는 셀 2,306개
-- 적재: `go run ./cmd/etl model-risk "<…/01_백엔드>"` → `model_risk_daily`(PK date,h3) + `model_risk_meta`(버전·metadata.json 원문)
-  - SHA-256, 총 행 수, 날짜별 3,651행, 중복, h3 연결, 날짜 범위 검증. 실패 시 롤백. 17초, DB +1.4GB, 날짜 1개 조회 ~1ms
-- API: `/api/model-risk/meta`, `/api/model-risk?date=`, `/api/grid?date=`(model_score·model_percentile), `/api/cells/:h3?date=`
-  - 범위 밖 날짜 404 "데이터 없음"(0으로 채우지 않음), 형식 오류 400
-- 지도: 좌상단 "표시" 패널(더미 위험도 / 교통사고 모델 날짜별 + 날짜 선택), 모델 모드 범례·팝업 문구는 인수인계서 권장대로
-- 다음 후보: 모델 점수와 실시간 요소(기상·혼잡도) 결합 방식 팀 합의 / 실시간 예측용 피처 생성(최신 사고 이력 공급 필요)
+## (폐기) 날짜별 교통사고 모델 (2026-10-11 → 2026-10-12 삭제)
+- `backend_catboost_13_v3` 2011~2021 날짜별 점수(1,467만 행)를 `model_risk_daily` 로 적재·`/api/model-risk?date=` 로 제공했으나,
+  현재 시점 서비스 목표와 맞지 않아 도로 전용 모델로 **교체·삭제**(테이블 DROP, API·지도 날짜 선택 제거). 코드는 git 이력(커밋 8e5007a~d621b7c)에 있음
+- 이때 통일한 **3,651셀 격자**(`data/raw/h3_cells_model_v3.csv`, 추자도 포함)는 ML 팀 공통 격자라 그대로 사용
+
+## 종합 위험도 combined_v1 (2026-10-12)
+**최종 = 0.8 × 위해도 + 0.2 × 고립도** (`internal/risk/risk.go`)
+- 위해도 = 가용 위험 모델 백분위/100 평균. 계획: 교통사고·재난·범죄 동일 가중. **현재 교통사고만**
+- 고립도 = 1 − 유동인구 백분위 순위(전체 3,651셀 기준, 인구 없는 셀 = 0명). 세 위험 공통 "도움받기 어려운 정도"로 보고 최종 단계에서 한 번만 반영
+- 위해도가 없는 셀(도로 자료 없는 1,451셀, 우도·추자도 포함)은 최종 위험도 null → 지도 회색 "도로 자료 없음"(안전 아님)
+- 등급 = 최종 점수의 셀 간 백분위, 경계 90/70/30/10
+- **가중치 0.2 기준**: 고립도를 넣어도 위해도만의 상위 10% 셀 중 70% 이상이 남는 가장 큰 값.
+  교통사고만일 때 분석(도로 2,200셀): 0.2→70%, 0.3→35%, 0.5→결과 뒤집힘. 재난·범죄 추가 시 같은 기준으로 재확인(허용 0.15~0.25)
+  - 도로 모델 백분위는 유동인구와 양의 상관(log 기준 0.55): 붐비는 20% 평균 77, 한산한 20% 평균 32 → 고립도가 반대 방향이라 큰 가중치는 도로 결과를 덮음
+- 실제 결과(combined_v1): 도로 모델과 순위 상관 0.98, 상위 10% 유지 79%, 한산한 셀 평균 32→39, 붐비는 셀 77→72. 등급 1=220, 2=440, 3=880, 4=440, 5=220
+- 자료
+  - 교통사고: `~/Documents/대학교/종프/교통사고ML_도로전용_20260914_백엔드전달` (`jeju_h3_r8_road_catboost_20260914_v1`, 도로자료 2026-09-14, 날짜 무관 고정 점수, 도로 있는 2,200셀만 백분위)
+    → `etl road-risk`: artifact_manifest SHA-256, 3,651행, 고유 h3, 격자 일치, 도로 셀 2,200, has_road↔백분위 null 일치 검증
+  - 유동인구: `~/Documents/대학교/종프/제주특별자치도_성연령별_제주도민_250그리드단위_유동인구현황_20151231` (2015-12 월 전체, 12개 성연령 합)
+    → `etl population`: 250m 격자 중심(EPSG:5179) → 위경도 → H3 합산, 17,225개 전부 매칭, 인구 있는 셀 3,058개
+    → **2015 도민 분포를 현재로 가정**(순위만 쓰므로 총량 변화 무관). 관광객 미포함·신규 개발지 과소 → API/범례에 가정 명시
+    → 평일/휴일 파일은 월 전체와 상관 0.998 이라 미사용. 시간대·날씨별 유동인구(`…_시간대별_…_20150131`)로 바꾸면 시간·날씨에 따라 변하는 위험도로 확장 가능
+- 테이블: `hazard_meta`, `hazard_score(h3,hazard)`, `cell_population`, `risk_combined` (`migrations/006_hazard_risk.sql`), 뷰 `v_cell_risk` 갱신
+- API: `/api/risk/meta`, `/api/grid`(risk_*·hazard·isolation·traffic_percentile·has_road·population, 더미는 dummy_*), `/api/cells/:h3`(risk·hazards·population). 날짜 파라미터 없음
+- 지도: "종합 위험도"(기본) / "더미 (테스트)" 모드, 도로 자료 없음 회색, 팝업에 구성(위해도×0.8 + 고립도×0.2)
+- 재난·범죄 모델 추가 방법: `hazard_meta`/`hazard_score` 에 hazard='disaster'|'crime' 로 적재하는 ETL 추가 → `etl combine`. API·지도는 수정 없이 반영(`hazards.*`)
 
 ## 진행 로그
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).
@@ -235,6 +252,9 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 2026-10-07: git 저장소 생성, 첫 커밋. 격자 = Uber H3 육각 격자임을 명시.
 - 2026-10-07: Step 0~7 완료 → **1차 목표 달성**. Nominatim 부정확 문제로 overrides CSV 도입(20곳 검증, 4곳 APPROX).
   **다음 후보**: 주행시간을 실제 도로망(OSRM + OSM 제주 도로)으로 교체 / APPROX 4곳 좌표 확정 / 다른 시설(CCTV·편의점·경찰서) 데이터 확보 / 실시간 수집기(기상청 API) 설계 / 프론트 담당과 API 형식 합의.
+
+- 2026-10-12: 날짜별 모델 삭제, 도로 전용 교통사고 모델 + 2015 유동인구 고립도로 종합 위험도 combined_v1 (0.8:0.2). 프론트 문서 갱신.
+  **다음 후보**: 재난·범죄 모델 수신 시 hazard 추가 / 시간대·날씨별 유동인구로 고립도 동적화 / 기상청 실시간 연동
 
 ## 이후 확장 메모 (1차 이후)
 - 주행시간 정밀화: OSRM(Docker) + Geofabrik south-korea.osm.pbf(약 200MB)에서 제주만 잘라 셀 중심→최근접 119 실제 주행시간 계산. `geo.DriveMinutes` 호출부만 교체
