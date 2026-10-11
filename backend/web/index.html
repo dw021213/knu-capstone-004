@@ -252,7 +252,7 @@ async function main() {
   population.onAdd = () => {
     const div = L.DomUtil.create('div', 'panel');
     div.style.maxWidth = '330px';
-    div.innerHTML = '<h4>주변 실시간 인구 · SKT</h4><div style="margin-bottom:8px">📍 파란 핀을 드래그하거나 지도를 클릭하세요.</div><input id="pop-lng" type="hidden" value="126.7324712"><input id="pop-lat" type="hidden" value="33.4982282"><label>반경(m) <input id="pop-radius" type="number" min="50" max="5000" value="1450" style="width:75px"></label> <button id="pop-load">인구 조회</button><div id="pop-result" style="margin-top:6px">핀 위치의 인구를 조회하세요.</div><div class="muted">모델은 선택한 과거 날짜, 인구는 현재 집계 기준.<br>주변 인구는 산책로 보행자 수와 다를 수 있습니다.</div>';
+    div.innerHTML = '<h4>주변 실시간 인구 · SKT</h4><div style="margin-bottom:8px">📍 파란 핀을 드래그하거나 지도를 클릭하세요.</div><input id="pop-lng" type="hidden" value="126.7324712"><input id="pop-lat" type="hidden" value="33.4982282"><label>반경(m) <input id="pop-radius" type="number" min="500" max="2000" step="50" value="1450" style="width:75px"></label> <button id="pop-load">인구 조회</button><div id="pop-result" style="margin-top:6px">핀 위치의 인구를 조회하세요.</div><div class="muted">모델은 선택한 과거 날짜, 인구는 현재 집계 기준.<br>주변 인구는 산책로 보행자 수와 다를 수 있습니다.</div>';
     L.DomEvent.disableClickPropagation(div);
     L.DomEvent.disableScrollPropagation(div);
     return div;
@@ -277,12 +277,14 @@ async function main() {
   document.getElementById('pop-radius').addEventListener('input', e => {
     populationRevision++;
     const radius = Number(e.target.value);
-    if (Number.isFinite(radius) && radius >= 50 && radius <= 5000) populationCircle.setRadius(radius);
+    if (Number.isFinite(radius) && radius >= 500 && radius <= 2000 && radius % 50 === 0) populationCircle.setRadius(radius);
     document.getElementById('pop-result').textContent = '조회 반경 변경됨 · 인구 조회를 눌러주세요.';
   });
   document.getElementById('pop-load').addEventListener('click', async () => {
     const button = document.getElementById('pop-load');
     const output = document.getElementById('pop-result');
+    const radiusInput = document.getElementById('pop-radius');
+    if (!radiusInput.reportValidity()) return;
     button.disabled = true; output.textContent = '조회 중…';
     const revision = populationRevision;
     try {

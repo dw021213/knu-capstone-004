@@ -45,7 +45,7 @@ func TestPopulationCacheAndValidation(t *testing.T) {
 	if calls.Load() != 2 {
 		t.Fatalf("duplicate lookup called upstream: %d", calls.Load())
 	}
-	for _, q := range []string{"lng=NaN&lat=33.4", "lng=126.5&lat=33.4&radius=0", "lng=127.5&lat=33.4"} {
+	for _, q := range []string{"lng=NaN&lat=33.4", "lng=126.5&lat=33.4&radius=0", "lng=127.5&lat=33.4", "lng=126.5&lat=33.4&radius=450", "lng=126.5&lat=33.4&radius=2050", "lng=126.5&lat=33.4&radius=525"} {
 		if query(q).Code != 400 {
 			t.Fatal("invalid query accepted")
 		}

@@ -75,8 +75,8 @@ func (h *Handler) population(c *gin.Context) {
 	lng, e1 := strconv.ParseFloat(c.Query("lng"), 64)
 	lat, e2 := strconv.ParseFloat(c.Query("lat"), 64)
 	radius, e3 := strconv.Atoi(c.DefaultQuery("radius", "1500"))
-	if e1 != nil || e2 != nil || e3 != nil || math.IsNaN(lng) || math.IsNaN(lat) || math.IsInf(lng, 0) || math.IsInf(lat, 0) || lng < 126 || lng > 127.1 || lat < 33 || lat > 34.2 || radius < 50 || radius > 5000 {
-		c.JSON(400, gin.H{"error": "제주 좌표 lng(126~127.1), lat(33~34.2), radius(50~5000m)를 입력하세요"})
+	if e1 != nil || e2 != nil || e3 != nil || math.IsNaN(lng) || math.IsNaN(lat) || math.IsInf(lng, 0) || math.IsInf(lat, 0) || lng < 126 || lng > 127.1 || lat < 33 || lat > 34.2 || radius < 500 || radius > 2000 || radius%50 != 0 {
+		c.JSON(400, gin.H{"error": "제주 좌표 lng(126~127.1), lat(33~34.2), radius(500~2000m, 50m 단위)를 입력하세요"})
 		return
 	}
 	s := h.Population

@@ -325,4 +325,4 @@ svg.selectAll('circle.fire').data(fac.features).join('circle')
 ## 제주 실시간 주변 인구
 `GET /api/population/live?lng=126.7324712&lat=33.4982282&radius=1450`
 반환: lng, lat, radius_m, residents(도민), visitors(관광객), total, observed_at(KST 집계 시각), fetched_at, cached, source, history(원본 시간별 IN_POP/OUT_POP/TIME).
-동일 조건은5분 메모리 캐시. lng126~127.1/lat33~34.2/radius50~5000m 서비스 입력 제한. 400입력 오류/502원천 조회 또는 결측 오류/503미설정. 자동 폴링 없음. 원천은 제주관광빅데이터플랫폼 내부 proxy API, User-Agent 외 로그인/키/쿠키 불필요로 검증. 역사적 모델 점수와 별도로 표시하며 길 위 보행자 수로 해석하지 않는다.
+동일 조건은5분 메모리 캐시. lng126~127.1/lat33~34.2/radius500~2000m（50m 단위） 서비스 입력 제한. 400입력 오류/502원천 조회 또는 결측 오류/503미설정. 자동 폴링 없음. 원천은 제주관광빅데이터플랫폼 내부 proxy API, User-Agent 외 로그인/키/쿠키 불필요로 검증. 역사적 모델 점수와 별도로 표시하며 길 위 보행자 수로 해석하지 않는다.
