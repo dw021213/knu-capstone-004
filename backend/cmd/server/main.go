@@ -26,7 +26,11 @@ func main() {
 	r := gin.Default()
 	r.Use(corsMiddleware())
 	(&api.Handler{DB: pool}).Register(r.Group("/api"))
-	r.StaticFile("/", "web/index.html")
+	// 확인용 지도 페이지. 코드가 자주 바뀌어서 브라우저가 옛 페이지를 캐시로 쓰지 않게 한다.
+	r.GET("/", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-cache")
+		c.File("web/index.html")
+	})
 
 	addr := os.Getenv("SERVER_ADDR")
 	if addr == "" {
