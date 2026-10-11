@@ -24,7 +24,8 @@
 | 제주 경계 | `data/raw/kostat_provinces.json` (southkorea-maps, 통계청 2013, simple) 중 `code=39` | 이미 다운로드 완료 |
 | 지도 | `web/index.html` 단일 파일, Leaflet(unpkg) + OSM 타일, Gin이 정적 서빙 | 같은 origin → CORS 불필요, 빌드 도구 없음 |
 | 모듈명 | `jejurisk` | |
-| 버전관리 | git, 기본 브랜치 `main`, 레포 로컬 user.email 설정됨 | 나중에 팀 GitHub에 `git remote add origin <url>` 후 push |
+| 버전관리 | 팀 레포 `github.com/dw021213/knu-capstone-004` 의 `backend/`, 작업 브랜치 **`feat/backend`** (main 은 PR 로만) | 2026-10-11 독립 레포 `종프/back` 에서 이력 포함 이전(subtree). 커밋 이메일은 GitHub noreply |
+| Docker 프로젝트 | compose `name: jeju-risk` → 컨테이너 `jeju-risk-db`, 볼륨 `jeju-risk_pgdata` | 폴더 이름과 무관하게 같은 DB 사용 |
 | 커밋 단위 | 로드맵 Step 하나 끝날 때마다 커밋 (메시지 예: `feat(etl): H3 격자 생성`) | 진행 상황 추적 |
 
 ## 알려진 이슈 / 주의
@@ -44,7 +45,7 @@
 
 ## 폴더 구조 (목표)
 ```
-back/
+backend/                           # 팀 레포 knu-capstone-004 의 backend/
 ├── ROADMAP.md                     # ← 이 파일
 ├── CLAUDE.md                      # 세션 시작 시 ROADMAP.md 읽으라는 안내
 ├── docker-compose.yml
@@ -209,6 +210,11 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 팀원 프론트는 D3.js. 연동 가이드: `docs/FRONTEND_API.md` (엔드포인트 스키마, D3 최소 예제, 자주 막히는 곳)
 - CORS: `gin-contrib/cors`, `CORS_ORIGINS`(쉼표 구분) 없으면 모든 origin 허용(개발용)
 - `/api/grid` 폴리곤을 `ST_ForcePolygonCW`로 **시계 방향** 출력 (d3-geo 요구사항. DB 원본은 CCW 그대로)
+
+## 팀 레포 이전 (2026-10-11)
+- 작업 위치: `~/Documents/대학교/종프/knu-capstone-004/backend` (브랜치 `feat/backend`). 이전 `종프/back` 폴더는 백업, 더 이상 작업하지 않음
+- 커밋 작성자 이메일을 `107867881+MinhwanO@users.noreply.github.com` 으로 변경(공개 레포라 gmail 비공개)
+- DB 볼륨 `back_pgdata` → `jeju-risk_pgdata` 로 복사(데이터 유지). `back_pgdata` 는 확인 후 삭제 가능
 
 ## 진행 로그
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).

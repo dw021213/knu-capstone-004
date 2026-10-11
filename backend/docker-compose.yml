@@ -1,3 +1,6 @@
+# 프로젝트 이름 고정: 폴더 이름(back/backend 등)과 무관하게 같은 컨테이너·볼륨(jeju-risk_pgdata)을 쓴다.
+name: jeju-risk
+
 services:
   db:
     image: imresamu/postgis:17-3.5
