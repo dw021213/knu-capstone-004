@@ -106,3 +106,25 @@ func Isolation(populations []float64) []float64 {
 	}
 	return pr
 }
+
+// Quantiles 는 값들의 0/n ~ n/n 분위수(n+1 개)를 돌려준다(선형 보간).
+func Quantiles(values []float64, n int) []float64 {
+	out := make([]float64, n+1)
+	if len(values) == 0 {
+		return out
+	}
+	s := append([]float64(nil), values...)
+	sort.Float64s(s)
+	for i := 0; i <= n; i++ {
+		pos := float64(i) / float64(n) * float64(len(s)-1)
+		lo := int(pos)
+		hi := lo + 1
+		if hi >= len(s) {
+			out[i] = s[len(s)-1]
+			continue
+		}
+		f := pos - float64(lo)
+		out[i] = s[lo]*(1-f) + s[hi]*f
+	}
+	return out
+}

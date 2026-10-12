@@ -174,6 +174,19 @@ func runCombine(ctx context.Context, pool *pgxpool.Pool) error {
 	if err != nil {
 		return fmt.Errorf("risk_combined 적재: %w", err)
 	}
+	// 기상 가산 후 점수를 기존 분포에 대어 백분위·등급을 매기기 위한 분위수 (0~100)
+	if _, err := tx.Exec(ctx, `DELETE FROM risk_score_quantiles`); err != nil {
+		return err
+	}
+	var qRows [][]any
+	for kind, vals := range map[string][]float64{"combined": allScore, "hazard": hazardVals} {
+		for q, v := range risk.Quantiles(vals, 100) {
+			qRows = append(qRows, []any{kind, int16(q), float32(v)})
+		}
+	}
+	if _, err := tx.CopyFrom(ctx, pgx.Identifier{"risk_score_quantiles"}, []string{"kind", "q", "score"}, pgx.CopyFromRows(qRows)); err != nil {
+		return err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}

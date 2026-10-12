@@ -1,0 +1,52 @@
+{
+  "version": "weather_rules_v1",
+  "description": "기상청 특보 발표 기준을 참고한 관측값 기준. 2일 연속 등 지속 조건은 쓰지 않고 해당 시각 관측으로 판별한다. 공식 특보가 아님.",
+  "max_bonus": 0.3,
+  "rules": [
+    {
+      "key": "heavy_rain", "label": "호우",
+      "weights": { "advisory": 0.10, "warning": 0.20 },
+      "criteria": [
+        { "metric": "rain_3h",  "op": ">=", "advisory": 60,  "warning": 90 },
+        { "metric": "rain_12h", "op": ">=", "advisory": 110, "warning": 180 }
+      ]
+    },
+    {
+      "key": "strong_wind", "label": "강풍",
+      "weights": { "advisory": 0.05, "warning": 0.10 },
+      "criteria": [
+        { "metric": "wind", "op": ">=", "advisory": 14, "warning": 21,
+          "mountain": { "advisory": 17, "warning": 24 } }
+      ]
+    },
+    {
+      "key": "heavy_snow", "label": "대설",
+      "weights": { "advisory": 0.10, "warning": 0.20 },
+      "criteria": [
+        { "metric": "snow_24h", "op": ">=", "advisory": 5, "warning": 20,
+          "mountain": { "advisory": 20, "warning": 30 } }
+      ]
+    },
+    {
+      "key": "heat", "label": "폭염",
+      "weights": { "advisory": 0.05, "warning": 0.10 },
+      "criteria": [
+        { "metric": "feels_like", "op": ">=", "advisory": 33, "warning": 35 }
+      ]
+    },
+    {
+      "key": "cold", "label": "한파",
+      "weights": { "advisory": 0.05, "warning": 0.10 },
+      "criteria": [
+        { "metric": "temp", "op": "<=", "advisory": -12, "warning": -15 }
+      ]
+    },
+    {
+      "key": "dry", "label": "건조",
+      "weights": { "advisory": 0.03, "warning": 0.05 },
+      "criteria": [
+        { "metric": "humidity", "op": "<=", "advisory": 35, "warning": 25 }
+      ]
+    }
+  ]
+}

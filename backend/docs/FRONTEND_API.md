@@ -28,7 +28,7 @@
 - **교통사고(도로) 점수는 고정**이고, **고립도는 조건·시간대에 따라 바뀐다.**
   - 조건(`condition`): `all` 전체, `weekday` 평일, `holiday` 휴일, `preholiday` 휴일전날, `clear` 맑음, `cloudy` 흐림, `rain` 비, `snow` 눈
   - 시간대(`hour`): 0~23
-  - 안 주면 **현재 한국 시각** 기준(토·일=휴일, 금=휴일전날, 그 외=평일 / 현재 시). 공휴일·실제 날씨는 아직 자동 반영 안 됨
+  - 안 주면 **`at`(기본 지금) 한국 시각** 기준(토·일=휴일, 금=휴일전날, 그 외=평일 / 그 시각의 시). 공휴일은 아직 미반영
 - **유동인구 켜기/끄기**: 응답에 두 버전이 다 들어 있다. 다시 호출할 필요 없이 쓰는 필드만 바꾸면 된다.
 
   | 유동인구(고립도) | 색에 쓸 필드 | 등급 |
@@ -39,17 +39,30 @@
 
 ---
 
+### 기상 가산 (2026-10-13 추가)
+
+```
+최종 = min(1, 위 점수 + min(0.3, Σ 기준 초과 항목 가중치))
+```
+- 셀마다 **가장 가까운 제주 AWS 지점(43곳)**의 관측이 우리 기준(기상청 특보 기준 참고, 공식 특보 아님)을 넘으면 더한다.
+  호우(3·12시간 강수), 강풍(풍속, 산지 기준 별도), 대설, 폭염(체감온도), 한파(기온), 건조(습도). 주의보급·경보급 두 단계.
+- 실시간: 서버가 15분마다 기상청 API허브에서 수집. 과거: 같은 방식으로 저장된 관측으로 계산 → **`at=` 로 과거 시각을 넣으면 그때 기준으로 판별**
+- 등급은 가산 전 점수 분포에 대어 다시 매기므로, 기준을 넘은 지역은 실제로 순위·등급이 올라간다.
+- 기준·가중치는 `config/weather_rules.json` (`/api/risk/meta` 의 `weather.rules` 로도 볼 수 있음)
+
 ## 한눈에 보기
 
 | # | 호출 | 언제 | 필수 |
 |---|---|---|---|
 | ① | `GET /api/risk/meta` | 페이지 처음 열 때 | ✅ |
-| ② | `GET /api/grid?condition={조건}&hour={시간}` | 처음 지도 그릴 때, 조건·시간 바꿀 때 | ✅ |
-| ③ | `GET /api/cells/{h3}?condition={조건}&hour={시간}` | 셀 클릭할 때 | ✅ |
+| ② | `GET /api/grid?at={시각}&condition={조건}&hour={시간}&weather={on/off}` | 처음 지도 그릴 때, 시각·조건 바꿀 때 | ✅ |
+| ③ | `GET /api/cells/{h3}?at={시각}&condition={조건}&hour={시간}&weather={on/off}` | 셀 클릭할 때 | ✅ |
 | ④ | `GET /api/facilities?type={시설종류}` | 119 마커 그릴 때 | 선택 |
 
 | 자리 | 형식 | 어디서 얻나 | 예 |
 |---|---|---|---|
+| `{시각}` | `YYYY-MM-DDTHH:MM` (KST, 생략 시 지금) | 사용자가 고른 날짜·시간 | `2021-08-23T19:00` |
+| `{on/off}` | 기상 가산 (생략 시 on) | 토글 | `off` |
 | `{조건}` | 위 8개 중 하나 (생략 가능) | 사용자 선택. 처음엔 ①의 `default_slot.condition` | `weekday` |
 | `{시간}` | 0~23 (생략 가능) | 사용자 선택. 처음엔 ①의 `default_slot.hour` | `21` |
 | `{h3}` | 15자리 문자열 | 클릭한 셀의 `properties.h3` (숫자로 바꾸지 말 것) | `8830d1cf3bfffff` |
@@ -172,7 +185,11 @@
 | `risk_level` | 등급 1~5 (①의 `levels` 경계) | 범주형 색·라벨을 쓸 때 |
 | `risk_score` | 최종 점수 0~1 | 부가 표시 |
 | `hazard` | 위해도 0~1 (위험 모델 백분위 평균) | 상세 패널 |
-| `hazard_percentile`, `hazard_level` | **유동인구를 끈** 위험도 순위·등급 (위해도만) | 유동인구 끔일 때 색 |
+| `hazard_percentile`, `hazard_level` | **유동인구를 끈** 위험도 순위·등급 (위해도만, 기상 가산 포함) | 유동인구 끔일 때 색 |
+| `base_percentile`, `base_level` | 기상 가산 **전** 순위·등급 | "기상 때문에 올랐다" 표시 |
+| `weather_bonus` | 기상 가산점 (0~0.3) | 툴팁 |
+| `weather_alerts` | 기준 초과 항목 `[{key, label, level(advisory/warning), metric, value, bonus}]` | 경고 아이콘·문구 |
+| `weather_stn` | 연결된 AWS 지점 번호 | 참고 |
 | `isolation` | 고립도 0~1 (1 = 가장 한산) | 상세 패널 |
 | `traffic_percentile` | 교통사고(도로) 모델 백분위 0~100 | 상세 패널 |
 | `has_road` | 이 셀에 도로 자료가 있는지 | `false` 면 "도로 자료 없음" |
@@ -183,7 +200,9 @@
 - 육각형은 **시계 방향(CW)** 으로 내려준다. d3-geo 규칙에 맞춘 것이므로 `turf.rewind` 등으로 **뒤집지 말 것**
 - (선택) `?bbox={최소경도},{최소위도},{최대경도},{최대위도}` 로 범위 셀만 받을 수 있다. 지금 규모에선 필요 없음
 - 같은 조건·시간 응답은 항상 같다(2015 패턴 기반). 한 번 받은 슬롯은 캐시해도 된다
-- `risk.auto_slot` 이 true 면 조건·시간을 안 줘서 현재 시각 기준으로 정해졌다는 뜻
+- `risk.auto_slot` 이 true 면 조건·시간을 안 줘서 at 시각 기준으로 정해졌다는 뜻
+- 최상위 `weather`: `{on, at, status(ok|no_data|off), stations_observed, stations_alerted, rules_version, max_bonus, sources}`.
+  `status: "no_data"` 면 그 시각 관측이 없어 가산 0 (안전하다는 뜻 아님)
 
 ---
 
@@ -240,7 +259,9 @@
 | `risk.hazard`, `risk.isolation` | 구성 요소 → "위해도 0.988 × 0.8 + 고립도 0.000 × 0.2" 같은 설명 | 상세 패널 |
 | `risk.hazard_percentile`, `risk.hazard_level` | 유동인구를 끈 순위·등급 | 유동인구 끔일 때 |
 | `hazards.traffic.percentile` | 교통사고(도로) 모델 순위. 재난·범죄가 들어오면 `hazards.disaster`, `hazards.crime` 이 추가됨 | 상세 패널 |
-| `hourly[]` | 같은 조건의 0~23시 순위·등급·유동인구 | 시간대별 그래프 |
+| `hourly[]` | 같은 조건의 0~23시 순위·등급·유동인구 (기상 가산 제외) | 시간대별 그래프 |
+| `risk.base_*`, `risk.weather_bonus` | 기상 가산 전 값, 가산점 | 상세 패널 |
+| `weather` | `{stn, name, mountain, dist_m, metrics{temp, wind, rain_1h, rain_3h, rain_12h, humidity, feels_like, snow_24h}, alerts[], bonus, at, status}` | "진달래밭(산지) 6.4km · 3h 67mm · 호우 주의보급" 같은 설명 |
 | `population.value` | 그 조건·시간대 유동인구 (없으면 `population` 자체가 null) | 상세 패널 |
 | `facilities.fire_station.*` | 119 정보 | 참고 |
 | `dummy`, `ems`, `congestion` | 백엔드 테스트용 | **사용하지 않음** |
@@ -274,6 +295,7 @@
 | bbox 형식 오류 | 400 | `{"error":"bbox=minLng,minLat,maxLng,maxLat"}` |
 | 조건 오류 | 400 | `{"error":"condition 은 all|weekday|holiday|preholiday|clear|cloudy|rain|snow"}` |
 | 시간 오류 | 400 | `{"error":"hour 는 0~23"}` |
+| 시각 오류 | 400 | `{"error":"at 형식은 YYYY-MM-DDTHH:MM (KST)"}` |
 | DB 오류 | 500 | `{"error":"…"}` |
 
 ---

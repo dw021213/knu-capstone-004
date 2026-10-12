@@ -262,6 +262,25 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   - 조건별(14시) 평균 순위 47.0~47.6 로 차이 작음(정상화 후). 가중치 기준(슬롯 안 위해도 상위 10% 유지) 75~88% 로 0.2 유지
 - 재난·범죄 모델 추가 방법: `hazard_meta`/`hazard_score` 에 hazard='disaster'|'crime' 로 적재하는 ETL 추가 → `etl combine`. API·지도는 수정 없이 반영(`hazards.*`)
 
+## 기상 가산 (2026-10-13)
+- 목적: 관측값이 우리 기준(기상청 특보 기준 참고)을 넘으면 위험도에 가중치를 더함. 모델 입력이 아니라 사후 가산. 실시간 + 과거 실험 같은 코드
+- 기준·가중치: `config/weather_rules.json` (요청마다 읽음 → 서버 재시작 없이 실험). **2일 연속 등 지속 조건 제거**, 그 시각 관측으로 판별
+  - 호우 3h 60/90mm·12h 110/180mm(+0.10/+0.20), 강풍 10분평균 14/21m/s·산지 17/24(+0.05/+0.10), 대설 24h 신적설 5/20cm·산지 20/30(+0.10/+0.20),
+    폭염 체감온도 33/35℃(+0.05/+0.10), 한파 기온 −12/−15℃(+0.05/+0.10), 건조 습도 35/25%(+0.03/+0.05). 합계 상한 0.3
+  - 체감온도: 기상청 여름철 식(Stull 습구온도). 순간풍속은 정시자료에 없어 미사용
+- 최종 = min(1, 기존 점수 + 가산), 등급은 가산 전 점수 분위수(`risk_score_quantiles`, etl combine 이 갱신)에 대어 `risk_pct()`·`risk_level()`(SQL 함수)로 다시 매김
+- 자료: **기상청 API허브** (`KMA_APIHUB_KEY` in `.env`, authKey 값만). 정시자료 `awsh.php`(TA·WS·RN_HR1·HM 등, 결측 −99), 지점정보 `stn_inf.php?inf=AWS`
+  - 제주 AWS 43곳(산지 8: 윗세오름·한라산남벽·삼각봉·진달래밭·영실 등, 지점정보 주소의 "(산지)"), 셀→최근접 지점 평균 3.3km
+  - API허브가 가끔 504 → 재시도. 1시간 1호출(전국)이라 하루 약 76초, 1년 약 8시간 → **과거 1년은 기상자료개방포털 CSV 권장**
+- 명령: `etl weather-stations`, `etl weather-fetch [-from -to]`, `etl weather-import <CSV 폴더>`(머리글 이름 기반: 지점·일시·기온·풍속·강수량·습도·적설),
+  `etl weather-test <heavy_rain|strong_wind|heat|cold|dry|clear> [-stn mountain|all|번호]`, `etl weather-eval -from -to [-out csv]`
+- 서버: `KMA_APIHUB_KEY` 있으면 15분마다 최근 3시간 수집(`WEATHER_POLL=off` 로 끔). `.env` 자동 로드(`internal/envfile`)
+- API: `?at=YYYY-MM-DDTHH:MM`(KST, 기본 지금, 유동인구 슬롯도 at 기준), `?weather=off`. 응답 `base_*`·`weather_bonus`·`weather_alerts`·`weather`(셀 지점·지표)
+- 지도: 날짜·"지금"·시간 슬라이더, "기상 가산" 체크, 팝업에 기준 초과·지점 관측, 범례에 관측/초과 지점 수
+- 검증: 산지 강풍 테스트 → 산지 기준 주의보급, 88셀 가산·24셀 등급 상승 / 2021-08-23(태풍 오마이스) API허브 수집 → 진달래밭 19~20시 호우 주의보급(3h 67mm)
+- **다음**: 기상자료개방포털 2021 제주 AWS 시간자료 CSV(사용자 다운로드) → `weather-import` → `weather-eval` 로 연간 초과 빈도 확인,
+  2021 교통사고 구급출동과 대조해 가중치 근거 마련 / 대설용 적설(ASOS) / migrations 010
+
 ## 진행 로그
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).
   Nominatim 1건 테스트 성공(제주 중앙로 342 → 33.4911, 126.5368). **다음: Step 0의 docker-compose부터.**
