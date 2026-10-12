@@ -71,11 +71,13 @@ func runWeatherStations(ctx context.Context, pool *pgxpool.Pool) error {
 // runWeatherFetch 는 API허브 정시자료를 받아 weather_obs 에 넣는다.
 //
 //	go run ./cmd/etl weather-fetch                                  최근 3시간 (실시간 수집)
-//	go run ./cmd/etl weather-fetch -from 2021-08-01 -to 2021-08-31   기간 (과거, 한 시간씩 호출)
+//	go run ./cmd/etl weather-fetch -from 2021-01-01 -to 2021-12-31   기간 (과거). 이미 받은 시간은 건너뜀(이어 받기)
+//	                               [-workers 4]                      동시 요청 수
 func runWeatherFetch(ctx context.Context, pool *pgxpool.Pool, args []string) error {
 	fs := flag.NewFlagSet("weather-fetch", flag.ExitOnError)
 	from := fs.String("from", "", "시작 날짜 YYYY-MM-DD (KST)")
 	to := fs.String("to", "", "끝 날짜 YYYY-MM-DD (KST, 포함)")
+	workers := fs.Int("workers", 4, "동시 요청 수 (API허브 504 가 잦으면 줄이기)")
 	fs.Parse(args)
 
 	hub, err := apiHub()
@@ -107,22 +109,71 @@ func runWeatherFetch(ctx context.Context, pool *pgxpool.Pool, args []string) err
 			end = t.Add(23 * time.Hour)
 		}
 	}
-	total, hours, failed := 0, 0, 0
-	for t := start; !t.After(end); t = t.Add(time.Hour) {
-		obs, err := hub.FetchHourly(ctx, t, stations)
-		if err != nil {
-			failed++
-			log.Printf("weather-fetch: %s 실패: %v", t.Format("2006-01-02 15:04"), err)
-			continue
-		}
-		n, err := weather.SaveObs(ctx, pool, obs)
+	// 이어 받기: 기간 안에서 이미 apihub 관측이 있는 시간은 건너뛴다
+	done := map[int64]bool{}
+	if *from != "" {
+		r, err := pool.Query(ctx, `SELECT DISTINCT ts FROM weather_obs WHERE source = 'apihub' AND ts BETWEEN $1 AND $2`, start, end)
 		if err != nil {
 			return err
 		}
-		total += n
+		for r.Next() {
+			var ts time.Time
+			if err := r.Scan(&ts); err != nil {
+				return err
+			}
+			done[ts.Unix()] = true
+		}
+		if err := r.Err(); err != nil {
+			return err
+		}
+	}
+	var todo []time.Time
+	for t := start; !t.After(end); t = t.Add(time.Hour) {
+		if !done[t.Unix()] {
+			todo = append(todo, t)
+		}
+	}
+	log.Printf("weather-fetch: %s ~ %s 중 받을 시간 %d (이미 있음 %d), 동시 %d",
+		start.Format("2006-01-02 15:04"), end.Format("2006-01-02 15:04"), len(todo), len(done), *workers)
+
+	type result struct {
+		t   time.Time
+		n   int
+		err error
+	}
+	jobs := make(chan time.Time)
+	results := make(chan result)
+	for w := 0; w < max(1, *workers); w++ {
+		go func() {
+			for t := range jobs {
+				obs, err := hub.FetchHourly(ctx, t, stations)
+				if err == nil {
+					_, err = weather.SaveObs(ctx, pool, obs)
+				}
+				results <- result{t, len(obs), err}
+			}
+		}()
+	}
+	go func() {
+		for _, t := range todo {
+			jobs <- t
+		}
+		close(jobs)
+	}()
+	total, hours, failed := 0, 0, 0
+	began := time.Now()
+	for range todo {
+		res := <-results
+		if res.err != nil {
+			failed++
+			log.Printf("weather-fetch: %s 실패: %v", res.t.Format("2006-01-02 15:04"), res.err)
+			continue
+		}
+		total += res.n
 		hours++
-		if hours%24 == 0 {
-			log.Printf("weather-fetch: %s 까지 %d시간 …", t.Format("2006-01-02 15:04"), hours)
+		if hours%100 == 0 {
+			left := time.Duration(float64(time.Since(began)) / float64(hours+failed) * float64(len(todo)-hours-failed))
+			log.Printf("weather-fetch: %d/%d시간 (실패 %d), 남은 시간 약 %s", hours, len(todo), failed, left.Round(time.Minute))
 		}
 	}
 	log.Printf("weather-fetch: %s ~ %s, %d시간 성공 (실패 %d), 관측 %d행",

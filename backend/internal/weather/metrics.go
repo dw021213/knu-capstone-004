@@ -21,14 +21,15 @@ type Obs struct {
 type Metrics map[string]*float64
 
 var knownMetrics = map[string]string{
-	"temp":       "기온 (℃)",
-	"humidity":   "상대습도 (%)",
-	"wind":       "10분 평균 풍속 (m/s)",
-	"rain_1h":    "1시간 강수량 (mm)",
-	"rain_3h":    "최근 3시간 누적 강수량 (mm)",
-	"rain_12h":   "최근 12시간 누적 강수량 (mm)",
-	"snow_24h":   "최근 24시간 신적설 (cm, 적설 증가량)",
-	"feels_like": "체감온도 (℃, 기상청 여름철 식)",
+	"temp":         "기온 (℃)",
+	"humidity":     "상대습도 (%)",
+	"humidity_24h": "최근 24시간 평균 상대습도 (%, 실효습도 근사. 12시간 이상 관측 있을 때만)",
+	"wind":         "10분 평균 풍속 (m/s)",
+	"rain_1h":      "1시간 강수량 (mm)",
+	"rain_3h":      "최근 3시간 누적 강수량 (mm)",
+	"rain_12h":     "최근 12시간 누적 강수량 (mm)",
+	"snow_24h":     "최근 24시간 신적설 (cm, 적설 증가량)",
+	"feels_like":   "체감온도 (℃, 기상청 여름철 식)",
 }
 
 // KnownMetric 은 규칙 파일에 쓸 수 있는 지표인지.
@@ -50,6 +51,7 @@ func ComputeMetrics(series []Obs, at time.Time) Metrics {
 	}
 	m["temp"], m["humidity"], m["wind"], m["rain_1h"] = cur.TA, cur.HM, cur.WS, cur.RN1h
 	m["rain_3h"] = sumRain(byHour, at, 3)
+	m["humidity_24h"] = meanHumidity(byHour, at, 24, 12)
 	m["rain_12h"] = sumRain(byHour, at, 12)
 	if cur.TA != nil && cur.HM != nil {
 		f := FeelsLike(*cur.TA, *cur.HM)
@@ -67,6 +69,23 @@ func ComputeMetrics(series []Obs, at time.Time) Metrics {
 		m["snow_24h"] = &d
 	}
 	return m
+}
+
+// meanHumidity 는 최근 n시간 습도 평균. 관측이 minObs 시간 미만이면 nil.
+// 건조특보의 실효습도(며칠간 가중 평균)를 대신한다 — 순간 습도는 한라산 고지대에서 너무 자주 낮게 나온다.
+func meanHumidity(byHour map[int64]Obs, at time.Time, n, minObs int) *float64 {
+	sum, cnt := 0.0, 0
+	for h := 0; h < n; h++ {
+		if o, ok := byHour[at.Add(-time.Duration(h)*time.Hour).Truncate(time.Hour).Unix()]; ok && o.HM != nil {
+			sum += *o.HM
+			cnt++
+		}
+	}
+	if cnt < minObs {
+		return nil
+	}
+	v := sum / float64(cnt)
+	return &v
 }
 
 // sumRain 은 최근 n시간 1시간 강수량 합. 관측이 하나도 없으면 nil (결측 시간은 0 으로 보지 않고 건너뜀).

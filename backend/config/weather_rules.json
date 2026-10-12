@@ -45,7 +45,7 @@
       "key": "dry", "label": "건조",
       "weights": { "advisory": 0.03, "warning": 0.05 },
       "criteria": [
-        { "metric": "humidity", "op": "<=", "advisory": 35, "warning": 25 }
+        { "metric": "humidity_24h", "op": "<=", "advisory": 35, "warning": 25 }
       ]
     }
   ]

@@ -45,7 +45,7 @@
 최종 = min(1, 위 점수 + min(0.3, Σ 기준 초과 항목 가중치))
 ```
 - 셀마다 **가장 가까운 제주 AWS 지점(43곳)**의 관측이 우리 기준(기상청 특보 기준 참고, 공식 특보 아님)을 넘으면 더한다.
-  호우(3·12시간 강수), 강풍(풍속, 산지 기준 별도), 대설, 폭염(체감온도), 한파(기온), 건조(습도). 주의보급·경보급 두 단계.
+  호우(3·12시간 강수), 강풍(풍속, 산지 기준 별도), 대설, 폭염(체감온도), 한파(기온), 건조(최근 24시간 평균 습도). 주의보급·경보급 두 단계.
 - 실시간: 서버가 15분마다 기상청 API허브에서 수집. 과거: 같은 방식으로 저장된 관측으로 계산 → **`at=` 로 과거 시각을 넣으면 그때 기준으로 판별**
 - 등급은 가산 전 점수 분포에 대어 다시 매기므로, 기준을 넘은 지역은 실제로 순위·등급이 올라간다.
 - 기준·가중치는 `config/weather_rules.json` (`/api/risk/meta` 의 `weather.rules` 로도 볼 수 있음)
@@ -261,7 +261,7 @@
 | `hazards.traffic.percentile` | 교통사고(도로) 모델 순위. 재난·범죄가 들어오면 `hazards.disaster`, `hazards.crime` 이 추가됨 | 상세 패널 |
 | `hourly[]` | 같은 조건의 0~23시 순위·등급·유동인구 (기상 가산 제외) | 시간대별 그래프 |
 | `risk.base_*`, `risk.weather_bonus` | 기상 가산 전 값, 가산점 | 상세 패널 |
-| `weather` | `{stn, name, mountain, dist_m, metrics{temp, wind, rain_1h, rain_3h, rain_12h, humidity, feels_like, snow_24h}, alerts[], bonus, at, status}` | "진달래밭(산지) 6.4km · 3h 67mm · 호우 주의보급" 같은 설명 |
+| `weather` | `{stn, name, mountain, dist_m, metrics{temp, wind, rain_1h, rain_3h, rain_12h, humidity, humidity_24h, feels_like, snow_24h}, alerts[], bonus, at, status}` | "진달래밭(산지) 6.4km · 3h 67mm · 호우 주의보급" 같은 설명 |
 | `population.value` | 그 조건·시간대 유동인구 (없으면 `population` 자체가 null) | 상세 패널 |
 | `facilities.fire_station.*` | 119 정보 | 참고 |
 | `dummy`, `ems`, `congestion` | 백엔드 테스트용 | **사용하지 않음** |
