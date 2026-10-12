@@ -307,6 +307,21 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 2026-10-12: 날짜별 모델 삭제, 도로 전용 교통사고 모델 + 2015 유동인구 고립도로 종합 위험도 combined_v1 (0.8:0.2). 프론트 문서 갱신.
   **다음 후보**: 재난·범죄 모델 수신 시 hazard 추가 / 시간대·날씨별 유동인구로 고립도 동적화 / 기상청 실시간 연동
 
+- 2026-10-13: 시간대별 유동인구 공통 기준(combined_v2), 기상 가산(API허브 실시간 + 2021 과거), 건조 24h 평균 습도, 사고 배율 분석, 주소로 시각 지정.
+
+## ▶ 현재 상태 요약 (2026-10-13, 이어서 작업할 때 여기부터)
+- **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (push 완료, main 미병합). 옛 `종프/back` 은 백업
+- **실행**: `docker compose up -d` → `go run ./cmd/server` (http://localhost:8080). `.env` 에 `KMA_APIHUB_KEY`(authKey 값만) 있으면 15분마다 기상 수집
+  - 서버 코드나 새 지표 이름을 바꾸면 **서버 재시작 필요**(규칙 파일 숫자만 바꾸면 불필요)
+- **위험도 = combined_v2**: 0.8 × 교통사고(도로 전용 모델 백분위) + 0.2 × 고립도(2015-01 시간대별 유동인구, 하루 평균, 모든 시간대 공통 순위)
+  + 기상 가산(최대 0.3, `config/weather_rules.json`, 가중치는 **현재값 유지 결정**). 등급은 분위수(`risk_score_quantiles`)로 재산정
+- **DB 데이터**(레포에 없는 원천): 도로 모델 `종프/교통사고ML_도로전용_20260914_백엔드전달`, 유동인구 `~/Downloads/제주특별자치도_시간대별_…_20150131`,
+  2021 기상 `~/Downloads/2021기상정보/*.zip`(풀어서 `etl weather-import`), 구급출동 `~/Downloads/제주…구급출동 현황/`(개인정보, 레포 금지)
+- **프론트 문서**: `docs/FRONTEND_API.md` (API 4개: /api/risk/meta, /api/grid, /api/cells/{h3}, /api/facilities, 파라미터 at·condition·hour·weather)
+- **2021 기준 초과 주요 이벤트**: 호우 09-13~17(태풍 찬투, 경보급 19곳), 06-10~11, 07-31; 강풍 섬 지점 겨울 위주; 폭염 08-06~07 경보급;
+  한파 01-07~09 산지 경보급; 건조 04-19~23(17곳). 지도: `/?at=2021-09-17T06:00` 처럼 열기
+- **남은 일/후보**: 재난·범죄 모델 수신 시 hazard 추가 + 고립도 가중치 재확인 / 대설용 ASOS 적설 / 공휴일 달력 / 프론트(D3) 실제 연동 / 배포(중간발표 10/19)
+
 ## 이후 확장 메모 (1차 이후)
 - 주행시간 정밀화: OSRM(Docker) + Geofabrik south-korea.osm.pbf(약 200MB)에서 제주만 잘라 셀 중심→최근접 119 실제 주행시간 계산. `geo.DriveMinutes` 호출부만 교체
 - 시설 추가: `facility.type`만 바꿔 `etl facilities` 재사용 (CSV 스키마 통일: type,name,address,lat,lng)
