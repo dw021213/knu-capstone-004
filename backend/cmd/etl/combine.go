@@ -110,37 +110,52 @@ func runCombine(ctx context.Context, pool *pgxpool.Pool) error {
 		log.Printf("combine: 시간대별 유동인구가 없어 고립도를 모두 같은 값으로 계산 (먼저 `etl population`)")
 	}
 
-	now := time.Now()
-	var rows [][]any
-	levels := map[int]int{}
+	// 공통 기준(C 방식): 모든 조건·시간대·셀의 유동인구를 한 줄로 세워 고립도를 매기고,
+	// 모든 조건·시간대의 최종 점수를 한 줄로 세워 순위·등급을 매긴다.
+	// → 새벽처럼 전체가 한산한 시간대는 고립도·위험도가 함께 올라가 시간대 간 비교가 된다.
+	var slots []slot
 	for _, c := range risk.Conditions {
 		for h := 0; h < 24; h++ {
-			iso := risk.Isolation(pops[slot{c.Key, h}])
-			scores := make([]float64, len(scored))
-			for k, i := range scored {
-				scores[k] = risk.Combine(*hazard[i], iso[i])
-			}
-			pct := make(map[int]float64, len(scored))
-			for k, rk := range risk.PercentRanks(scores) {
-				pct[scored[k]] = rk * 100
-			}
-			for i, h3 := range cells {
-				var score, p, lvl, hp, hl any
-				if hazard[i] != nil {
-					s := risk.Combine(*hazard[i], iso[i])
-					l := risk.Level(pct[i])
-					score, p, lvl = float32(s), float32(pct[i]), int16(l)
-					hp, hl = float32(hPct[i]), int16(risk.Level(hPct[i]))
-					if c.Key == "all" && h == 12 {
-						levels[l]++
-					}
+			slots = append(slots, slot{c.Key, h})
+		}
+	}
+	allPop := make([]float64, 0, len(slots)*len(cells))
+	for _, sl := range slots {
+		allPop = append(allPop, pops[sl]...)
+	}
+	iso := risk.Isolation(allPop) // iso[si*len(cells)+i]
+
+	allScore := make([]float64, 0, len(slots)*len(scored))
+	for si := range slots {
+		for _, i := range scored {
+			allScore = append(allScore, risk.Combine(*hazard[i], iso[si*len(cells)+i]))
+		}
+	}
+	pct := risk.PercentRanks(allScore) // pct[si*len(scored)+k]
+	pos := make(map[int]int, len(scored))
+	for k, i := range scored {
+		pos[i] = k
+	}
+
+	now := time.Now()
+	var rows [][]any
+	levels := map[string]map[int]int{"all@3": {}, "all@12": {}}
+	for si, sl := range slots {
+		for i, h3 := range cells {
+			var hz, score, p, lvl, hp, hl any
+			isoV := iso[si*len(cells)+i]
+			if hazard[i] != nil {
+				k := pos[i]
+				pv := pct[si*len(scored)+k] * 100
+				l := risk.Level(pv)
+				hz = float32(*hazard[i])
+				score, p, lvl = float32(allScore[si*len(scored)+k]), float32(pv), int16(l)
+				hp, hl = float32(hPct[i]), int16(risk.Level(hPct[i]))
+				if m, ok := levels[fmt.Sprintf("%s@%d", sl.cond, sl.hour)]; ok {
+					m[l]++
 				}
-				var hz any
-				if hazard[i] != nil {
-					hz = float32(*hazard[i])
-				}
-				rows = append(rows, []any{h3, c.Key, int16(h), hz, float32(iso[i]), score, p, lvl, hp, hl, used[i], now})
 			}
+			rows = append(rows, []any{h3, sl.cond, int16(sl.hour), hz, float32(isoV), score, p, lvl, hp, hl, used[i], now})
 		}
 	}
 
@@ -165,7 +180,7 @@ func runCombine(ctx context.Context, pool *pgxpool.Pool) error {
 	if _, err := pool.Exec(ctx, `ANALYZE risk_combined`); err != nil {
 		return err
 	}
-	log.Printf("combine: %s (위해도 %.1f + 고립도 %.1f) 위험 모델 %v → %d행 (조건 %d × 24시간 × 셀 %d), 위험도 있는 셀 %d, 등급 분포(전체·12시) %v",
+	log.Printf("combine: %s (위해도 %.1f + 고립도 %.1f, 공통 기준) 위험 모델 %v → %d행 (조건 %d × 24시간 × 셀 %d), 위험도 있는 셀 %d, 등급 분포 %v",
 		risk.Version, risk.WeightHazard, risk.WeightIsolation, nHazard, n, len(risk.Conditions), len(cells), len(scored), levels)
 	return nil
 }

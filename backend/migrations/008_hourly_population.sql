@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS cell_population_hourly (
   h3_index   VARCHAR(15) REFERENCES h3_cell ON DELETE CASCADE,
   condition  TEXT NOT NULL REFERENCES population_source ON DELETE CASCADE,
   hour       SMALLINT NOT NULL CHECK (hour BETWEEN 0 AND 23),
-  population REAL NOT NULL,                 -- 그 시간대 250m 격자 유동인구 합 (중복 카운트 포함 추정치)
+  population REAL NOT NULL,                 -- 그 시간대 하루 평균 유동인구 (250m 격자 합, 중복 카운트 포함 추정치. 009 참고)
   PRIMARY KEY (h3_index, condition, hour)
 );
 

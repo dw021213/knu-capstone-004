@@ -120,12 +120,36 @@ func runPopulation(ctx context.Context, pool *pgxpool.Pool, dir string) error {
 
 	tag, err := tx.Exec(ctx, `
 		INSERT INTO cell_population_hourly (h3_index, condition, hour, population)
-		SELECT m.h3_index, p.condition, p.hour, sum(p.pop)
+		SELECT m.h3_index, p.condition, p.hour, sum(p.pop) -- 여기선 월 합계, 아래에서 하루 평균으로 나눈다
 		FROM pop250 p JOIN g250h3 m USING (id)
 		GROUP BY m.h3_index, p.condition, p.hour`)
 	if err != nil {
 		return err
 	}
+	// 월 합계 → 하루 평균 (internal/risk Condition.Days 참고)
+	var allTotal float64
+	if err := tx.QueryRow(ctx, `SELECT sum(population) FROM cell_population_hourly WHERE condition = 'all'`).Scan(&allTotal); err != nil {
+		return err
+	}
+	allPerDay := allTotal / risk.Conditions[0].Days
+	for _, cond := range risk.Conditions {
+		days, basis := cond.Days, "2015-01 달력 일수"
+		if days == 0 {
+			var total float64
+			if err := tx.QueryRow(ctx, `SELECT sum(population) FROM cell_population_hourly WHERE condition = $1`, cond.Key).Scan(&total); err != nil {
+				return err
+			}
+			days, basis = total/allPerDay, "일수 자료 없음: 섬 전체 하루 인구를 전체 조건과 같게 맞춘 환산 일수"
+		}
+		if _, err := tx.Exec(ctx, `UPDATE cell_population_hourly SET population = population / $2 WHERE condition = $1`, cond.Key, days); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE population_source SET days = $2, days_basis = $3 WHERE condition = $1`, cond.Key, days, basis); err != nil {
+			return err
+		}
+		log.Printf("population: %s 하루 평균으로 환산 ÷ %.2f일 (%s)", cond.Label, days, basis)
+	}
+
 	var cells, unmatched int
 	if err := tx.QueryRow(ctx, `
 		SELECT (SELECT count(DISTINCT h3_index) FROM cell_population_hourly),

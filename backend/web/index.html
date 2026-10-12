@@ -120,7 +120,7 @@ async function cellPopup(h3) {
       <tr><td>교통사고(도로)</td><td>${t?.percentile != null ? `백분위 ${t.percentile.toFixed(1)}` : '도로 자료 없음'}</td></tr>
       <tr><td>유동인구</td><td>${fmtPop(d.population?.value)} <span class="muted">(${condLabel(state.condition)} ${state.hour}시, 고립도 ${iso != null ? iso.toFixed(2) : '-'})</span></td></tr>
       ${fireRows}
-    </table>${hourlyBars(d.hourly)}<div class="muted" style="margin-top:4px">${r.version ?? ''} · 셀 간 상대 순위, 사고 확률 아님<br>유동인구는 2015-01 도민 시간대별 분포를 현재로 가정</div></div>`;
+    </table>${hourlyBars(d.hourly)}<div class="muted" style="margin-top:4px">${r.version ?? ''} · 셀 간 상대 순위, 사고 확률 아님<br>유동인구는 2015-01 도민 시간대별 하루 평균을 현재로 가정 · 모든 시간대 공통 순위</div></div>`;
   }
 
   const r = d.dummy || {};
@@ -214,7 +214,7 @@ async function main() {
         `</div></div>` +
         `<div><i style="background:${NO_DATA_COLOR}"></i>도로 자료 없음</div>` + fire +
         `<div class="muted" style="margin-top:6px">${state.isolation
-          ? `교통사고(도로) 80% + 고립도 20% · <b>${condLabel(state.condition)} ${state.hour}시</b><br>도로자료 ${traffic?.snapshot_date ?? '-'} · 유동인구 2015-01 도민 시간대별(현재로 가정)`
+          ? `교통사고(도로) 80% + 고립도 20% · <b>${condLabel(state.condition)} ${state.hour}시</b><br>도로자료 ${traffic?.snapshot_date ?? '-'} · 유동인구 2015-01 도민 시간대별·하루평균(현재로 가정)<br>순위는 모든 시간대 공통 기준`
           : `교통사고(도로) 100% · 유동인구 끔<br>도로자료 ${traffic?.snapshot_date ?? '-'}`}<br>사고 확률 아님 · ${meta.version}</div>`;
     } else {
       div.innerHTML = '<h4>위험도 (더미)</h4>' + bar +

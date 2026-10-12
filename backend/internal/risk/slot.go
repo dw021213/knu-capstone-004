@@ -5,22 +5,28 @@ import "time"
 // 고립도는 시간대별 유동인구(2015-01 제주도민)로 조건 × 시간대마다 따로 계산한다.
 
 // Condition 은 유동인구 파일 조건. FileTag 는 파일 이름의 "유동인구_비율포함_<FileTag>_20150131.csv" 부분(전체는 "").
+//
+// 파일 값은 그 조건에 해당하는 날들을 합한 월 합계라서(평일+휴일+휴일전날 = 전체) Days 로 나눠 하루 평균으로 쓴다.
+// Days 는 2015년 1월 달력 기준: 휴일 = 주말 9일 + 1/1 신정, 휴일전날 = 금요일 5일, 평일 = 나머지.
+// 날씨 조건은 일수 자료가 없어(넷의 합이 전체보다 큼 = 날짜 중복) Days=0 으로 두고,
+// 섬 전체 하루 인구가 "전체"와 같아지도록 맞춘다(시간대·지역 분포만 반영, 날씨에 따른 총량 변화는 미반영).
 type Condition struct {
-	Key     string `json:"key"`
-	Label   string `json:"label"`
-	Group   string `json:"group"` // day | weather | all
-	FileTag string `json:"-"`
+	Key     string  `json:"key"`
+	Label   string  `json:"label"`
+	Group   string  `json:"group"` // day | weather | all
+	FileTag string  `json:"-"`
+	Days    float64 `json:"-"`
 }
 
 var Conditions = []Condition{
-	{"all", "전체", "all", ""},
-	{"weekday", "평일", "day", "평일"},
-	{"holiday", "휴일", "day", "휴일"},
-	{"preholiday", "휴일전날", "day", "휴일전날"},
-	{"clear", "맑음", "weather", "맑음"},
-	{"cloudy", "흐림", "weather", "흐림"},
-	{"rain", "비", "weather", "비"},
-	{"snow", "눈", "weather", "눈"},
+	{"all", "전체", "all", "", 31},
+	{"weekday", "평일", "day", "평일", 16},
+	{"holiday", "휴일", "day", "휴일", 10},
+	{"preholiday", "휴일전날", "day", "휴일전날", 5},
+	{"clear", "맑음", "weather", "맑음", 0},
+	{"cloudy", "흐림", "weather", "흐림", 0},
+	{"rain", "비", "weather", "비", 0},
+	{"snow", "눈", "weather", "눈", 0},
 }
 
 // ConditionByKey 는 key 로 조건을 찾는다.

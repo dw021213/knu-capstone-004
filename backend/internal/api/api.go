@@ -37,7 +37,7 @@ func (h *Handler) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-const riskLegend = "제주 셀 간 상대 위험 순위"
+const riskLegend = "제주 상대 위험 순위 (모든 시간대 공통 기준)"
 
 // slotOf 는 ?condition=&hour= 를 읽는다. 없으면 현재 한국 시각 기준(요일 구분, 현재 시간대).
 // 잘못된 값이면 400 을 쓰고 ok=false.
@@ -112,14 +112,15 @@ func (h *Handler) riskMeta(c *gin.Context) {
 		"version":         risk.Version,
 		"computed_at":     computedAt,
 		"legend":          riskLegend,
-		"formula":         "최종 = 0.8 × 위해도(가용 위험 모델 백분위 평균) + 0.2 × 고립도(1 − 그 조건·시간대 유동인구 백분위)",
+		"formula":         "최종 = 0.8 × 위해도(가용 위험 모델 백분위 평균) + 0.2 × 고립도(1 − 유동인구 백분위). 고립도·최종 순위는 모든 조건·시간대·셀을 한 줄로 세운 공통 기준",
 		"weights":         gin.H{"hazard": risk.WeightHazard, "isolation": risk.WeightIsolation},
 		"hazards":         hazards,
 		"hazards_planned": risk.Hazards,
 		"population": gin.H{
 			"source":     "제주도민 250m 격자 시간대별 유동인구",
 			"std_ym":     popStdYM,
-			"assumption": "2015년 1월 제주도민 시간대별 유동인구 분포를 현재 패턴으로 가정 (관광객 미포함)",
+			"assumption": "2015년 1월 제주도민 시간대별 유동인구(하루 평균으로 환산)를 현재 패턴으로 가정 (관광객 미포함)",
+			"per_day":    "원본은 조건별 월 합계라 2015-01 달력 일수(전체 31·평일 16·휴일 10·휴일전날 5)로 나눔. 날씨 조건은 일수 자료가 없어 섬 전체 하루 인구를 '전체'와 같게 맞춤",
 		},
 		"conditions": risk.Conditions,
 		"hours":      gin.H{"min": 0, "max": 23},
@@ -131,8 +132,9 @@ func (h *Handler) riskMeta(c *gin.Context) {
 		"no_data":          "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_* 가 null. 안전으로 표시하지 않는다",
 		"isolation_toggle": "유동인구(고립도) 반영: risk_percentile·risk_level / 끔(위해도만): hazard_percentile·hazard_level",
 		"notes": []string{
-			"risk_percentile 은 셀 간 상대 순위이며 사고 확률이 아니다",
+			"risk_percentile 은 모든 조건·시간대·셀을 통틀어 매긴 상대 순위이며 사고 확률이 아니다. 시간대끼리 비교 가능(새벽이 낮보다 높게 나옴)",
 			"위해도(도로 모델)는 고정, 고립도만 유동인구 조건·시간대에 따라 바뀐다. 실시간 관측이 아니라 2015-01 패턴이다",
+			"hazard_percentile·hazard_level(유동인구 끔)은 도로 셀끼리의 순위로 시간대와 무관",
 		},
 	})
 }
