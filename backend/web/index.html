@@ -174,6 +174,17 @@ async function main() {
   state.condition = meta.default_slot.condition;
   state.hour = meta.default_slot.hour;
   state.date = todayKST();
+  // 주소로 바로 열기: /?at=2021-09-14T09:00&condition=weekday&weather=off&population=off
+  const qs = new URLSearchParams(location.search);
+  const m = (qs.get('at') || '').match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{1,2}))?/);
+  if (m) {
+    state.date = m[1];
+    state.hour = m[2] != null ? +m[2] : 0;
+    state.condition = dayCondition(state.date);
+  }
+  if (qs.get('condition')) state.condition = qs.get('condition');
+  if (qs.get('weather') === 'off') state.weather = false;
+  if (qs.get('population') === 'off') state.isolation = false;
   const [grid, fac] = await Promise.all([
     getJSON('/api/grid' + slotQuery()),
     getJSON('/api/facilities?type=fire_station'),
@@ -284,7 +295,14 @@ async function main() {
     dateIn.disabled = hourIn.disabled = wxBox.disabled = document.getElementById('now').disabled = off;
     condSel.disabled = off || !state.isolation;  // 유동인구를 끄면 조건이 결과에 영향 없음
   };
-  const redraw = () => { map.closePopup(); gridLayer.setStyle(styleOf); renderLegend(); syncSlotUI(); };
+  // 지금 보는 시각·설정을 주소에 남겨 새로고침·공유해도 같은 화면이 나오게 한다
+  function syncURL() {
+    const q = new URLSearchParams({ at: `${state.date}T${pad2(state.hour)}:00`, condition: state.condition });
+    if (!state.weather) q.set('weather', 'off');
+    if (!state.isolation) q.set('population', 'off');
+    history.replaceState(null, '', '?' + q.toString());
+  }
+  const redraw = () => { map.closePopup(); gridLayer.setStyle(styleOf); renderLegend(); syncSlotUI(); syncURL(); };
   // 조건·시간대가 바뀌면 그 슬롯의 격자를 다시 받는다 (요청이 겹치면 마지막 것만 반영)
   let seq = 0;
   async function reloadSlot() {
@@ -294,6 +312,7 @@ async function main() {
     if (my !== seq) return;
     map.closePopup();
     state.wx = data.weather;
+    syncURL();
     gridLayer.clearLayers();
     gridLayer.addData(data);
     applyZoomStyle();
@@ -322,7 +341,10 @@ async function main() {
     state.date = todayKST();
     reloadSlot();
   });
+  isoBox.checked = state.isolation;
+  wxBox.checked = state.weather;
   syncSlotUI();
+  syncURL();
   renderLegend();
 }
 
