@@ -22,8 +22,9 @@
     .popup td { padding: 1px 6px 1px 0; }
     .popup td:first-child { color: #666; }
     .controls label { display: block; cursor: pointer; }
-    .controls input[type=date] { margin-top: 4px; font: inherit; }
-    .controls input[type=date]:disabled { opacity: .4; }
+    .controls .slot { margin: 6px 0 4px 18px; }
+    .controls select, .controls button { font: inherit; }
+    .controls input[type=range] { width: 160px; vertical-align: middle; }
   </style>
 </head>
 <body>
@@ -68,48 +69,88 @@ async function getJSON(url) {
   return res.json();
 }
 
-// 표시 모드: dummy = 더미 위험도(구급출동·혼잡도), model = 교통사고 ML 모델의 선택 날짜 상대 순위
-const state = { mode: 'dummy', date: null, meta: null };
+// 표시 모드: combined = 종합 위험도(도로 교통사고 모델 80% + 고립도 20%), dummy = 백엔드 테스트용 더미
+const state = { mode: 'combined', isolation: true, weather: true, meta: null, condition: null, hour: null, date: null, wx: null };
+const pad2 = n => String(n).padStart(2, '0');
+// at(시각, KST) + 유동인구 조건 + 기상 가산 여부
+const slotQuery = () =>
+  `?at=${state.date}T${pad2(state.hour)}:00&condition=${state.condition}&hour=${state.hour}&weather=${state.weather ? 'on' : 'off'}`;
+// 날짜의 요일 구분 (서버 risk.DefaultSlot 과 같은 규칙: 토·일 휴일, 금 휴일전날, 나머지 평일)
+const dayCondition = ymd => ({ 0: 'holiday', 6: 'holiday', 5: 'preholiday' })[new Date(ymd + 'T00:00:00').getDay()] ?? 'weekday';
+const todayKST = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+const condLabel = k => state.meta?.conditions.find(c => c.key === k)?.label ?? k;
+const NO_DATA_COLOR = '#bdbdbd';
 
-// 셀 색에 쓰는 0~1 값. 모델은 백분위(0~100)를 0~1 로.
-const cellValue = p => state.mode === 'model'
-  ? (p.model_percentile == null ? null : p.model_percentile / 100)
-  : p.score;
+// 셀 색에 쓰는 0~1 값. 종합 위험도는 셀 간 백분위(0~100)를 0~1 로. null 이면 "자료 없음".
+// 유동인구(고립도)를 끄면 위해도만의 순위(hazard_percentile)를 쓴다.
+const combinedPct = p => state.isolation ? p.risk_percentile : p.hazard_percentile;
+const cellValue = p => state.mode === 'combined'
+  ? (combinedPct(p) == null ? null : combinedPct(p) / 100)
+  : p.dummy_score;
 
-// 교통사고 모델 백분위 → 그날 상대 위험 구간 (범례의 상위 10%·30%·중간·하위 30%·10% 와 같은 경계)
-function modelBand(p) {
-  if (p >= 90) return '매우 높음';
-  if (p >= 70) return '높음';
-  if (p >= 30) return '보통';
-  if (p >= 10) return '낮음';
-  return '매우 낮음';
+const LEVEL_NAME = l => ({ 5: '매우 높음', 4: '높음', 3: '보통', 2: '낮음', 1: '매우 낮음' })[l] ?? '-';
+const swatch = v => `<i style="display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-1px;margin-right:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2);background:${v == null ? NO_DATA_COLOR : scoreColor(v)}"></i>`;
+// 유동인구는 하루 평균 추정치라 작은 값이 많다(셀·시간대 중앙값 약 0.1). 10 미만은 소수 둘째 자리까지.
+const fmtPop = v => v == null ? '자료 없음 (0으로 계산)' : v < 10 ? v.toFixed(2) : Math.round(v).toLocaleString('ko-KR');
+
+// 팝업용 0~23시 순위 막대 (현재 시간대 강조)
+function hourlyBars(hourly) {
+  if (!state.isolation || !hourly?.length || hourly[0].percentile == null) return '';
+  const bars = hourly.map(x => `<div title="${x.hour}시 · 백분위 ${x.percentile}" style="flex:1;height:${Math.max(2, x.percentile * 0.32)}px;background:${scoreColor(x.percentile / 100)};outline:${x.hour === state.hour ? '1px solid #333' : 'none'}"></div>`).join('');
+  return `<div class="muted" style="margin-top:6px">시간대별 순위 (${condLabel(state.condition)})</div>
+    <div style="display:flex;align-items:flex-end;gap:1px;height:34px">${bars}</div>
+    <div class="muted" style="display:flex;justify-content:space-between"><span>0시</span><span>12시</span><span>23시</span></div>`;
 }
-const swatch = v => `<i style="display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-1px;margin-right:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2);background:${scoreColor(v)}"></i>`;
+
+// 셀의 도로자료 출처 (본섬 표준노드링크 / 우도·추자도 수치지도)
+function roadSource(dt) {
+  if (!dt || !dt.road_source || dt.road_source === 'no_mapped_road') return '';
+  return dt.road_source === 'NGII_digital_map'
+    ? `<br><span class="muted">수치지도 ${dt.island_map_year ?? ''} · 도로 형상만 사용</span>`
+    : `<br><span class="muted">표준노드링크 ${dt.road_snapshot_date ?? ''}</span>`;
+}
 
 async function cellPopup(h3) {
-  const isModel = state.mode === 'model';
-  const d = await getJSON('/api/cells/' + h3 + (isModel && state.date ? `?date=${state.date}` : ''));
+  const d = await getJSON('/api/cells/' + h3 + slotQuery());
   const fs = d.facilities.fire_station || {};
   const fireRows = `
     <tr><td>119 도착</td><td>약 ${fs.nearest_drive_min ?? '-'}분 <span class="muted">(직선 ${fmtDist(fs.nearest_dist_m)})</span></td></tr>
     <tr><td>셀 내 119</td><td>${fs.count_in_cell ?? 0}곳 (인접 포함 ${fs.count_k1 ?? 0}곳)</td></tr>`;
 
-  // 교통사고 모델 모드: 모델이 산출한 그날 위험도만 보여 준다(더미 값은 숨김). 색은 지도와 같은 백분위 기준.
-  if (isModel) {
-    const m = d.model;
-    const top = m ? 100 - m.percentile : null;
-    const riskRow = m
-      ? `<tr><td>위험도</td><td>${swatch(m.percentile / 100)}<b>${modelBand(m.percentile)}</b> · ${top < 0.1 ? '최상위' : `상위 ${top.toFixed(1)}%`}</td></tr>
-         <tr><td>백분위</td><td>${m.percentile.toFixed(1)} <span class="muted">(그날 3,651셀 중 순위)</span></td></tr>
-         <tr><td>모델 점수</td><td>${m.score.toFixed(4)} <span class="muted">(날짜 간 비교용 아님)</span></td></tr>`
-      : `<tr><td>위험도</td><td>데이터 없음</td></tr>`;
-    return `<div class="popup"><b>H3 ${d.h3}</b> <span class="muted">${state.date}</span><table>
-      ${riskRow}
+  if (state.mode === 'combined') {
+    const r = d.risk || {};
+    const t = d.hazards.traffic;
+    const iso = r.isolation;
+    const pct = state.isolation ? r.percentile : r.hazard_percentile;
+    const lvl = state.isolation ? r.level : r.hazard_level;
+    const formula = state.isolation
+      ? `위해도 ${r.hazard?.toFixed(3)} × 0.8 + 고립도 ${iso?.toFixed(3)} × 0.2 = <b>${r.score?.toFixed(3)}</b>`
+      : `위해도 ${r.hazard?.toFixed(3)} <span class="muted">(유동인구 끔)</span>`;
+    const bonus = r.weather_bonus ?? 0;
+    const basePct = state.isolation ? r.base_percentile : r.base_hazard_percentile;
+    const riskRows = pct != null
+      ? `<tr><td>위험도</td><td>${swatch(pct / 100)}<b>${LEVEL_NAME(lvl)}</b> · ${100 - pct < 0.1 ? '최상위' : `상위 ${(100 - pct).toFixed(1)}%`}</td></tr>
+         <tr><td>구성</td><td>${formula}${bonus > 0 ? ` <b>+ 기상 ${bonus.toFixed(2)}</b> <span class="muted">(가산 전 상위 ${(100 - basePct).toFixed(1)}%)</span>` : ''}</td></tr>`
+      : `<tr><td>위험도</td><td>${swatch(null)}<b>도로 자료 없음</b> <span class="muted">(안전하다는 뜻 아님)</span></td></tr>`;
+    const w = d.weather || {};
+    const m = w.metrics || {};
+    const obsText = [m.temp != null && `${m.temp.toFixed(1)}℃`, m.wind != null && `${m.wind.toFixed(1)}m/s`,
+                     m.rain_3h != null && `3h ${m.rain_3h.toFixed(1)}mm`, m.humidity != null && `${Math.round(m.humidity)}%`].filter(Boolean).join(' · ');
+    const weatherRow = !state.weather ? `<tr><td>기상</td><td class="muted">가산 끔</td></tr>`
+      : w.status === 'no_data' || !obsText ? `<tr><td>기상</td><td class="muted">${w.at ?? ''} 관측 없음 (가산 0)</td></tr>`
+      : `<tr><td>기상</td><td>${(w.alerts || []).length
+          ? w.alerts.map(a => `<b>${a.label} ${a.level === 'warning' ? '경보급' : '주의보급'}</b> +${a.bonus}`).join(', ')
+          : '기준 초과 없음'}<br><span class="muted">${w.name ?? ''}${w.mountain ? '(산지)' : ''} ${(w.dist_m / 1000).toFixed(1)}km · ${obsText}</span></td></tr>`;
+    return `<div class="popup"><b>H3 ${d.h3}</b> <span class="muted">${state.date} ${state.hour}시</span><table>
+      ${riskRows}
+      <tr><td>교통사고(도로)</td><td>${t?.percentile != null ? `백분위 ${t.percentile.toFixed(1)}` : '도로 자료 없음'}${roadSource(t?.detail)}</td></tr>
+      <tr><td>유동인구</td><td>${fmtPop(d.population?.value)} <span class="muted">(${condLabel(state.condition)} ${state.hour}시, 고립도 ${iso != null ? iso.toFixed(2) : '-'})</span></td></tr>
+      ${weatherRow}
       ${fireRows}
-    </table><div class="muted" style="margin-top:4px">교통사고 모델 ${m?.version ?? ''} · 선택 날짜의 상대 위험 순위, 사고 확률 아님</div></div>`;
+    </table>${hourlyBars(d.hourly)}<div class="muted" style="margin-top:4px">${r.version ?? ''} · 셀 간 상대 순위, 사고 확률 아님<br>유동인구는 2015-01 도민 시간대별 하루 평균을 현재로 가정 · 모든 시간대 공통 순위</div></div>`;
   }
 
-  const r = d.risk || {};
+  const r = d.dummy || {};
   return `<div class="popup"><b>H3 ${d.h3}</b><table>
     <tr><td>위험도</td><td>${r.score != null ? swatch(r.score) + r.score.toFixed(3) : '-'} (등급 ${r.level ?? '-'} · ${LEVEL_LABELS[r.level] ?? ''})</td></tr>
     <tr><td>출처</td><td>더미(테스트 값)</td></tr>
@@ -136,22 +177,41 @@ function blurPx(zoom) {
 }
 
 async function main() {
-  const [grid, fac, meta] = await Promise.all([
-    getJSON('/api/grid'),
-    getJSON('/api/facilities?type=fire_station'),
-    fetch('/api/model-risk/meta').then(r => r.ok ? r.json() : null),
-  ]);
+  const meta = await getJSON('/api/risk/meta');
   state.meta = meta;
-  state.date = meta?.date_end ?? null;
+  state.condition = meta.default_slot.condition;
+  state.hour = meta.default_slot.hour;
+  state.date = todayKST();
+  // 주소로 바로 열기: /?at=2021-09-14T09:00&condition=weekday&weather=off&population=off
+  const qs = new URLSearchParams(location.search);
+  const m = (qs.get('at') || '').match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{1,2}))?/);
+  if (m) {
+    state.date = m[1];
+    state.hour = m[2] != null ? +m[2] : 0;
+    state.condition = dayCondition(state.date);
+  }
+  if (qs.get('condition')) state.condition = qs.get('condition');
+  if (qs.get('weather') === 'off') state.weather = false;
+  if (qs.get('population') === 'off') state.isolation = false;
+  const [grid, fac] = await Promise.all([
+    getJSON('/api/grid' + slotQuery()),
+    getJSON('/api/facilities?type=fire_station'),
+  ]);
+  state.wx = grid.weather;
 
   const smooth = () => map.getZoom() <= BLUR_MAX_ZOOM;
+  const styleOf = f => {
+    const v = cellValue(f.properties);
+    return {
+      color: '#555', weight: smooth() ? 0 : 0.3,
+      fillColor: v == null ? NO_DATA_COLOR : scoreColor(v),
+      fillOpacity: v == null ? 0.35 : 0.75,
+    };
+  };
   const gridLayer = L.geoJSON(grid, {
     pane: 'risk',
     renderer: riskRenderer,
-    style: f => ({
-      color: '#555', weight: smooth() ? 0 : 0.3,
-      fillColor: scoreColor(cellValue(f.properties)), fillOpacity: 0.75,
-    }),
+    style: styleOf,
     onEachFeature: (f, layer) => {
       layer.on('click', async e => {
         L.popup().setLatLng(e.latlng).setContent('불러오는 중…').openOn(map);
@@ -160,11 +220,10 @@ async function main() {
       });
     },
   }).addTo(map);
-  let gridData = grid;
 
   function applyZoomStyle() {
     map.getPane('risk').style.filter = smooth() ? `blur(${blurPx(map.getZoom()).toFixed(1)}px)` : '';
-    gridLayer.setStyle(f => ({ weight: smooth() ? 0 : 0.3 }));
+    gridLayer.setStyle(styleOf);
   }
   map.on('zoomend', applyZoomStyle);
   applyZoomStyle();
@@ -180,67 +239,120 @@ async function main() {
 
   L.control.layers(null, { '위험도 격자 (H3 res8)': gridLayer, '119안전센터': facLayer }, { collapsed: false }).addTo(map);
 
-  // 범례: 모드에 따라 문구가 바뀐다. 모델은 인수인계서 권장 문구("선택 날짜의 상대 위험 순위")를 쓴다.
+  // 범례: 종합 위험도는 /api/risk/meta 의 범례 문구·등급 구간을 쓴다.
   const legend = L.control({ position: 'bottomright' });
   legend.onAdd = () => L.DomUtil.create('div', 'panel legend');
   legend.addTo(map);
+  function weatherLegend() {
+    const w = state.wx;
+    if (!state.weather || !w || !w.on) return '기상 가산 끔';
+    if (w.status === 'no_data') return `기상 ${w.at.replace('T', ' ')} 관측 없음 (가산 0)`;
+    return `기상 ${w.at.replace('T', ' ')} · 관측 ${w.stations_observed}곳 · <b>기준 초과 ${w.stations_alerted}곳</b>`;
+  }
   function renderLegend() {
     const div = legend.getContainer();
     const bar = `<div class="scale"><div class="bar" style="background:${GRADIENT_CSS}"></div><div class="ticks">`;
     const fire = `<div style="margin-top:6px"><i style="background:#c00;border-radius:50%"></i>119안전센터</div>`;
-    if (state.mode === 'model') {
+    if (state.mode === 'combined') {
+      const traffic = meta.hazards.find(h => h.hazard === 'traffic');
       div.innerHTML = `<h4>${meta.legend}</h4>` + bar +
         ['매우 높음 · 상위 10%', '높음 · 상위 30%', '보통', '낮음 · 하위 30%', '매우 낮음 · 하위 10%'].map(t => `<div>${t}</div>`).join('') +
-        `</div></div>` + fire +
-        `<div class="muted" style="margin-top:6px">${state.date} · ${meta.version}<br>2011~2021 과거 점수 · 사고 확률 아님<br>같은 순위라도 날짜 간 절대 위험은 다름</div>`;
+        `</div></div>` +
+        `<div><i style="background:${NO_DATA_COLOR}"></i>도로 자료 없음</div>` + fire +
+        `<div class="muted" style="margin-top:6px">${state.isolation
+          ? `교통사고(도로) 80% + 고립도 20% · <b>${condLabel(state.condition)} ${state.hour}시</b><br>도로자료 ${traffic?.snapshot_date ?? '-'}(섬 수치지도 2025) · 유동인구 2015-01 도민 시간대별·하루평균(현재로 가정)<br>순위는 모든 시간대 공통 기준`
+          : `교통사고(도로) 100% · 유동인구 끔<br>도로자료 ${traffic?.snapshot_date ?? '-'}(섬 수치지도 2025)`}<br>${weatherLegend()}<br>사고 확률 아님 · ${meta.version}</div>`;
     } else {
-      const ts = gridData.features.find(f => f.properties.ts)?.properties.ts;
-      div.innerHTML = '<h4>위험도</h4>' + bar +
+      div.innerHTML = '<h4>위험도 (더미)</h4>' + bar +
         [5, 4, 3, 2, 1].map(l => `<div>${l} · ${LEVEL_LABELS[l]}</div>`).join('') +
         `</div></div>` + fire +
-        `<div class="muted" style="margin-top:6px">더미: 구급출동(2021) 많을수록 ↑<br>혼잡하면 ↓ · 기본 2등급<br>셀 ${gridData.features.length}개 · ${ts ? new Date(ts).toLocaleString('ko-KR') : ''}</div>`;
+        `<div class="muted" style="margin-top:6px">테스트 값: 구급출동(2021) 많을수록 ↑<br>혼잡하면 ↓ · 기본 2등급</div>`;
     }
   }
 
-  // 모드·날짜 선택
+  // 모드 선택
   const controls = L.control({ position: 'topleft' });
   controls.onAdd = () => {
     const div = L.DomUtil.create('div', 'panel controls');
     div.innerHTML = `<h4>표시</h4>
-      <label><input type="radio" name="mode" value="dummy" checked> 더미 위험도</label>
-      <label><input type="radio" name="mode" value="model" ${meta ? '' : 'disabled'}> 교통사고 모델 (날짜별)</label>
-      <input type="date" id="model-date" ${meta ? `min="${meta.date_start}" max="${meta.date_end}" value="${state.date}"` : ''} disabled>
-      ${meta ? '' : '<div class="muted">모델 점수 미적재</div>'}`;
+      <label><input type="radio" name="mode" value="combined" checked> 종합 위험도</label>
+      <label style="margin-left:18px"><input type="checkbox" id="isolation" checked> 유동인구(고립도) 반영</label>
+      <label style="margin-left:18px"><input type="checkbox" id="weather" checked> 기상 가산</label>
+      <div class="slot" id="slot">
+        <input type="date" id="date"> <button type="button" id="now" title="현재 한국 시각 기준">지금</button><br>
+        <input type="range" id="hour" min="0" max="23" step="1"> <b id="hour-label"></b><br>
+        유동인구 <select id="condition">${meta.conditions.map(c => `<option value="${c.key}">${c.label}</option>`).join('')}</select>
+      </div>
+      <label><input type="radio" name="mode" value="dummy"> 더미 (테스트)</label>`;
     L.DomEvent.disableClickPropagation(div);
     return div;
   };
   controls.addTo(map);
-  const dateInput = document.getElementById('model-date');
-
-  async function reload() {
-    const q = state.mode === 'model' ? `?date=${state.date}` : '';
-    try {
-      gridData = await getJSON('/api/grid' + q);
-    } catch (err) {
-      alert(`${state.date}: 데이터 없음 (${meta.date_start} ~ ${meta.date_end})`);
-      return;
-    }
+  const isoBox = document.getElementById('isolation');
+  const wxBox = document.getElementById('weather');
+  const dateIn = document.getElementById('date');
+  const condSel = document.getElementById('condition');
+  const hourIn = document.getElementById('hour');
+  const hourLabel = document.getElementById('hour-label');
+  const syncSlotUI = () => {
+    condSel.value = state.condition;
+    hourIn.value = state.hour;
+    dateIn.value = state.date;
+    hourLabel.textContent = `${state.hour}시`;
+    const off = state.mode !== 'combined';
+    dateIn.disabled = hourIn.disabled = wxBox.disabled = document.getElementById('now').disabled = off;
+    condSel.disabled = off || !state.isolation;  // 유동인구를 끄면 조건이 결과에 영향 없음
+  };
+  // 지금 보는 시각·설정을 주소에 남겨 새로고침·공유해도 같은 화면이 나오게 한다
+  function syncURL() {
+    const q = new URLSearchParams({ at: `${state.date}T${pad2(state.hour)}:00`, condition: state.condition });
+    if (!state.weather) q.set('weather', 'off');
+    if (!state.isolation) q.set('population', 'off');
+    history.replaceState(null, '', '?' + q.toString());
+  }
+  const redraw = () => { map.closePopup(); gridLayer.setStyle(styleOf); renderLegend(); syncSlotUI(); syncURL(); };
+  // 조건·시간대가 바뀌면 그 슬롯의 격자를 다시 받는다 (요청이 겹치면 마지막 것만 반영)
+  let seq = 0;
+  async function reloadSlot() {
+    const my = ++seq;
+    syncSlotUI();
+    const data = await getJSON('/api/grid' + slotQuery());
+    if (my !== seq) return;
     map.closePopup();
+    state.wx = data.weather;
+    syncURL();
     gridLayer.clearLayers();
-    gridLayer.addData(gridData);
+    gridLayer.addData(data);
     applyZoomStyle();
     renderLegend();
   }
   document.querySelectorAll('input[name=mode]').forEach(el => el.addEventListener('change', () => {
     state.mode = el.value;
-    dateInput.disabled = state.mode !== 'model';
-    reload();
+    isoBox.disabled = state.mode !== 'combined';
+    redraw();
   }));
-  dateInput.addEventListener('change', () => {
-    if (!dateInput.value) return;
-    state.date = dateInput.value;
-    reload();
+  isoBox.addEventListener('change', () => { state.isolation = isoBox.checked; redraw(); });
+  condSel.addEventListener('change', () => { state.condition = condSel.value; reloadSlot(); });
+  wxBox.addEventListener('change', () => { state.weather = wxBox.checked; reloadSlot(); });
+  dateIn.addEventListener('change', () => {
+    if (!dateIn.value) return;
+    state.date = dateIn.value;
+    state.condition = dayCondition(state.date);  // 날짜를 바꾸면 유동인구 조건도 그 날 요일로
+    reloadSlot();
   });
+  hourIn.addEventListener('input', () => { hourLabel.textContent = `${hourIn.value}시`; });
+  hourIn.addEventListener('change', () => { state.hour = +hourIn.value; reloadSlot(); });
+  document.getElementById('now').addEventListener('click', async () => {
+    const m = await getJSON('/api/risk/meta');
+    state.condition = m.default_slot.condition;
+    state.hour = m.default_slot.hour;
+    state.date = todayKST();
+    reloadSlot();
+  });
+  isoBox.checked = state.isolation;
+  wxBox.checked = state.weather;
+  syncSlotUI();
+  syncURL();
   renderLegend();
 }
 

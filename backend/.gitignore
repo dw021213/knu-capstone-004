@@ -18,3 +18,7 @@ coverage.*
 
 # Claude 로컬 설정
 .claude/settings.local.json
+
+# DB 덤프 (드라이브로 따로 전달)
+*.sql.gz
+*.dump
