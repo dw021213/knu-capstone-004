@@ -312,6 +312,8 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 2026-10-13: 교통사고 모델을 **우도·추자도 포함 도로 모델**(`jeju_h3_r8_road_islands_its20260914_ngii2025_v1`)로 교체.
   도로 셀 2,200 → 2,249(섬 수치지도 49셀, 도로 형상 3개 변수만). 셀별 출처는 `hazard_score.detail`(migration 011) → `/api/cells` `hazards.traffic.detail`.
   `etl road-risk`는 옛/새 metadata 키 둘 다 읽음. 고립도 0.2 재확인: 위해도 상위 10% 유지율 0.15→85%, 0.2→79%, 0.25→69%, 0.3→53% → 0.2 유지.
+- 2026-10-13: 팀 공유용 `README.md`, `scripts/db-dump.sh`·`db-restore.sh` 추가. 덤프 `종프/jeju_20261013_road-islands.sql.gz`(21MB),
+  빈 새 DB 컨테이너에 복원해 행 수 일치 확인. 덤프는 레포 금지(.gitignore), 드라이브로 전달.
 
 ## ▶ 현재 상태 요약 (2026-10-13, 이어서 작업할 때 여기부터)
 - **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (push 완료, main 미병합). 옛 `종프/back` 은 백업
