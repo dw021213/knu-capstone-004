@@ -298,7 +298,8 @@ SELECT json_build_object(
              WHERE rc.h3_index = c.h3_index AND rc.condition = $3),
   'hazards', (SELECT COALESCE(json_object_agg(hs.hazard, json_build_object(
                 'label', hm.label, 'percentile', hs.percentile, 'score', hs.score,
-                'available', hs.available, 'dataset_id', hm.dataset_id, 'snapshot_date', hm.snapshot_date)), '{}'::json)
+                'available', hs.available, 'dataset_id', hm.dataset_id, 'snapshot_date', hm.snapshot_date,
+                'detail', hs.detail)), '{}'::json)
               FROM hazard_score hs JOIN hazard_meta hm USING (hazard) WHERE hs.h3_index = c.h3_index),
   'population', (SELECT json_build_object('value', round(p.population::numeric, 1), 'condition', p.condition, 'hour', p.hour,
                                          'std_ym', ps.std_ym, 'file', ps.file)

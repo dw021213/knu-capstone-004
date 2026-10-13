@@ -22,7 +22,7 @@
 
 | 구성 | 자료 | 비고 |
 |---|---|---|
-| 교통사고 | ML 팀 **도로 전용 CatBoost** (`jeju_h3_r8_road_catboost_20260914_v1`, 도로자료 2026-09-14) | 차로·제한속도·교차로 등 도로 특성 19개 입력. 도로 있는 2,200셀만 점수 있음 |
+| 교통사고 | ML 팀 **도로 전용 CatBoost, 우도·추자도 포함** (`jeju_h3_r8_road_islands_its20260914_ngii2025_v1`, 본섬 표준노드링크 2026-09-14 / 섬 수치지도 2025) | 차로·제한속도·교차로 등 도로 특성 입력(섬 49셀은 도로 길이·밀도·개수 3개만). 도로 있는 2,249셀만 점수 있음 |
 | 고립도 | 2015-01 제주도민 250m 격자 **시간대별** 유동인구 (조건 8종 × 0~23시, 하루 평균으로 환산) | 2015 분포를 현재로 가정, 관광객 미포함 |
 
 - **교통사고(도로) 점수는 고정**이고, **고립도는 조건·시간대에 따라 바뀐다.**
@@ -88,7 +88,7 @@
       "hazard": "traffic",
       "name": "교통사고",
       "label": "도로 특성 기반 상대 교통사고 위험도",
-      "dataset_id": "jeju_h3_r8_road_catboost_20260914_v1",
+      "dataset_id": "jeju_h3_r8_road_islands_its20260914_ngii2025_v1",
       "snapshot_date": "2026-09-14",
       "limitations": ["…ML 팀 제한사항(영문)…"]
     }
@@ -235,8 +235,9 @@
       "percentile": 98.77273,
       "score": 0.4546484,
       "available": true,
-      "dataset_id": "jeju_h3_r8_road_catboost_20260914_v1",
-      "snapshot_date": "2026-09-14"
+      "dataset_id": "jeju_h3_r8_road_islands_its20260914_ngii2025_v1",
+      "snapshot_date": "2026-09-14",
+      "detail": { "road_source": "ITS_standard_nodelink", "feature_coverage": "standard_link_attributes", "road_snapshot_date": "2026-09-14" }
     }
   },
   "hourly": [
@@ -259,6 +260,7 @@
 | `risk.hazard`, `risk.isolation` | 구성 요소 → "위해도 0.988 × 0.8 + 고립도 0.000 × 0.2" 같은 설명 | 상세 패널 |
 | `risk.hazard_percentile`, `risk.hazard_level` | 유동인구를 끈 순위·등급 | 유동인구 끔일 때 |
 | `hazards.traffic.percentile` | 교통사고(도로) 모델 순위. 재난·범죄가 들어오면 `hazards.disaster`, `hazards.crime` 이 추가됨 | 상세 패널 |
+| `hazards.traffic.detail` | 셀의 도로자료 출처. `road_source`: `ITS_standard_nodelink`(본섬 표준노드링크, `road_snapshot_date`) / `NGII_digital_map`(우도·추자도 수치지도, `island_map_year`, `feature_coverage=geometry_only` 도로 형상만 사용) / `no_mapped_road` | 상세 패널에 출처 표기 |
 | `hourly[]` | 같은 조건의 0~23시 순위·등급·유동인구 (기상 가산 제외) | 시간대별 그래프 |
 | `risk.base_*`, `risk.weather_bonus` | 기상 가산 전 값, 가산점 | 상세 패널 |
 | `weather` | `{stn, name, mountain, dist_m, metrics{temp, wind, rain_1h, rain_3h, rain_12h, humidity, humidity_24h, feels_like, snow_24h}, alerts[], bonus, at, status}` | "진달래밭(산지) 6.4km · 3h 67mm · 호우 주의보급" 같은 설명 |

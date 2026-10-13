@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// runRoadRisk 는 도로 전용 교통사고 모델(교통사고ML_도로전용_…_백엔드전달) 점수를 hazard_score(hazard='traffic')에 넣고
+// runRoadRisk 는 도로 전용 교통사고 모델(교통사고ML_도로전용_…_백엔드전달, 교통사고ML_2026도로_우도추자도포함_백엔드전달) 점수를 hazard_score(hazard='traffic')에 넣고
 // 최종 위험도를 다시 계산한다. 인수인계서 확인 항목(해시, 3,651행, 고유 h3, 격자 일치, 도로 셀 수,
 // 도로 없는 셀은 백분위 null)을 검사하고 하나라도 어긋나면 롤백한다.
 //
@@ -28,13 +28,21 @@ func runRoadRisk(ctx context.Context, pool *pgxpool.Pool, dir string) error {
 	}
 	var meta struct {
 		DatasetID        string `json:"dataset_id"`
-		RoadSnapshotDate string `json:"road_snapshot_date"`
+		RoadSnapshotDate string `json:"road_snapshot_date"`         // 2026-09-14 본섬 전용 전달본
+		StandardLinkDate string `json:"standard_link_release_date"` // 우도·추자도 포함 전달본
 		Cells            int    `json:"cells"`
+		CellCount        int    `json:"cell_count"`
 		RoadPresentCells int    `json:"road_present_cells"`
 		H3Resolution     int    `json:"h3_resolution"`
 	}
 	if err := json.Unmarshal(rawMeta, &meta); err != nil {
 		return fmt.Errorf("metadata.json: %w", err)
+	}
+	if meta.RoadSnapshotDate == "" {
+		meta.RoadSnapshotDate = meta.StandardLinkDate
+	}
+	if meta.Cells == 0 {
+		meta.Cells = meta.CellCount
 	}
 	if meta.H3Resolution != H3Res {
 		return fmt.Errorf("모델 H3 해상도 %d ≠ 백엔드 %d", meta.H3Resolution, H3Res)
@@ -117,8 +125,18 @@ func runRoadRisk(ctx context.Context, pool *pgxpool.Pool, dir string) error {
 		if hasRoad {
 			withRoad++
 		}
-		batch.Queue(`INSERT INTO hazard_score (h3_index, hazard, score, percentile, available)
-			VALUES ($1, 'traffic', $2, $3, $4)`, h, score, pct, hasRoad)
+		// 셀별 도로자료 출처 (우도·추자도 포함 전달본부터). 없는 열은 넣지 않는다.
+		detail := map[string]any{}
+		for _, k := range []string{"road_source", "feature_coverage", "road_snapshot_date"} {
+			if r[k] != "" {
+				detail[k] = r[k]
+			}
+		}
+		if y, err := strconv.Atoi(r["island_map_year"]); err == nil {
+			detail["island_map_year"] = y
+		}
+		batch.Queue(`INSERT INTO hazard_score (h3_index, hazard, score, percentile, available, detail)
+			VALUES ($1, 'traffic', $2, $3, $4, $5)`, h, score, pct, hasRoad, detail)
 	}
 	if withRoad != meta.RoadPresentCells {
 		return fmt.Errorf("도로 있는 셀 %d ≠ metadata %d", withRoad, meta.RoadPresentCells)
