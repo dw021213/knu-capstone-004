@@ -272,3 +272,16 @@ for r in dist_curve:
     print(f"  고립도 {r['x']:.2f}: 현장거리 평균 {r['mean_km']:.1f}km, 중앙 {r['median_km']:.1f}km, 10km 초과 {r['share_over_10km']:.0%} (n={r['n']})")
 if out_path:
     json.dump(res, open(out_path, "w"), ensure_ascii=False, indent=1)
+
+# ---------- 영향도 비례 기상 가산 제안 ----------
+# 규칙: 점수 환산 추정치(Δscore = ln RR / b), 음수는 0, 경보급 ≥ 주의보급, 추정 불가는 기존값 유지
+CURRENT = {"호우": (0.10, 0.20), "강풍": (0.05, 0.10), "폭염": (0.05, 0.10), "한파": (0.05, 0.10), "건조": (0.03, 0.05)}
+print("영향도 비례 가산 제안 (주의보급, 경보급):")
+for it in ITEMS:
+    est = {w["level"]: w for w in weather if w["item"] == it}
+    vals = []
+    for lvl in (1, 2):
+        w = est.get(lvl, {})
+        vals.append(round(max(0.0, w["delta_score"]), 2) if "delta_score" in w else CURRENT[it][lvl - 1])
+    vals[1] = max(vals[1], vals[0])
+    print(f"  {it}: {CURRENT[it]} → ({vals[0]:.2f}, {vals[1]:.2f})")

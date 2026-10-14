@@ -139,7 +139,7 @@ async function cellPopup(h3) {
     const weatherRow = !state.weather ? `<tr><td>기상</td><td class="muted">가산 끔</td></tr>`
       : w.status === 'no_data' || !obsText ? `<tr><td>기상</td><td class="muted">${w.at ?? ''} 관측 없음 (가산 0)</td></tr>`
       : `<tr><td>기상</td><td>${(w.alerts || []).length
-          ? w.alerts.map(a => `<b>${a.label} ${a.level === 'warning' ? '경보급' : '주의보급'}</b> +${a.bonus}`).join(', ')
+          ? w.alerts.map(a => `<b>${a.label} ${a.level === 'warning' ? '경보급' : '주의보급'}</b> ${a.bonus > 0 ? '+' + a.bonus : '<span class="muted">(가산 0)</span>'}`).join(', ')
           : '기준 초과 없음'}<br><span class="muted">${w.name ?? ''}${w.mountain ? '(산지)' : ''} ${(w.dist_m / 1000).toFixed(1)}km · ${obsText}</span></td></tr>`;
     return `<div class="popup"><b>H3 ${d.h3}</b> <span class="muted">${state.date} ${state.hour}시</span><table>
       ${riskRows}

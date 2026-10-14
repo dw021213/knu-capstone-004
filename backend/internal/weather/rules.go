@@ -42,12 +42,14 @@ type Rule struct {
 	Label    string            `json:"label"`
 	Weights  map[Level]float64 `json:"weights"`
 	Criteria []Criterion       `json:"criteria"`
+	Evidence map[string]any    `json:"evidence,omitempty"` // 가중치 근거 (analysis/calibration.py)
 }
 
 type Rules struct {
 	Version     string  `json:"version"`
 	Description string  `json:"description"`
 	MaxBonus    float64 `json:"max_bonus"`
+	Calibration string  `json:"calibration,omitempty"` // 가중치를 정한 방법
 	Rules       []Rule  `json:"rules"`
 }
 
