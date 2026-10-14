@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,6 +37,14 @@ func NewAPIHub(key string) *APIHub {
 }
 
 // get 은 API허브가 가끔 504 를 내서 몇 번 다시 시도한다. 응답은 CP949 텍스트일 수 있어 UTF-8 로 바꾼다.
+// redactKey 는 오류 메시지(요청 URL 포함)에서 인증키를 가린다. 로그에 키가 남지 않게.
+func redactKey(err error, key string) error {
+	if key == "" {
+		return err
+	}
+	return errors.New(strings.ReplaceAll(err.Error(), key, "***"))
+}
+
 func (a *APIHub) get(ctx context.Context, path string, q url.Values) ([]byte, error) {
 	q.Set("authKey", a.Key)
 	u := "https://apihub.kma.go.kr/api/typ01/url/" + path + "?" + q.Encode()
@@ -54,7 +63,7 @@ func (a *APIHub) get(ctx context.Context, path string, q url.Values) ([]byte, er
 		}
 		resp, err := a.Client.Do(req)
 		if err != nil {
-			lastErr = err
+			lastErr = redactKey(err, a.Key)
 			continue
 		}
 		body, err := io.ReadAll(resp.Body)
