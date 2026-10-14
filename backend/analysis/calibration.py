@@ -1,16 +1,17 @@
-"""고립도·기상 가산 보정 곡선 (2021 교통사고 구급출동, 셀 × 일 단위).
+"""고립도·기상 가산 보정 곡선 (교통사고 구급출동, 셀 × 일 단위, 여러 해).
 
 구급출동 자료에 신고 시각(시·분)이 비어 있어 '셀-일'을 단위로 쓴다.
   - 셀의 하루 점수 = 그날 요일 조건(평일/휴일/휴일전날)의 0~23시 평균 (risk_combined)
-  - 기상 = 셀에서 가장 가까운 (2021 관측 있는) AWS 지점의 그날 항목별 최고 단계
+  - 기상 = 셀에서 가장 가까운 (그해 관측 있는) AWS 지점의 그날 항목별 최고 단계
 
-Poisson 회귀 (월 고정효과, 노출 = 셀-일 수):
+Poisson 회귀 (연-월 고정효과, 노출 = 셀-일 수):
   M1  log μ = 월 + b·기본점수 + Σ c_k·기상항목_k   → 기상 항목의 '점수 환산 가산' = c_k / b
   M2  log μ = 월 + b1·위해도 + b2·고립도            → 사고 빈도 기준의 고립도 상대 가중치 = b2 / (b1 + b2)
 
 입력 (원본 구급출동 CSV 는 개인정보가 있어 레포에 넣지 않는다 — 아래는 중간 산출물):
   inc_h3.csv    순번,날짜(YYYYMMDD),h3,현장거리km,종결구분   ← 사고 좌표를 h3_cell 에 ST_Contains 로 연결
-  cells.csv     h3,조건,위해도,고립도,기본점수,지점         ← risk_combined 조건별 하루 평균 + 최근접 지점
+  cells.csv     h3,조건,위해도,고립도,기본점수              ← risk_combined 조건별 하루 평균
+  stn_map.csv   연도,h3,지점                                ← 그해 관측 있는 최근접 AWS 지점
   obs_days.csv  지점,날짜,관측시간수
   eval.csv      weather-eval 출력 (기준 초과 시각만)
 
@@ -29,11 +30,14 @@ ITEMS = ["호우", "강풍", "폭염", "한파", "건조"]
 
 # ---------- 입력 ----------
 cell = {}  # (h3, 조건) → (위해도, 고립도, 점수)
-stn_of = {}
-for h, cond, hz, iso, sc, stn in csv.reader(open(f"{d}/cells.csv")):
+for h, cond, hz, iso, sc in csv.reader(open(f"{d}/cells.csv")):
     cell[(h, cond)] = (float(hz), float(iso), float(sc))
-    stn_of[h] = int(stn)
-cells = sorted(stn_of)
+stn_of = {}  # (연도, h3) → 지점
+for yr, h, stn in csv.reader(open(f"{d}/stn_map.csv")):
+    stn_of[(int(yr), h)] = int(stn)
+cells = sorted({h for h, _ in cell})
+years = sorted({y for y, _ in stn_of})
+road = set(cells)
 
 inc = collections.Counter()  # (h3, 날짜) → 건수
 far = {5: collections.Counter(), 10: collections.Counter()}  # 구급차 현장거리 > N km 인 사고
@@ -44,7 +48,7 @@ for _, day, h, km, st in csv.reader(open(f"{d}/inc_h3.csv")):
         continue
     n_all += 1
     day = f"{day[:4]}-{day[4:6]}-{day[6:]}"
-    if h in stn_of:
+    if h in road:
         n_road += 1
         inc[(h, day)] += 1
         if km:
@@ -68,16 +72,17 @@ def cond_of(day):  # internal/risk/slot.go DefaultSlot 과 같게
     return "holiday" if wd >= 5 else "preholiday" if wd == 4 else "weekday"
 
 
-days = [dt.date(2021, 1, 1) + dt.timedelta(i) for i in range(365)]
+days = [day for y in years for day in (dt.date(y, 1, 1) + dt.timedelta(i) for i in range(366)) if day.year == y]
+MONTHS = [(y, m) for y in years for m in range(1, 13)]  # 연-월 고정효과
 
 # ---------- 셀-일 집계 ----------
 # 곡선용: 변수별 분위 구간 / 회귀용: (점수 구간, 월, 기상 벡터) 그룹
 units = []  # (위해도, 고립도, 점수, 월, 기상키 또는 None, 사고)
 for day in days:
-    ds, cond, m = day.isoformat(), cond_of(day), day.month
+    ds, cond, m = day.isoformat(), cond_of(day), (day.year, day.month)
     for h in cells:
         hz, iso, sc = cell[(h, cond)]
-        s = stn_of[h]
+        s = stn_of[(day.year, h)]
         wkey = None
         if (s, ds) in obs_ok:
             a = alert.get((s, ds), {})
@@ -170,7 +175,7 @@ def poisson(groups, names):
 
 
 def month_x(m):
-    return [1.0 if m == k else 0.0 for k in range(2, 13)]
+    return [1.0 if m == k else 0.0 for k in MONTHS[1:]]
 
 
 # M1: 점수 + 기상 (관측 있는 셀-일만)
@@ -181,7 +186,7 @@ for hz, iso, sc, m, wk, ev, *_ in w_units:
     k = (bin_of(sc, sc_edges), m, wk)
     g[k][0] += 1; g[k][1] += ev; g[k][2] += sc
 dummies = [(it, lvl) for it in ITEMS for lvl in (1, 2)]
-names1 = ["const"] + [f"m{k}" for k in range(2, 13)] + ["score"] + [f"{it}{'경보급' if l == 2 else '주의보급'}" for it, l in dummies]
+names1 = ["const"] + [f"m{k}" for k in MONTHS[1:]] + ["score"] + [f"{it}{'경보급' if l == 2 else '주의보급'}" for it, l in dummies]
 groups1 = []
 for (b, m, wk), (expo, ev, ssum) in g.items():
     x = [1.0] + month_x(m) + [ssum / expo] + [1.0 if wk[ITEMS.index(it)] == l else 0.0 for it, l in dummies]
@@ -214,7 +219,7 @@ for it, l in dummies:
 # M2: 위해도 + 고립도. 정답을 바꿔 가며 (전체 사고 / 현장거리 5km·10km 초과 사고)
 hz_edges = quantile_edges([u[0] for u in units], 40)
 iso_edges = quantile_edges([u[1] for u in units], 40)
-names2 = ["const"] + [f"m{k}" for k in range(2, 13)] + ["hazard", "isolation"]
+names2 = ["const"] + [f"m{k}" for k in MONTHS[1:]] + ["hazard", "isolation"]
 m2 = {}
 for label, col in (("전체 사고", 5), ("현장거리 5km 초과", 6), ("현장거리 10km 초과", 7)):
     g2 = collections.defaultdict(lambda: [0, 0, 0.0, 0.0])
