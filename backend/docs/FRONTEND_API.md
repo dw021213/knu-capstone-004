@@ -33,8 +33,11 @@
 
   | 유동인구(고립도) | 색에 쓸 필드 | 등급 |
   |---|---|---|
-  | 켬 (기본) | `risk_percentile` | `risk_level` |
-  | 끔 (교통사고 모델만) | `hazard_percentile` | `hazard_level` |
+  | **끔 (기본, 교통사고 모델 + 기상 가산)** | `hazard_percentile` | `hazard_level` |
+  | 켬 (0.8 모델 + 0.2 고립도) | `risk_percentile` | `risk_level` |
+
+  2026-10-15부터 **기본은 유동인구 끔**이다(①의 `default_population: false`). 2021 사고 자료에서 고립도(한산할수록 위험)가
+  사고 빈도와 반대 방향으로 나와 근거가 약하다. 범죄·재난 모델이 들어오면 다시 켤 수 있다.
 - 도로 자료가 없는 셀(1,451개, 우도·추자도 포함)은 위험도가 **null** → "도로 자료 없음"으로 표시.
 
 ---
@@ -187,7 +190,7 @@
 | `hazard` | 위해도 0~1 (위험 모델 백분위 평균) | 상세 패널 |
 | `hazard_percentile`, `hazard_level` | **유동인구를 끈** 위험도 순위·등급 (위해도만, 기상 가산 포함) | 유동인구 끔일 때 색 |
 | `base_percentile`, `base_level` | 기상 가산 **전** 순위·등급 | "기상 때문에 올랐다" 표시 |
-| `weather_bonus` | 기상 가산점 (0~0.3) | 툴팁 |
+| `weather_bonus` | 기상 가산점 (상한 0.3, 현재 규칙 v3 는 호우 경보급 +0.18 만) | 툴팁 |
 | `weather_alerts` | 기준 초과 항목 `[{key, label, level(advisory/warning), metric, value, bonus}]` | 경고 아이콘·문구 |
 | `weather_stn` | 연결된 AWS 지점 번호 | 참고 |
 | `isolation` | 고립도 0~1 (1 = 가장 한산) | 상세 패널 |
@@ -304,12 +307,13 @@
 
 ## 표시 규칙 (ML 팀 인수인계서 요구사항 포함)
 
-1. **색은 `risk_percentile`(0~100)** 로 칠한다.
+1. **색은 `hazard_percentile`(0~100, 기본 = 유동인구 끔)** 로 칠한다. 유동인구를 켜면 `risk_percentile`.
 2. 범례는 ①의 `legend` ("제주 상대 위험 순위 (모든 시간대 공통 기준)"). **"사고 확률", "안전" 으로 표시하지 않는다.**
    - percentile 90 = 모든 시간대·셀 중 상위 10% 라는 뜻이지 사고 확률 90% 가 아니다.
-3. `risk_percentile` 이 **null 인 셀은 "도로 자료 없음"** (회색 등)으로 표시한다. 0점·안전으로 칠하지 않는다.
+3. 위험도(`hazard_percentile`·`risk_percentile`)가 **null 인 셀은 "도로 자료 없음"** (회색 등)으로 표시한다. 0점·안전으로 칠하지 않는다.
 4. **실시간 관측으로 설명하지 않는다.** 도로 자료(2026-09-14) + 2015-01 시간대별 유동인구 패턴 기반이다.
-5. 출처 표기: "교통사고(도로자료 2026-09-14) 80% + 고립도(2015-01 도민 시간대별 유동인구, 현재로 가정) 20%"
+5. 출처 표기 (기본): "교통사고 도로 모델(본섬 2026-09-14, 섬 수치지도 2025) + 호우 경보급 +0.18"
+   유동인구 켬: "교통사고 80% + 고립도(2015-01 도민 시간대별 유동인구, 현재로 가정) 20%"
 
 백엔드 확인용 지도(`http://localhost:8080`)는 다음 색을 쓴다. 맞출 필요는 없지만 참고용.
 
@@ -342,7 +346,7 @@ const projection = d3.geoMercator().fitSize([width, height], grid);  // ← 팀�
 const color = teamColorScale;                                        // ← 팀원 색 스케일 (입력: 0~100)
 const NO_DATA = '#bdbdbd';
 
-let usePopulation = true;   // 유동인구(고립도) 켜기/끄기
+let usePopulation = false;  // 유동인구(고립도) 켜기/끄기 (기본 끔)
 const pct = d => usePopulation ? d.properties.risk_percentile : d.properties.hazard_percentile;
 
 const cells = svg.selectAll('path.cell')

@@ -70,7 +70,7 @@ async function getJSON(url) {
 }
 
 // 표시 모드: combined = 종합 위험도(도로 교통사고 모델 80% + 고립도 20%), dummy = 백엔드 테스트용 더미
-const state = { mode: 'combined', isolation: true, weather: true, meta: null, condition: null, hour: null, date: null, wx: null };
+const state = { mode: 'combined', isolation: false, weather: true, meta: null, condition: null, hour: null, date: null, wx: null };
 const pad2 = n => String(n).padStart(2, '0');
 // at(시각, KST) + 유동인구 조건 + 기상 가산 여부
 const slotQuery = () =>
@@ -182,7 +182,7 @@ async function main() {
   state.condition = meta.default_slot.condition;
   state.hour = meta.default_slot.hour;
   state.date = todayKST();
-  // 주소로 바로 열기: /?at=2021-09-14T09:00&condition=weekday&weather=off&population=off
+  // 주소로 바로 열기: /?at=2021-09-14T09:00&condition=weekday&weather=off&population=on (유동인구는 기본 끔)
   const qs = new URLSearchParams(location.search);
   const m = (qs.get('at') || '').match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{1,2}))?/);
   if (m) {
@@ -192,7 +192,7 @@ async function main() {
   }
   if (qs.get('condition')) state.condition = qs.get('condition');
   if (qs.get('weather') === 'off') state.weather = false;
-  if (qs.get('population') === 'off') state.isolation = false;
+  if (qs.get('population') === 'on') state.isolation = true;
   const [grid, fac] = await Promise.all([
     getJSON('/api/grid' + slotQuery()),
     getJSON('/api/facilities?type=fire_station'),
@@ -276,7 +276,7 @@ async function main() {
     const div = L.DomUtil.create('div', 'panel controls');
     div.innerHTML = `<h4>표시</h4>
       <label><input type="radio" name="mode" value="combined" checked> 종합 위험도</label>
-      <label style="margin-left:18px"><input type="checkbox" id="isolation" checked> 유동인구(고립도) 반영</label>
+      <label style="margin-left:18px"><input type="checkbox" id="isolation"> 유동인구(고립도) 반영</label>
       <label style="margin-left:18px"><input type="checkbox" id="weather" checked> 기상 가산</label>
       <div class="slot" id="slot">
         <input type="date" id="date"> <button type="button" id="now" title="현재 한국 시각 기준">지금</button><br>
@@ -307,7 +307,7 @@ async function main() {
   function syncURL() {
     const q = new URLSearchParams({ at: `${state.date}T${pad2(state.hour)}:00`, condition: state.condition });
     if (!state.weather) q.set('weather', 'off');
-    if (!state.isolation) q.set('population', 'off');
+    if (state.isolation) q.set('population', 'on');
     history.replaceState(null, '', '?' + q.toString());
   }
   const redraw = () => { map.closePopup(); gridLayer.setStyle(styleOf); renderLegend(); syncSlotUI(); syncURL(); };

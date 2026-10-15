@@ -129,10 +129,11 @@ func (h *Handler) riskMeta(c *gin.Context) {
 			"condition": defCond, "hour": defHour,
 			"rule": "condition·hour 를 안 주면 at(기본 지금) 한국 시각: 토·일=holiday, 금=preholiday, 그 외=weekday (공휴일 미반영)",
 		},
-		"levels":           levels,
-		"weather":          h.weatherMeta(c),
-		"no_data":          "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_* 가 null. 안전으로 표시하지 않는다",
-		"isolation_toggle": "유동인구(고립도) 반영: risk_percentile·risk_level / 끔(위해도만): hazard_percentile·hazard_level",
+		"levels":             levels,
+		"weather":            h.weatherMeta(c),
+		"no_data":            "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_* 가 null. 안전으로 표시하지 않는다",
+		"isolation_toggle":   "유동인구(고립도) 반영: risk_percentile·risk_level / 끔(위해도만): hazard_percentile·hazard_level",
+		"default_population": false, // 2026-10-15 기본 표시는 유동인구 끔(hazard_*). 사고 빈도와 고립도 방향이 반대라 근거가 약함
 		"notes": []string{
 			"risk_percentile 은 모든 조건·시간대·셀을 통틀어 매긴 상대 순위이며 사고 확률이 아니다. 시간대끼리 비교 가능(새벽이 낮보다 높게 나옴)",
 			"위해도(도로 모델)는 고정, 고립도만 유동인구 조건·시간대에 따라 바뀐다. 실시간 관측이 아니라 2015-01 패턴이다",
