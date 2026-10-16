@@ -7,7 +7,7 @@ const MODEL = '교통사고 도로 모델(2017~2021 사고 자료)';
 const LINK = '표준노드링크 2026-09-14';
 const NGII = '수치지도 2025';
 const NEARBY: ReasonInput['nearby'] = { convenience: { r300: 2 }, cctv: { r300: 0 } };
-const FACILITY = '반경 300m 안에 편의점 2곳이 있고 CCTV는 없어요.';
+const FACILITY = '반경 300m 안에 편의점 2곳이 있고 CCTV는 자료에 없어요.';
 
 function input(percentile: number | null, roadSource: RoadSource): ReasonInput {
   return { level: levelFromPercentile(percentile), percentile, roadSource, nearby: NEARBY };
@@ -105,16 +105,16 @@ describe('buildReason 세부 규칙', () => {
     expect(buildReason({ ...base, percentile: 81.5 }).body).toContain('상위 19% 안');
   });
 
-  it('주변 시설: 있는 것만 개수, CCTV·편의점이 0이면 없다고 말한다', () => {
+  it('주변 시설: 있는 것만 개수, CCTV·편의점이 0이면 자료에 없다고 말한다(자료가 실제보다 적을 수 있어 단정하지 않음)', () => {
     const body = (nearby: ReasonInput['nearby']) => buildReason({ ...base, nearby }).body;
     expect(
       body({ cctv: { r300: 3 }, convenience: { r300: 1 }, police: { r300: 1 }, fire: { r300: 0 } }),
     ).toContain('반경 300m 안에 CCTV 3곳, 편의점 1곳, 경찰 지구대·파출소 1곳이 있어요.');
     expect(body({ cctv: { r300: 0 }, convenience: { r300: 0 }, lodging: { r300: 0 } })).toContain(
-      '반경 300m 안에 CCTV와 편의점은 없어요.',
+      '반경 300m 안에 CCTV와 편의점은 자료에 없어요.',
     );
     expect(body({ convenience: { r300: 0 }, lodging: { r300: 2 } })).toContain(
-      '반경 300m 안에 숙박시설 2곳이 있고 편의점은 없어요.',
+      '반경 300m 안에 숙박시설 2곳이 있고 편의점은 자료에 없어요.',
     );
   });
 

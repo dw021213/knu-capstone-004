@@ -127,7 +127,7 @@ describe('CellSheet', () => {
       '119안전센터00',
     ]);
     const reason = screen.getByTestId('sheet-reason').textContent!;
-    expect(reason).toContain('반경 300m 안에 CCTV 1곳이 있고 편의점은 없어요.');
+    expect(reason).toContain('반경 300m 안에 CCTV 1곳이 있고 편의점은 자료에 없어요.');
     expect(reason).not.toContain('숙박');
     expect(reason).not.toContain('경찰');
   });

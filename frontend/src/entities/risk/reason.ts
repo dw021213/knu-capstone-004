@@ -43,7 +43,7 @@ const FACILITY: { type: PoiType; name: string; topic: string; and: string }[] = 
   { type: 'police', name: '경찰 지구대·파출소', topic: '는', and: '와' },
   { type: 'fire', name: '119안전센터', topic: '는', and: '와' },
 ];
-/** 0곳일 때 '없어요'라고 말하는 종류 */
+/** 0곳일 때 '자료에 없어요'라고 말하는 종류. 시설 자료가 실제보다 적을 수 있어 '없어요'로 단정하지 않는다 */
 const MENTION_ABSENT: ReadonlySet<PoiType> = new Set(['cctv', 'convenience']);
 
 function facilitySentence(nearby: ReasonInput['nearby']): string | null {
@@ -57,9 +57,9 @@ function facilitySentence(nearby: ReasonInput['nearby']): string | null {
   }
   const none = absent.map((f, i) => f.name + (i < absent.length - 1 ? f.and : f.topic)).join(' ');
   if (present.length > 0 && absent.length > 0)
-    return `반경 300m 안에 ${present.join(', ')}이 있고 ${none} 없어요.`;
+    return `반경 300m 안에 ${present.join(', ')}이 있고 ${none} 자료에 없어요.`;
   if (present.length > 0) return `반경 300m 안에 ${present.join(', ')}이 있어요.`;
-  if (absent.length > 0) return `반경 300m 안에 ${none} 없어요.`;
+  if (absent.length > 0) return `반경 300m 안에 ${none} 자료에 없어요.`;
   return null;
 }
 
