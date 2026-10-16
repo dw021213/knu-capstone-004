@@ -189,6 +189,8 @@ export function MapView({
       highlight,
     });
     hitsRef.current = { view: settled, hits };
+    // 조작 중에는 다시 그리지 않는다(끝날 때 한 번). e2e가 횟수를 센다
+    if (items.length > 0) performance.mark('markers-drawn');
   }, [markers, settled, size, highlight]);
 
   // e2e·디버그용 읽기 전용 창구. 좌표는 페이지(뷰포트) 기준
