@@ -4,7 +4,7 @@
 
 ## 실행법
 
-Node 22 이상이 필요합니다(`.nvmrc`는 `22`).
+Node 22.13 이상이 필요합니다(`.nvmrc`는 `22`, 잠긴 vite 8·eslint 10·jsdom 29가 22.13 이상을 요구).
 
 ```bash
 cd frontend
