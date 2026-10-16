@@ -15,6 +15,7 @@ import { cellAt } from '../features/map/hitTest';
 import { MapView, type MapFocus } from '../features/map/MapView';
 import type { Insets } from '../features/map/view';
 import { PlaceSearch } from '../features/search/PlaceSearch';
+import { ErrorState } from '../features/status/ErrorState';
 import { LoadingBanner } from '../features/status/LoadingBanner';
 import { cellCenter } from '../shared/geo/h3';
 import type { PoiType } from '../data/types';
@@ -22,8 +23,10 @@ import { useScores } from './useScores';
 import styles from './MapPage.module.css';
 
 export function MapPage({ source = dataSource }: { source?: DataSource }) {
-  const { data: scores, isPending } = useScores(source);
-  const loading = isPending;
+  const { data: scores, isError, isFetching, refetch } = useScores(source);
+  // 실패: 다시 시도 중이 아닐 때만. 점수가 없는 나머지 동안은 받는 중으로 본다
+  const failed = isError && !isFetching;
+  const loading = !scores && !failed;
   // 셀 시트 대상: 격자 셀 또는 격자 밖(바다)을 누른 곳
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const selected = target?.kind === 'cell' ? target.h3 : null;
@@ -145,6 +148,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
         <LayerPanel on={layers.on} toggle={toggle} count={count} states={states} />
         <Legend mode={source.mode} generatedAt={scores?.generatedAt} disabled={loading} />
         {loading && <LoadingBanner />}
+        {failed && <ErrorState onRetry={() => void refetch()} />}
         {/* 아래 묶음: 셀 시트를 날짜 칩 위에 쌓아 시트를 연 채로도 날짜를 바꿀 수 있다 */}
         <div className={styles.dock}>
           {target && (

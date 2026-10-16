@@ -70,3 +70,33 @@ test.describe('U7-1 로딩', () => {
     await expect(page.getByRole('dialog', { name: '날짜 선택' })).toBeVisible();
   });
 });
+
+test.describe('U7-3 불러오기 실패', () => {
+  test('점수 요청이 실패하면 다시 시도 버튼이 있는 오류 안내를 띄우고, 다시 시도해 성공하면 셀을 그린다', async ({
+    page,
+  }) => {
+    let calls = 0;
+    await page.route('**/data/scores.json', async (route) => {
+      calls++;
+      if (calls === 1) await route.abort();
+      else await route.continue();
+    });
+    await page.goto('/');
+    const alert = page.getByRole('alert').filter({ hasText: '위험도를 불러오지 못했어요' });
+    await expect(alert).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: '불러오는 중' })).toHaveCount(0);
+    // 저절로 다시 받지 않는다(사용자가 다시 시도를 누를 때만)
+    await page.waitForTimeout(1500);
+    expect(calls).toBe(1);
+    expect(await page.evaluate(() => window.__mapReady === true)).toBe(false);
+
+    await alert.getByRole('button', { name: '다시 시도' }).click();
+    await page.waitForFunction(() => window.__mapReady === true);
+    expect(calls).toBe(2);
+    await expect(alert).toHaveCount(0);
+    // 셀이 그려졌다: 제주시청 셀을 누르면 등급 시트가 열린다
+    const [x, y] = await page.evaluate(() => window.__mapDebug!.project(126.5312, 33.4996));
+    await page.mouse.click(x, y);
+    await expect(page.getByTestId('sheet-badge')).toBeVisible();
+  });
+});

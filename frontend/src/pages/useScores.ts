@@ -14,5 +14,7 @@ export function useScores(source: DataSource) {
     queryFn: () => source.getScores(at ? { at } : undefined),
     // 다시 받는 동안 앞 점수를 그대로 그린다
     placeholderData: keepPreviousData,
+    // 실패하면 저절로 다시 받지 않고 오류 안내의 '다시 시도'에 맡긴다
+    retry: false,
   });
 }
