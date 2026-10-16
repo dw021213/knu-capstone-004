@@ -11,7 +11,9 @@ import { PoiCard } from '../features/layers/PoiCard';
 import { LAYER_TYPES, useLayers } from '../features/layers/useLayers';
 import { usePoiLayers } from '../features/layers/usePoiLayers';
 import { Legend } from '../features/legend/Legend';
-import { MapView } from '../features/map/MapView';
+import { cellAt } from '../features/map/hitTest';
+import { MapView, type MapFocus } from '../features/map/MapView';
+import { PlaceSearch } from '../features/search/PlaceSearch';
 import { cellCenter } from '../shared/geo/h3';
 import type { PoiType } from '../data/types';
 import { useScores } from './useScores';
@@ -25,6 +27,8 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
   // 시트를 닫으면 열기 전 포커스로 돌아간다(검색창 등)
   const returnFocus = useRef<Element | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  // 검색으로 고른 곳(지도가 옮겨 가 확대한다)
+  const [focus, setFocus] = useState<MapFocus | null>(null);
   const { date } = useSelectedDate();
   const sheetData = useSheetData(source, target !== null);
   // 마커를 눌러 연 시설 카드
@@ -94,10 +98,22 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
         markers={markerLayout}
         onMarkerSelect={(type, id) => setPicked({ type: type as PoiType, id })}
         highlight={pickedPoi?.id ?? null}
+        focus={focus}
       />
       {/* 지도 위에 얹는 층. MapView 밖(형제)에 두어 여기서 누른 것은 확대·셀 선택으로 가지 않는다 */}
       <div ref={overlayRef} className={styles.overlay} data-testid="map-overlay">
         <header className={styles.top}>
+          <PlaceSearch
+            onPick={(item, input) => {
+              setFocus((f) => ({ key: (f?.key ?? 0) + 1, bbox: item.bbox, point: item.center }));
+              setPicked(null);
+              // 고른 곳의 셀 시트를 연다. 시트를 닫으면 검색창으로 돌아온다
+              const [lng, lat] = item.center;
+              const h3 = scores ? cellAt(lng, lat, scores.cells) : null;
+              returnFocus.current = input;
+              setTarget(h3 ? { kind: 'cell', h3 } : { kind: 'sea', lngLat: item.center });
+            }}
+          />
           {/* 위험 종류 탭 자리. 지금은 '종합' 하나라 선택된 라벨로 둔다 */}
           <div className={styles.tabs} data-testid="risk-tabs" role="group" aria-label="위험 종류">
             <span className={styles.tab} aria-current="true">

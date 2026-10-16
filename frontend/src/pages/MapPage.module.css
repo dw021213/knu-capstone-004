@@ -6,8 +6,8 @@
 
 /* 지도 위 층: 빈 곳은 지도로 통과시킨다(상속). 보이는 패널만 pointer-events: auto */
 .overlay {
-  /* 상단 영역 아래 첫 줄(레이어 버튼, 범례, 데스크톱 셀 패널) */
-  --overlay-top: calc(var(--touch) + var(--space-3));
+  /* 상단 영역(검색창 줄 + '종합' 탭 줄 + 아래 선) 바로 아래 첫 줄(레이어 버튼, 범례, 데스크톱 셀 패널) */
+  --overlay-top: calc(var(--touch) * 2 + var(--space-2) * 2 + 1px + var(--space-3));
   position: absolute;
   inset: 0;
   pointer-events: none;

@@ -1,7 +1,7 @@
 /* 지도 왼쪽 위(상단 '종합' 아래). 범례(오른쪽 위)와 같은 높이 */
 .root {
   position: absolute;
-  top: calc(var(--touch) + var(--space-3));
+  top: var(--overlay-top);
   left: var(--space-3);
   z-index: 2;
 }

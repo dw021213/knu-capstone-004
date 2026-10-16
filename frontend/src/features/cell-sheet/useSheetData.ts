@@ -1,6 +1,6 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import type { DataSource, EmergencyList, PoiType } from '../../data/types';
-import type { EmdFile } from '../../entities/place/emd';
+import { EMD_QUERY_KEY, fetchEmd, type EmdFile } from '../../entities/place/emd';
 import { LAYER_TYPES } from '../layers/useLayers';
 import type { LayerState } from '../layers/usePoiLayers';
 
@@ -12,12 +12,6 @@ export interface SheetData {
   facilities: Record<PoiType, LayerState>;
   emergency: EmergencyState;
   emd: EmdFile | null;
-}
-
-async function fetchEmd(): Promise<EmdFile> {
-  const res = await fetch('/data/emd.json');
-  if (!res.ok) throw new Error(`읍면동 파일 응답 ${res.status}`);
-  return (await res.json()) as EmdFile;
 }
 
 /**
@@ -37,7 +31,7 @@ export function useSheetData(source: DataSource, enabled: boolean): SheetData {
     queryFn: () => source.getEmergency(),
     enabled,
   });
-  const emd = useQuery({ queryKey: ['emd'], queryFn: fetchEmd, enabled });
+  const emd = useQuery({ queryKey: EMD_QUERY_KEY, queryFn: fetchEmd, enabled });
 
   const facilities = {} as Record<PoiType, LayerState>;
   LAYER_TYPES.forEach((type, i) => {

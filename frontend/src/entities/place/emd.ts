@@ -22,6 +22,15 @@ export interface EmdFile {
   items: EmdItem[];
 }
 
+export const EMD_QUERY_KEY = ['emd'] as const;
+
+/** 배포본에 실린 public/data/emd.json */
+export async function fetchEmd(): Promise<EmdFile> {
+  const res = await fetch('/data/emd.json');
+  if (!res.ok) throw new Error(`읍면동 파일 응답 ${res.status}`);
+  return (await res.json()) as EmdFile;
+}
+
 export interface Place {
   item: EmdItem;
   /** false면 어느 경계에도 들지 않아 가장 가까운 곳을 골랐다(바다, 줄인 해안선 밖) */
