@@ -11,7 +11,11 @@ const HALLA: [number, number] = [126.53, 33.36];
 const selected = (page: Page) => page.getByTestId('selected-cell');
 const zoomNow = (page: Page) => page.evaluate(() => window.__mapDebug!.zoom());
 
+// 시트 안 날짜 칸을 이름으로 누르므로 날짜가 지나도 깨지지 않게 서울 2026-10-17(토) 10시로 고정한다
+const FIXED_NOW = new Date('2026-10-17T10:00:00+09:00');
+
 async function zoomIntoLand(page: Page) {
+  await page.clock.setFixedTime(FIXED_NOW);
   await page.goto('/');
   await page.waitForFunction(() => window.__mapReady === true);
   for (let i = 0; i < 3; i++) {
