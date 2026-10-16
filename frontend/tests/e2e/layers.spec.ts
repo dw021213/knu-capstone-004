@@ -256,6 +256,24 @@ for (const tag of ['', '@desktop ']) {
   });
 }
 
+test('@desktop CCTV·편의점·숙박을 함께 켜도 알약끼리 겹치지 않는다', async ({ page }) => {
+  await openMap(page);
+  await turnOn(page, 'CCTV', '편의점', '숙박');
+  await expect.poll(async () => new Set((await drawn(page)).map((i) => i.group)).size).toBe(3);
+  const pills = (await drawn(page)).filter((i) => i.kind === 'cluster');
+  expect(pills.length).toBeGreaterThan(20);
+  const overlaps: string[] = [];
+  for (let i = 0; i < pills.length; i++) {
+    for (let j = i + 1; j < pills.length; j++) {
+      const [a, b] = [pills[i].box, pills[j].box];
+      if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]) {
+        overlaps.push(`${pills[i].label} ${pills[i].count} / ${pills[j].label} ${pills[j].count}`);
+      }
+    }
+  }
+  expect(overlaps).toEqual([]);
+});
+
 test('두 종류를 켜면 종류별로 따로 묶이고, 하나를 끄면 그 종류만 사라진다', async ({ page }) => {
   await openMap(page);
   await turnOn(page, 'CCTV', '편의점');
@@ -433,7 +451,8 @@ for (const tag of ['', '@desktop ']) {
 
 test('손가락으로 탭해도 마커는 카드를 열고 클러스터는 확대한다', async ({ page }) => {
   await openMap(page);
-  await turnOn(page, 'CCTV', '119안전센터');
+  // 119만 켜야 둘레에 알약이 없는 마커가 생긴다(알약은 빈자리로 비켜 나며 마커를 덮을 수 있다)
+  await turnOn(page, '119안전센터');
   await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
   const vp = page.viewportSize()!;
   const m = lonelyMarker(await drawn(page), vp, 'fire')!;
@@ -442,6 +461,8 @@ test('손가락으로 탭해도 마커는 카드를 열고 클러스터는 확�
   await expect(card(page)).toBeVisible();
   await expect(page.getByTestId('selected-cell')).toHaveText('');
   await card(page).getByRole('button', { name: '닫기' }).click();
+  await turnOn(page, 'CCTV');
+  await expect.poll(async () => (await drawn(page)).some((i) => i.group === 'cctv')).toBe(true);
   await page.waitForTimeout(400);
   const z0 = await zoomNow(page);
   const c = (await drawn(page))

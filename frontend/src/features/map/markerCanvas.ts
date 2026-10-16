@@ -49,28 +49,41 @@ export const pillText = (i: MarkerItem) => `${i.label} ${i.count}`;
 const overlaps = (a: number[], b: number[]) =>
   a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
+/** 알약을 비켜 놓을 후보 자리: 가로 16px, 세로 한 줄 간격 격자를 가까운 순서로 */
+const PILL_STEP_X = 16;
+const PILL_STEP_Y = PILL_H + 2;
+const PILL_RINGS = 24;
+const PILL_OFFSETS: [number, number][] = (() => {
+  const out: [number, number][] = [];
+  for (let i = -PILL_RINGS; i <= PILL_RINGS; i++)
+    for (let j = -PILL_RINGS; j <= PILL_RINGS; j++) out.push([i * PILL_STEP_X, j * PILL_STEP_Y]);
+  // 같은 거리면 위아래(세로)를 먼저, 그다음 아래쪽을 먼저
+  return out.sort(
+    (a, b) => Math.hypot(...a) - Math.hypot(...b) || Math.abs(a[0]) - Math.abs(b[0]) || b[1] - a[1],
+  );
+})();
+
 /**
- * 항목마다 그릴 상자를 정한다. 알약은 글자 폭으로 넓이를 재고, 앞서 놓은 알약과 겹치면
- * 위아래로 한 칸씩 비켜 본다(다 겹치면 제자리). 마커는 제자리.
+ * 항목마다 그릴 상자를 정한다. 알약은 글자 폭으로 넓이를 재고, 종류와 상관없이 앞서 놓은
+ * 알약과 겹치면 가장 가까운 빈자리로 비켜 놓는다. 마커는 제자리.
  */
 export function placeMarkers(items: MarkerItem[], measure: (text: string) => number): MarkerHit[] {
   const placed: MarkerHit['box'][] = [];
-  const step = PILL_H + 2;
   return items.map((item) => {
     if (item.kind === 'marker') {
       const r = MARKER_R;
       return { ...item, box: [item.x - r, item.y - r, item.x + r, item.y + r] };
     }
     const w = PILL_PAD * 2 + PILL_ICON + PILL_GAP + measure(pillText(item));
-    const at = (dy: number): MarkerHit['box'] => [
-      item.x - w / 2,
+    const at = ([dx, dy]: [number, number]): MarkerHit['box'] => [
+      item.x + dx - w / 2,
       item.y + dy - PILL_H / 2,
-      item.x + w / 2,
+      item.x + dx + w / 2,
       item.y + dy + PILL_H / 2,
     ];
-    let box = at(0);
-    for (const dy of [0, step, -step, 2 * step, -2 * step, 3 * step, -3 * step]) {
-      const b = at(dy);
+    let box = at([0, 0]);
+    for (const off of PILL_OFFSETS) {
+      const b = at(off);
       if (!placed.some((p) => overlaps(p, b))) {
         box = b;
         break;

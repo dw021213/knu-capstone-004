@@ -54,6 +54,19 @@ describe('placeMarkers', () => {
     expect((hits[0].box[1] + hits[0].box[3]) / 2).toBeCloseTo(200);
   });
 
+  it('종류와 상관없이 한곳에 몰린 알약 30개도 서로 겹치지 않고 가까운 빈자리에 놓는다', () => {
+    const groups = ['cctv', 'convenience', 'lodging'];
+    const items = Array.from({ length: 30 }, (_, i) =>
+      pill(200 + (i % 5), 300 + (i % 3), i + 2, groups[i % 3]),
+    );
+    const hits = placeMarkers(items, measure);
+    for (let i = 0; i < hits.length; i++)
+      for (let j = i + 1; j < hits.length; j++)
+        expect(overlap(hits[i].box, hits[j].box), `${i}/${j}`).toBe(false);
+    // 가장 먼 것도 몰린 자리에서 크게 벗어나지 않는다
+    for (const h of hits) expect(Math.hypot(h.x - 200, h.y - 300)).toBeLessThan(260);
+  });
+
   it('개별 마커는 제자리, 상자는 마커 크기', () => {
     const [h] = placeMarkers([marker(50, 60, 'a')], measure);
     expect(h.x).toBe(50);
