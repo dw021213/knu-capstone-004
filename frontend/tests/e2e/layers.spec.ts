@@ -431,6 +431,27 @@ for (const tag of ['', '@desktop ']) {
   });
 }
 
+test('손가락으로 탭해도 마커는 카드를 열고 클러스터는 확대한다', async ({ page }) => {
+  await openMap(page);
+  await turnOn(page, 'CCTV', '119안전센터');
+  await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+  const vp = page.viewportSize()!;
+  const m = lonelyMarker(await drawn(page), vp, 'fire')!;
+  expect(m).toBeDefined();
+  await page.touchscreen.tap(m.x, m.y);
+  await expect(card(page)).toBeVisible();
+  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  await card(page).getByRole('button', { name: '닫기' }).click();
+  await page.waitForTimeout(400);
+  const z0 = await zoomNow(page);
+  const c = (await drawn(page))
+    .filter((i) => i.kind === 'cluster' && i.y > 150 && i.y < vp.height - 150)
+    .reduce((a, b) => (a.count! > b.count! ? a : b));
+  await page.touchscreen.tap(c.x, c.y);
+  await expect.poll(() => zoomNow(page)).toBeCloseTo(z0 + 1, 1);
+  await expect(page.getByTestId('selected-cell')).toHaveText('');
+});
+
 test('카드를 연 채 레이어를 끄거나 지도를 누르면 카드가 닫힌다', async ({ page }) => {
   await openMap(page);
   await turnOn(page, '119안전센터');
