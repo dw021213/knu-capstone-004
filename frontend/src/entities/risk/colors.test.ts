@@ -49,4 +49,8 @@ describe('위험 색', () => {
     expect(g).toBe(b);
     expect(r).toBeLessThan(parseInt(NO_DATA_COLOR.slice(1, 3), 16));
   });
+
+  it('범례 빗금 견본 선(--risk-none-hatch)이 지도 빗금 선과 같다', () => {
+    expect(token('--risk-none-hatch')?.toUpperCase()).toBe(NO_DATA_HATCH_COLOR.toUpperCase());
+  });
 });
