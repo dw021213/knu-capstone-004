@@ -1,0 +1,218 @@
+{
+  "dataset_id": "jeju_h3_r8_road_islands_its20260914_ngii2025_v1",
+  "generated_at": "2026-10-12T09:47:48.581628+09:00",
+  "scope": "static spatial relative risk with current available road sources",
+  "standard_link_release_date": "2026-09-14",
+  "standard_link_date_semantics": "filename release-date proxy, not verified survey date",
+  "island_map_creation_year": 2025,
+  "island_map_publication_metadata": [
+    {
+      "도엽번호": "33602023",
+      "도엽명": "추자023",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-04-09 17:06:07.0"
+    },
+    {
+      "도엽번호": "33602024",
+      "도엽명": "추자024",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-04-09 17:06:07.0"
+    },
+    {
+      "도엽번호": "33602012",
+      "도엽명": "추자012",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-04-09 17:06:07.0"
+    },
+    {
+      "도엽번호": "33602013",
+      "도엽명": "추자013",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-04-09 17:06:07.0"
+    },
+    {
+      "도엽번호": "33602014",
+      "도엽명": "추자014",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-04-09 17:06:07.0"
+    },
+    {
+      "도엽번호": "33602022",
+      "도엽명": "추자022",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-04-09 17:06:07.0"
+    },
+    {
+      "도엽번호": "33608069",
+      "도엽명": "성산069",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-03-30 17:16:15.0"
+    },
+    {
+      "도엽번호": "33608059",
+      "도엽명": "성산059",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-03-30 17:16:15.0"
+    },
+    {
+      "도엽번호": "33608068",
+      "도엽명": "성산068",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-03-30 17:16:15.0"
+    },
+    {
+      "도엽번호": "33608049",
+      "도엽명": "성산049",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-03-30 17:16:15.0"
+    },
+    {
+      "도엽번호": "33608058",
+      "도엽명": "성산058",
+      "제작년도": "2025",
+      "고시일자": "2026-03-13 00:00:00.0",
+      "등록일자": "2026-03-30 17:16:15.0"
+    }
+  ],
+  "cell_count": 3651,
+  "road_present_cells": 2249,
+  "source_counts": {
+    "ITS_standard_nodelink": 2200,
+    "no_mapped_road": 1402,
+    "NGII_digital_map": 49
+  },
+  "h3_resolution": 8,
+  "geometry_crs": "EPSG:4326",
+  "geometry_coordinate_order": [
+    "longitude",
+    "latitude"
+  ],
+  "model_algorithm": "CatBoost",
+  "model_group": "road",
+  "model_depth": 6,
+  "model_seeds": [
+    42,
+    52,
+    62
+  ],
+  "model_features": [
+    "link_length_m",
+    "link_density_km_per_km2",
+    "link_count",
+    "mean_lanes",
+    "max_lanes",
+    "mean_max_speed_kmh",
+    "max_speed_kmh",
+    "rank105_length_m",
+    "rank106_length_m",
+    "rank107_length_m",
+    "road_type002_length_m",
+    "road_type003_length_m",
+    "speed60plus_length_m",
+    "lanes2plus_length_m",
+    "node_count",
+    "intersection_node_count",
+    "major_intersection_node_count",
+    "dead_end_node_count",
+    "intersection_density_per_km2"
+  ],
+  "model_source": "road_paper_islands_v3",
+  "model_files": [
+    {
+      "path": "model.joblib",
+      "sha256": "50f6aea49ea1970d1953d286a6b6f00f20ecd7d53c36ef0f88c4b40dc880d1e7"
+    },
+    {
+      "path": "model.joblib",
+      "sha256": "84a775fb45ab380abe4069501affc2e539b92d52102b2d3cac6f5c76df1d7f88"
+    },
+    {
+      "path": "model.joblib",
+      "sha256": "636950f447bbb79c492b2e6eabd2bbbd00b6616d777efe9fe966876e0625bb86"
+    }
+  ],
+  "training_years": [
+    2017,
+    2018,
+    2019
+  ],
+  "validation_year": 2020,
+  "test_year": 2021,
+  "historical_2021_metrics": {
+    "validation_AP": 0.0702133768532925,
+    "daily_AP": 0.0478626976369402,
+    "annual_AP": 0.0274178079840678,
+    "roc_auc": 0.8880060403869081,
+    "positive": 3284.0,
+    "rows": 1332615.0,
+    "cells": 3651.0,
+    "days": 365.0,
+    "capture1": 0.1964068209500609,
+    "capture5": 0.4975639464068209,
+    "capture10": 0.6303288672350792,
+    "capture20": 0.8133373934226553
+  },
+  "historical_metrics_are_not2026_accuracy": true,
+  "score_semantics": "uncalibrated ensemble score; not personal accident probability",
+  "percentile_semantics": "100*average ascending rank / count of mapped-road cells; global across both road sources; roadless=null",
+  "input_sources": {
+    "standard_link": {
+      "path": "[2026-09-14]NODELINKDATA.zip",
+      "sha256": "fa0392bfdc919b77e7892cb2d73bc59d1db03580da1927764ee913c0c8e47140"
+    },
+    "island_map": {
+      "path": "(B010)수치지도_33608058_2025_0000058471185 (2).zip",
+      "sha256": "84069edc9a94e6a1c9aba232d4c1a89610741b8f77f39455cb35704e5178af8a",
+      "creation_year": 2025
+    }
+  },
+  "calendar_used": false,
+  "weather_used": false,
+  "traffic_volume_used": false,
+  "incident_history_used": false,
+  "island_attributes_used": [
+    "link_length_m",
+    "link_density_km_per_km2",
+    "link_count"
+  ],
+  "island_attributes_unknown": [
+    "mean_lanes",
+    "max_lanes",
+    "mean_max_speed_kmh",
+    "max_speed_kmh",
+    "rank105_length_m",
+    "rank106_length_m",
+    "rank107_length_m",
+    "road_type002_length_m",
+    "road_type003_length_m",
+    "speed60plus_length_m",
+    "lanes2plus_length_m",
+    "node_count",
+    "intersection_node_count",
+    "major_intersection_node_count",
+    "dead_end_node_count",
+    "intersection_density_per_km2"
+  ],
+  "date_dependent_scores": false,
+  "current_year_accuracy_measured": false,
+  "current_network_transfer_validated_with_labels": false,
+  "backend_connected": false,
+  "replaces_dataset_id": "jeju_h3_r8_road_catboost_20260914_v1",
+  "limitations": [
+    "NGII centerlines differ from ITS directed links; geometry-only island coverage",
+    "new road snapshots differ from historical training snapshots",
+    "fixed3651cells, peripheral islets and unmapped roads can remain",
+    "scores not calibrated and target ambulance traffic call cell-days rather than all crashes or tourists",
+    "no2026 ground-truth accuracy evaluation"
+  ]
+}
