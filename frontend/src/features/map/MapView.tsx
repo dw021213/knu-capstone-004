@@ -70,6 +70,8 @@ export interface MapFocus {
   zoom?: { min: number; max: number };
   /** 점을 둘 세로 위치(화면 높이 비율, 기본 0.4) */
   anchorY?: number;
+  /** 오른쪽에서 가리는 너비(px). 가로는 그 왼쪽 영역 가운데에 맞춘다 */
+  right?: number;
 }
 
 /** 이 거리(CSS px)보다 덜 움직이고 뗀 포인터만 셀 선택으로 본다 */
@@ -200,6 +202,7 @@ export function MapView({
       minZ: f.zoom?.min,
       maxZ: f.zoom?.max,
       anchorY: f.anchorY,
+      right: f.right,
     });
     const extent: [[number, number], [number, number]] = [
       [0, 0],
