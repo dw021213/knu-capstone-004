@@ -13,6 +13,17 @@ body,
   margin: 0;
 }
 
+:root {
+  /* 데스크톱 오른쪽 패널 너비: 1024px부터 넓게, 그보다 좁은 태블릿은 좁게 */
+  --panel-size: var(--panel-w-narrow);
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --panel-size: var(--panel-w);
+  }
+}
+
 body {
   font-family: var(--font);
   color: var(--ink);

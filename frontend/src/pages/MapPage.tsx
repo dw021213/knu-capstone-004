@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useWide } from '../app/useBreakpoint';
 import { dataSource, type DataSource } from '../data';
 import { CellSheet, type SheetTarget } from '../features/cell-sheet/CellSheet';
 import { useSheetData } from '../features/cell-sheet/useSheetData';
@@ -127,10 +128,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
       root.style.setProperty('--legend-w', `${box.width}px`);
       // 데스크톱 '오늘 안전한 코스'를 레이어 버튼 바로 옆에 둔다(켠 개수 배지로 너비가 바뀐다)
       root.style.setProperty('--layer-w', `${layer.getBoundingClientRect().width}px`);
-      root.style.setProperty(
-        '--overlay-top',
-        `calc(${header.getBoundingClientRect().height}px + var(--space-3))`,
-      );
+      root.style.setProperty('--header-h', `${header.getBoundingClientRect().height}px`);
     });
     ro.observe(legend);
     ro.observe(header);
@@ -138,12 +136,30 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
     return () => ro.disconnect();
   }, []);
 
+  // 데스크톱: 셀 정보는 머리글 아래 오른쪽 패널(지도 main 밖 보조 영역). 모바일: 날짜 칩 위 카드
+  const wide = useWide();
+  const sheet = target && (
+    <CellSheet
+      target={target}
+      cell={target.kind === 'cell' ? scores?.cells.get(target.h3) : undefined}
+      mode={source.mode}
+      weather={scores?.weather ?? 'off'}
+      dateLabel={chipLabel(date)}
+      data={sheetData}
+      // 시설 카드와 함께 보이지 않는다: 카드가 떠 있는 동안 숨기고 닫으면 다시 보인다
+      hidden={pickedPoi !== null}
+      onClose={closeSheet}
+    />
+  );
+  // 패널이 열리면 지도 위 조작(범례·날짜 칩·내 위치)과 지도 출처를 패널 왼쪽 영역으로 옮긴다
+  const panelOpen = wide && target !== null && pickedPoi === null;
+
   const count = LAYER_TYPES.filter(
     (t) => layers.on.has(t) && states[t].status !== 'pending',
   ).length;
 
   return (
-    <div ref={rootRef} className={styles.page}>
+    <div ref={rootRef} className={styles.page} data-panel={panelOpen ? 'open' : undefined}>
       <header ref={headerRef} className={styles.top}>
         <div className={styles.bar}>
           {/* 모바일은 화면 맨 위가 검색창이라 이름을 숨기고, 데스크톱은 로고 자리와 함께 보인다 */}
@@ -219,19 +235,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
                 <LocateButton busy={my.state.status === 'locating'} onClick={my.locate} />
               </div>
             </div>
-            {target && (
-              <CellSheet
-                target={target}
-                cell={target.kind === 'cell' ? scores?.cells.get(target.h3) : undefined}
-                mode={source.mode}
-                weather={scores?.weather ?? 'off'}
-                dateLabel={chipLabel(date)}
-                data={sheetData}
-                // 시설 카드와 함께 보이지 않는다: 카드가 떠 있는 동안 숨기고 닫으면 다시 보인다
-                hidden={pickedPoi !== null}
-                onClose={closeSheet}
-              />
-            )}
+            {!wide && sheet}
             <DateChips mode={source.mode} disabled={loading} weather={scores?.weather} />
           </div>
           {pickedPoi && pickedLayer && (
@@ -248,6 +252,11 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
           {selected ?? ''}
         </output>
       </main>
+      {wide && sheet && (
+        <aside className={styles.panel} aria-label="선택한 곳 정보" hidden={!panelOpen}>
+          {sheet}
+        </aside>
+      )}
     </div>
   );
 }

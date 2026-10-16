@@ -1,6 +1,10 @@
 .page {
-  /* 상단 영역(검색창 줄 + '종합' 탭 줄 + 아래 선) 바로 아래 첫 줄(레이어 버튼, 범례, 데스크톱 셀 패널). MapPage가 잰 값으로 바꾼다 */
-  --overlay-top: calc(var(--touch) * 2 + var(--space-2) * 2 + 1px + var(--space-3));
+  /* 상단 영역(검색창 줄 + '종합' 탭 줄 + 아래 선) 높이. MapPage가 잰 값으로 바꾼다 */
+  --header-h: calc(var(--touch) * 2 + var(--space-2) * 2 + 1px);
+  /* 머리글 바로 아래 첫 줄(레이어 버튼, 모바일 범례) */
+  --overlay-top: calc(var(--header-h) + var(--space-3));
+  /* 오른쪽 패널이 가리는 너비. 지도 위 조작과 지도 출처를 그만큼 왼쪽으로 옮긴다 */
+  --panel-offset: 0px;
   position: relative;
   flex: 1;
   min-height: 0;
@@ -12,11 +16,32 @@
   inset: 0;
 }
 
-/* 지도 위 층: 빈 곳은 지도로 통과시킨다(상속). 보이는 패널만 pointer-events: auto */
+/* 지도 위 층: 빈 곳은 지도로 통과시킨다(상속). 보이는 패널만 pointer-events: auto.
+   데스크톱 패널이 열리면 패널 왼쪽 지도 영역만 쓴다 */
 .overlay {
   position: absolute;
-  inset: 0;
+  inset: 0 var(--panel-offset) 0 0;
   pointer-events: none;
+}
+
+.page[data-panel='open'] {
+  --panel-offset: var(--panel-size);
+}
+
+/* 데스크톱 셀 패널: 머리글 아래부터 바닥까지 오른쪽에 붙는다. 넘치면 안에서 굴린다 */
+.panel {
+  position: absolute;
+  top: var(--header-h);
+  right: 0;
+  bottom: 0;
+  display: flex;
+  width: var(--panel-size);
+  background: var(--white);
+  border-left: 1px solid var(--line);
+}
+
+.panel[hidden] {
+  display: none;
 }
 
 /* 모바일: 아래쪽에 셀 시트와 날짜 칩을 차례로 쌓는다 */
@@ -85,10 +110,11 @@
     padding: 0;
   }
 
+  /* Figma: 내 위치는 범례 카드 바로 위, 오른쪽 맞춤 */
   .locate {
     position: absolute;
-    right: calc(var(--space-4) + var(--legend-w, 0px) + var(--space-2));
-    bottom: var(--space-8);
+    right: var(--space-4);
+    bottom: calc(var(--space-8) + var(--legend-h, 0px) + var(--space-2));
   }
 
   .courseLink {
