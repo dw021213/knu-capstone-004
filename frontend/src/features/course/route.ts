@@ -29,25 +29,28 @@ export function bboxOf(coords: [number, number][]): [number, number, number, num
   return [w, so, e, n];
 }
 
-/** 코스 전체 보기. 모바일은 아래 시트 위쪽에 둔다 */
-export function courseFocus(key: number, coords: [number, number][], wide: boolean): MapFocus {
+/** 오른쪽 패널에 가리는 너비(px)가 있으면 데스크톱: 그 왼쪽 영역 가운데. 0이면 모바일: 아래 시트 위쪽(0.3) */
+const place = (right: number) => (right > 0 ? { anchorY: 0.5, right } : { anchorY: 0.3 });
+
+/** 코스 전체 보기 */
+export function courseFocus(key: number, coords: [number, number][], right: number): MapFocus {
   const bbox = bboxOf(coords);
   return {
     key,
     bbox,
     point: [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2],
     zoom: { min: 9, max: 14 },
-    anchorY: wide ? 0.5 : 0.3,
+    ...place(right),
   };
 }
 
 /** 주의 구간 하나로 옮겨 확대 */
-export function segmentFocus(key: number, seg: Segment, wide: boolean): MapFocus {
+export function segmentFocus(key: number, seg: Segment, right: number): MapFocus {
   return {
     key,
     bbox: bboxOf(seg.coords),
     point: segmentMid(seg),
     zoom: { min: 14, max: 15 },
-    anchorY: wide ? 0.5 : 0.3,
+    ...place(right),
   };
 }

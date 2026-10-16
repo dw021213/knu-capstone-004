@@ -43,18 +43,19 @@ describe('courseRoute', () => {
 });
 
 describe('맞춤', () => {
-  it('코스 전체는 줌 9~14, 모바일은 아래 시트 위(0.3)에 가운데를 둔다', () => {
+  it('코스 전체는 줌 9~14, 모바일은 아래 시트 위(0.3), 데스크톱은 오른쪽 패널 왼쪽 가운데', () => {
     const coords = segs.flatMap((g) => g.coords);
     expect(bboxOf(coords)).toEqual([126.5, 33.4, 126.54, 33.42]);
-    const f = courseFocus(0, coords, false);
+    const f = courseFocus(0, coords, 0);
     expect(f).toMatchObject({ key: 0, zoom: { min: 9, max: 14 }, anchorY: 0.3 });
     expect(f.point[0]).toBeCloseTo(126.52, 6);
     expect(f.point[1]).toBeCloseTo(33.41, 6);
-    expect(courseFocus(0, coords, true).anchorY).toBe(0.5);
+    expect(f.right).toBeUndefined();
+    expect(courseFocus(0, coords, 412)).toMatchObject({ anchorY: 0.5, right: 412 });
   });
 
   it('주의 구간은 그 구간 가운데 점으로 줌 14~15', () => {
-    expect(segmentFocus(3, segs[1], false)).toEqual({
+    expect(segmentFocus(3, segs[1], 0)).toEqual({
       key: 3,
       bbox: [126.51, 33.4, 126.53, 33.41],
       point: [126.52, 33.41],

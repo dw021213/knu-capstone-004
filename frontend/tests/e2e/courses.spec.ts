@@ -155,6 +155,38 @@ test.describe('U8-4 코스 상세', () => {
     });
   }
 
+  for (const tag of ['', '@desktop ']) {
+    for (const id of ['olle-1', 'olle-10', 'olle-20']) {
+      test(`${tag}${id} 처음 화면에 코스 시작·끝과 주의 지점이 모두 시트·패널에 가리지 않고 보인다`, async ({
+        page,
+      }) => {
+        const course = (
+          (await (await page.request.get('/data/courses.json')).json()).items as {
+            id: string;
+            coords: [number, number][];
+          }[]
+        ).find((c) => c.id === id)!;
+        await page.goto(`/courses/${id}`);
+        await page.waitForFunction(() => window.__mapReady === true);
+        const vp = page.viewportSize()!;
+        const sheet = (await page.getByTestId('course-sheet').boundingBox())!;
+        const bar = (await page.getByRole('button', { name: '뒤로' }).boundingBox())!;
+        const visible = ([x, y]: [number, number]) =>
+          x > 0 && y > bar.y + bar.height && (tag ? x < sheet.x : x < vp.width && y < sheet.y);
+        await expect
+          .poll(async () => {
+            const ends = await page.evaluate(
+              ([a, b]) => [window.__mapDebug!.project(...a), window.__mapDebug!.project(...b)],
+              [course.coords[0], course.coords[course.coords.length - 1]] as const,
+            );
+            const ms = (await marks(page)).map((m) => [m.x, m.y] as [number, number]);
+            return [...ends, ...ms].every(visible);
+          })
+          .toBe(true);
+      });
+    }
+  }
+
   test('주의 구간을 누르면 지도가 그 구간으로 옮겨 확대한다(키보드로도)', async ({ page }) => {
     await openDetail(page);
     await expect.poll(async () => (await marks(page)).length).toBe(6);

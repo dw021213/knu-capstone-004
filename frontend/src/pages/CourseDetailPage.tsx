@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { dataSource, type DataSource } from '../data';
@@ -28,6 +28,20 @@ const EMD_SOURCE = '읍면동 경계: 통계청 SGIS, vuski/admdongkor(CC BY 4.0
 /** 데스크톱 배치(시트가 오른쪽 패널)인지. CSS 미디어 쿼리와 같은 기준 */
 const isWide = () => window.matchMedia?.('(min-width: 768px)').matches ?? false;
 
+/** 데스크톱 오른쪽 패널이 가리는 너비(px). 모바일은 0. 지도 맞춤을 그 왼쪽 영역에 한다 */
+function useRightInset() {
+  const [right, setRight] = useState<number | null>(null);
+  const measureSheet = useCallback((el: HTMLElement | null) => {
+    if (!el) return;
+    const measure = () =>
+      setRight(isWide() ? Math.max(0, window.innerWidth - el.getBoundingClientRect().left) : 0);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [right, measureSheet] as const;
+}
+
 /** 코스 상세: 지도에 구간별 색 경로와 주의 지점, 아래(데스크톱은 오른쪽) 시트에 등급·설명·주의 구간 */
 export function CourseDetailPage({ source = dataSource }: { source?: DataSource }) {
   const { id } = useParams();
@@ -40,11 +54,14 @@ export function CourseDetailPage({ source = dataSource }: { source?: DataSource 
 
   const route = useMemo(() => (summary ? courseRoute(summary) : null), [summary]);
   const dim = useMemo(() => (summary ? routeCells(summary) : null), [summary]);
-  // 처음에는 코스 전체, 주의 구간을 누르면 그 구간으로
+  // 처음에는 코스 전체(시트 자리를 잰 뒤), 주의 구간을 누르면 그 구간으로
+  const [right, measureSheet] = useRightInset();
   const [picked, setPicked] = useState<{ index: number; focus: MapFocus } | null>(null);
   const focus = useMemo(
-    () => picked?.focus ?? (summary ? courseFocus(0, summary.course.coords, isWide()) : null),
-    [picked, summary],
+    () =>
+      picked?.focus ??
+      (summary && right !== null ? courseFocus(0, summary.course.coords, right) : null),
+    [picked, summary, right],
   );
 
   const placeOf = (seg: Segment) => {
@@ -72,7 +89,12 @@ export function CourseDetailPage({ source = dataSource }: { source?: DataSource 
             </Link>
           </div>
         ) : (
-          <section className={styles.sheet} aria-label="코스 위험도" data-testid="course-sheet">
+          <section
+            ref={measureSheet}
+            className={styles.sheet}
+            aria-label="코스 위험도"
+            data-testid="course-sheet"
+          >
             <p className={styles.badgeRow}>
               <LevelBadge level={summary.level} />
               <span className={styles.badgeNote}>
@@ -96,7 +118,7 @@ export function CourseDetailPage({ source = dataSource }: { source?: DataSource 
                   const seg = summary.caution.find((s) => s.index === index)!;
                   setPicked((p) => ({
                     index,
-                    focus: segmentFocus((p?.focus.key ?? 0) + 1, seg, isWide()),
+                    focus: segmentFocus((p?.focus.key ?? 0) + 1, seg, right ?? 0),
                   }));
                 }}
               />
