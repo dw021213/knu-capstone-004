@@ -56,6 +56,10 @@
   color: var(--white);
 }
 
+.chip[aria-disabled='true'] {
+  cursor: default;
+}
+
 .chip:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;

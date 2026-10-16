@@ -13,7 +13,14 @@ const NOTICE: Record<DataSource['mode'], string> = {
 };
 
 /** 지도 아래 '오늘 / 날짜 선택' 칩. 날짜 선택은 달력 시트로 연다 */
-export function DateChips({ mode }: { mode: DataSource['mode'] }) {
+export function DateChips({
+  mode,
+  disabled = false,
+}: {
+  mode: DataSource['mode'];
+  /** 점수를 받는 동안: 눌러도 반응하지 않는다 */
+  disabled?: boolean;
+}) {
   const { date, isToday, setDate } = useSelectedDate();
   const [open, setOpen] = useState(false);
   const pickRef = useRef<HTMLButtonElement>(null);
@@ -32,7 +39,10 @@ export function DateChips({ mode }: { mode: DataSource['mode'] }) {
           type="button"
           className={styles.chip}
           aria-pressed={isToday}
-          onClick={() => setDate(kstNow().date)}
+          aria-disabled={disabled || undefined}
+          onClick={() => {
+            if (!disabled) setDate(kstNow().date);
+          }}
         >
           오늘
         </button>
@@ -42,7 +52,10 @@ export function DateChips({ mode }: { mode: DataSource['mode'] }) {
           className={styles.chip}
           aria-pressed={!isToday}
           aria-haspopup="dialog"
-          onClick={() => setOpen(true)}
+          aria-disabled={disabled || undefined}
+          onClick={() => {
+            if (!disabled) setOpen(true);
+          }}
         >
           <CalendarIcon className={styles.icon} />
           {isToday ? '날짜 선택' : chipLabel(date)}

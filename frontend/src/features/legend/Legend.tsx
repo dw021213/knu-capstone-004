@@ -32,9 +32,11 @@ interface LegendProps {
   mode: DataSource['mode'];
   /** snapshot 점수 파일의 생성 시각(ISO). api 모드는 at 시각 기준이라 적지 않는다 */
   generatedAt?: string;
+  /** 점수를 받는 동안: 눌러도 펼치지 않는다 */
+  disabled?: boolean;
 }
 
-export function Legend({ mode, generatedAt }: LegendProps) {
+export function Legend({ mode, generatedAt, disabled = false }: LegendProps) {
   const [open, setOpen] = useState(isDesktop);
   const time = mode === 'snapshot' ? basisTime(generatedAt) : null;
   const listId = useId();
@@ -46,7 +48,10 @@ export function Legend({ mode, generatedAt }: LegendProps) {
         className={styles.head}
         aria-expanded={open}
         aria-controls={listId}
-        onClick={() => setOpen((o) => !o)}
+        aria-disabled={disabled || undefined}
+        onClick={() => {
+          if (!disabled) setOpen((o) => !o);
+        }}
       >
         <span className={styles.ramp}>
           {LEVELS_UP.map((lv) => (

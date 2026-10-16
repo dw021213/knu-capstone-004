@@ -15,13 +15,15 @@ import { cellAt } from '../features/map/hitTest';
 import { MapView, type MapFocus } from '../features/map/MapView';
 import type { Insets } from '../features/map/view';
 import { PlaceSearch } from '../features/search/PlaceSearch';
+import { LoadingBanner } from '../features/status/LoadingBanner';
 import { cellCenter } from '../shared/geo/h3';
 import type { PoiType } from '../data/types';
 import { useScores } from './useScores';
 import styles from './MapPage.module.css';
 
 export function MapPage({ source = dataSource }: { source?: DataSource }) {
-  const { data: scores } = useScores(source);
+  const { data: scores, isPending } = useScores(source);
+  const loading = isPending;
   // 셀 시트 대상: 격자 셀 또는 격자 밖(바다)을 누른 곳
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const selected = target?.kind === 'cell' ? target.h3 : null;
@@ -107,6 +109,8 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
         scores={scores}
         selected={selected}
         onCellSelect={(h3, lngLat) => {
+          // 점수가 없으면(받는 중·실패) 셀인지 바다인지 모르므로 시트를 열지 않는다
+          if (!scores) return;
           setPicked(null);
           openSheet(h3 ? { kind: 'cell', h3 } : { kind: 'sea', lngLat });
         }}
@@ -125,7 +129,8 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
               setPicked(null);
               // 고른 곳의 셀 시트를 연다. 시트를 닫으면 검색창으로 돌아온다
               const [lng, lat] = item.center;
-              const h3 = scores ? cellAt(lng, lat, scores.cells) : null;
+              if (!scores) return;
+              const h3 = cellAt(lng, lat, scores.cells);
               returnFocus.current = input;
               setTarget(h3 ? { kind: 'cell', h3 } : { kind: 'sea', lngLat: item.center });
             }}
@@ -138,7 +143,8 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
           </div>
         </header>
         <LayerPanel on={layers.on} toggle={toggle} count={count} states={states} />
-        <Legend mode={source.mode} generatedAt={scores?.generatedAt} />
+        <Legend mode={source.mode} generatedAt={scores?.generatedAt} disabled={loading} />
+        {loading && <LoadingBanner />}
         {/* 아래 묶음: 셀 시트를 날짜 칩 위에 쌓아 시트를 연 채로도 날짜를 바꿀 수 있다 */}
         <div className={styles.dock}>
           {target && (
@@ -154,7 +160,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
               onClose={closeSheet}
             />
           )}
-          <DateChips mode={source.mode} />
+          <DateChips mode={source.mode} disabled={loading} />
         </div>
         {pickedPoi && pickedLayer && (
           <PoiCard
