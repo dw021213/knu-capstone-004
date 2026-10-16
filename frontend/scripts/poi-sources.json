@@ -44,8 +44,8 @@
       "limits": "등재 자료라 폐업·영업시간(24시간 여부)을 보증하지 않는다"
     },
     "lodging": {
-      "status": "pending",
-      "label": "아직 내려받지 않음",
+      "status": "ready",
+      "label": "소상공인시장진흥공단 상가(상권)정보 2026-06",
       "provider": "소상공인시장진흥공단",
       "publicDataPk": "15083033",
       "page": "https://www.data.go.kr/data/15083033/fileData.do",
