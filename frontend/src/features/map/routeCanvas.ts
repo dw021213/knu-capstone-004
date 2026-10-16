@@ -88,7 +88,7 @@ function trace(
 
 /**
  * 셀 위에 코스를 그린다(변환은 drawCells가 넣은 기기 배율 그대로).
- * 흰 밑선 → 구간 등급 색 선(데이터 부족은 회색 점선) → 시작·끝 표지 → 주의 지점 빨간 원과 흰 번호
+ * 흰 밑선 → 구간 등급 색 선(데이터 부족은 회색 점선) → 주의 지점 빨간 원과 흰 번호 → 시작·끝 표지
  */
 export function drawRoute(
   ctx: CanvasRenderingContext2D,
@@ -117,19 +117,6 @@ export function drawRoute(
   }
   ctx.setLineDash([]);
 
-  const first = route.lines[0].coords[0];
-  const lastLine = route.lines[route.lines.length - 1].coords;
-  const last = lastLine[lastLine.length - 1];
-  const ends: RouteMarkHit[] = [];
-  for (const [lngLat, label] of [
-    [first, '시작'],
-    [last, '끝'],
-  ] as const) {
-    const [x, y] = lngLatToScreen(view, ...lngLat);
-    drawEnd(ctx, [x, y], label, style);
-    ends.push({ x, y, label });
-  }
-
   const hits: RouteMarkHit[] = [];
   for (const m of route.marks) {
     const [x, y] = lngLatToScreen(view, ...m.lngLat);
@@ -146,6 +133,18 @@ export function drawRoute(
     ctx.textBaseline = 'middle';
     ctx.fillText(m.label, x, y + 0.5);
     hits.push({ x, y, label: m.label });
+  }
+  const first = route.lines[0].coords[0];
+  const lastLine = route.lines[route.lines.length - 1].coords;
+  const last = lastLine[lastLine.length - 1];
+  const ends: RouteMarkHit[] = [];
+  for (const [lngLat, label] of [
+    [first, '시작'],
+    [last, '끝'],
+  ] as const) {
+    const [x, y] = lngLatToScreen(view, ...lngLat);
+    drawEnd(ctx, [x, y], label, style);
+    ends.push({ x, y, label });
   }
   return { marks: hits, ends };
 }

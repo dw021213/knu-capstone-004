@@ -148,10 +148,9 @@ describe('drawRoute', () => {
     const startLabel = ops.find((o) => o.op === 'fillText' && o.text === '시작')!;
     expect(startLabel.args![0]).toBeCloseTo(sx, 6);
     expect(sy - startLabel.args![1]).toBeGreaterThanOrEqual(CAUTION_MARK_RADIUS + 10);
-    // 시작·끝은 선 위, 주의 지점 아래
+    // 시작·끝은 주의 지점보다 나중에(위에) 그려 끝 근처 빨간 점에 가리지 않는다
     const startText = ops.findIndex((o) => o.op === 'fillText' && o.text === '시작');
-    expect(startText).toBeGreaterThan(ops.indexOf(strokes[3]));
-    expect(startText).toBeLessThan(ops.indexOf(markFill!));
+    expect(startText).toBeGreaterThan(ops.indexOf(markFill!));
   });
 
   it('구간이 없으면 아무것도 그리지 않는다', () => {
