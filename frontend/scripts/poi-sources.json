@@ -7,8 +7,8 @@
   },
   "kinds": {
     "cctv": {
-      "status": "pending",
-      "label": "아직 내려받지 않음",
+      "status": "ready",
+      "label": "행정안전부 전국CCTV표준데이터(공공데이터포털, 2020년 기준 일부)",
       "provider": "행정안전부(지방자치단체 등록 자료)",
       "publicDataPk": "15013094",
       "page": "https://www.data.go.kr/data/15013094/standard.do",
