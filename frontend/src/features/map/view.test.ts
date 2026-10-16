@@ -3,7 +3,14 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { zoomIdentity } from 'd3';
 import { cellCenter, cellPolygon } from '../../shared/geo/h3';
-import { lngLatToScreen, screenToLngLat, viewProjection, zoomLevel, fitView } from './view';
+import {
+  lngLatToScreen,
+  screenToLngLat,
+  viewProjection,
+  zoomLevel,
+  fitView,
+  focusView,
+} from './view';
 import { cellAtScreen } from './hitTest';
 import { JEJU_BOUNDS } from './projection';
 
@@ -93,5 +100,26 @@ describe('fitView', () => {
       return lng < b.west || lng > b.east || lat < b.south || lat > b.north;
     });
     expect(outside).toEqual([]);
+  });
+});
+
+describe('focusView', () => {
+  const small = { west: 126.52, south: 33.5, east: 126.53, north: 33.51 };
+  const big = { west: 126.25, south: 33.35, east: 126.5, north: 33.5 };
+
+  it('점을 가로 가운데, 세로 anchorY 위치에 둔다', () => {
+    const v = focusView(390, 844, big, [126.33, 33.46]);
+    const [x, y] = lngLatToScreen(v, 126.33, 33.46);
+    expect(x).toBeCloseTo(195, 6);
+    expect(y).toBeCloseTo(844 * 0.4, 6);
+  });
+
+  it('경계 상자에 맞춘 줌을 12~14로 자른다', () => {
+    expect(zoomLevel(focusView(390, 844, big, [126.33, 33.46]))).toBeCloseTo(12, 6);
+    expect(zoomLevel(focusView(390, 844, small, [126.525, 33.505]))).toBeCloseTo(14, 6);
+    const mid = { west: 126.5, south: 33.45, east: 126.56, north: 33.5 };
+    const z = zoomLevel(focusView(390, 844, mid, [126.53, 33.47]));
+    expect(z).toBeGreaterThan(12);
+    expect(z).toBeLessThan(14);
   });
 });

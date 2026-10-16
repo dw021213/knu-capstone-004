@@ -18,6 +18,7 @@ import { JEJU_BOUNDS } from './projection';
 import {
   SCALE_EXTENT,
   fitView,
+  focusView,
   lngLatToScreen,
   screenToLngLat,
   worldExtent,
@@ -37,6 +38,16 @@ export interface MapViewProps {
   onMarkerSelect?: (group: string, id: string) => void;
   /** 크게 그릴 마커 id */
   highlight?: string | null;
+  /** 이곳으로 옮기고 확대한다(검색). key가 바뀔 때마다 한 번 */
+  focus?: MapFocus | null;
+}
+
+export interface MapFocus {
+  key: number;
+  /** 맞출 경계 [서, 남, 동, 북] */
+  bbox: [number, number, number, number];
+  /** 화면 위쪽 가운데에 둘 점 [경도, 위도] */
+  point: [number, number];
 }
 
 /** 이 거리(CSS px)보다 덜 움직이고 뗀 포인터만 셀 선택으로 본다 */
@@ -67,6 +78,7 @@ export function MapView({
   markers,
   onMarkerSelect,
   highlight = null,
+  focus = null,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -134,6 +146,38 @@ export function MapView({
       zoomRef.current = null;
     };
   }, [size]);
+
+  // 검색으로 고른 곳으로 옮기고 확대한다
+  const focusKey = focus?.key;
+  const focusRef = useRef(focus);
+  const appliedFocus = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    focusRef.current = focus;
+  });
+  useEffect(() => {
+    const f = focusRef.current;
+    if (focusKey === undefined || !f || !zoomRef.current || !size) return;
+    // 같은 검색 결과로는 한 번만 옮긴다(크기가 바뀌어도 다시 옮기지 않음)
+    if (appliedFocus.current === focusKey) return;
+    appliedFocus.current = focusKey;
+    const { behavior, sel } = zoomRef.current;
+    const [west, south, east, north] = f.bbox;
+    const v = focusView(size.w, size.h, { west, south, east, north }, f.point);
+    const extent: [[number, number], [number, number]] = [
+      [0, 0],
+      [size.w, size.h],
+    ];
+    const t = behavior.constrain()(
+      zoomIdentity.translate(v.x, v.y).scale(v.k),
+      extent,
+      worldExtent(JEJU_BOUNDS),
+    );
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    sel
+      .transition()
+      .duration(reduce ? 0 : 300)
+      .call(behavior.transform, t);
+  }, [focusKey, size]);
 
   // 셀 그리기(조작이 끝났을 때, 크기·데이터·선택이 바뀔 때)
   useLayoutEffect(() => {
