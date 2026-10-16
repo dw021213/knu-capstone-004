@@ -25,8 +25,8 @@
       "limits": "포털 JSON은 전국 114,829행뿐이고(페이지 표기 353,263행) 기관마다 500행에서 끊긴 곳이 많다(제주특별자치도·서귀포시 각 500행). 기준일 2020-07~12. 실제 CCTV보다 적다. 원본 파일 주소 https://file.localdata.go.kr/file/cctv_info/info 는 이 환경에서 403"
     },
     "convenience": {
-      "status": "pending",
-      "label": "아직 내려받지 않음",
+      "status": "ready",
+      "label": "소상공인시장진흥공단 상가(상권)정보 2026-06",
       "provider": "소상공인시장진흥공단",
       "publicDataPk": "15083033",
       "page": "https://www.data.go.kr/data/15083033/fileData.do",
