@@ -30,12 +30,12 @@ describe('달력의 날씨 반영 점', () => {
       .getAllByTestId('weather-dot')
       .map((d) => d.closest('button')!.getAttribute('aria-label'));
     expect(dotted).toEqual([
-      '10월 17일 (토)',
-      '10월 18일 (일)',
-      '10월 19일 (월)',
-      '10월 20일 (화)',
-      '10월 21일 (수)',
-      '10월 22일 (목)',
+      '17, 10월 17일 (토)',
+      '18, 10월 18일 (일)',
+      '19, 10월 19일 (월)',
+      '20, 10월 20일 (화)',
+      '21, 10월 21일 (수)',
+      '22, 10월 22일 (목)',
     ]);
     expect(within(sheet).getByText('점 = 날씨 반영 기간 (오늘 ~ 10월 22일)')).toBeInTheDocument();
   });

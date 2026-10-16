@@ -59,7 +59,9 @@ function renderWith(source: DataSource) {
 
 async function pick(label: string) {
   await userEvent.click(screen.getByRole('button', { name: '날짜 선택' }));
-  await userEvent.click(screen.getByRole('button', { name: label }));
+  // 날짜 칸 이름은 보이는 숫자로 시작한다: '20, 10월 20일 (화)'
+  const day = label.match(/(\d+)일/)![1];
+  await userEvent.click(screen.getByRole('button', { name: `${day}, ${label}` }));
   await userEvent.click(screen.getByRole('button', { name: `${label} 보기` }));
 }
 

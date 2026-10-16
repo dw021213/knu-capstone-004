@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { DataSource } from '../../data/types';
-import { WEEKDAY_NAMES, addDays, chipLabel, kstNow, monthCells, shortLabel } from './kst';
+import { WEEKDAY_NAMES, addDays, chipLabel, dayLabel, kstNow, monthCells, shortLabel } from './kst';
 import styles from './DatePickerSheet.module.css';
 
 /** 오늘부터 며칠 뒤까지 날씨 반영 점을 찍는지(api 모드만) */
@@ -124,7 +124,7 @@ export function DatePickerSheet({ mode, initial, onClose, onConfirm }: Props) {
                 key={d}
                 type="button"
                 className={styles.day}
-                aria-label={chipLabel(d)}
+                aria-label={dayLabel(d)}
                 aria-pressed={d === pending}
                 aria-current={d === today ? 'date' : undefined}
                 disabled={d < today}

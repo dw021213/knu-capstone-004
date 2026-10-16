@@ -34,10 +34,10 @@ test('날짜 선택은 달력 시트로 열리고, 지난 날짜는 고를 수 �
   const s = sheet(page);
   await expect(s).toBeVisible();
   await expect(s.getByRole('heading', { name: '2026년 10월' })).toBeVisible();
-  await expect(s.getByRole('button', { name: '10월 16일 (금)', exact: true })).toBeDisabled();
-  await expect(s.getByRole('button', { name: '10월 1일 (목)', exact: true })).toBeDisabled();
-  await expect(s.getByRole('button', { name: '10월 17일 (토)', exact: true })).toBeEnabled();
-  await expect(s.getByRole('button', { name: '10월 17일 (토)', exact: true })).toHaveAttribute(
+  await expect(s.getByRole('button', { name: '16, 10월 16일 (금)', exact: true })).toBeDisabled();
+  await expect(s.getByRole('button', { name: '1, 10월 1일 (목)', exact: true })).toBeDisabled();
+  await expect(s.getByRole('button', { name: '17, 10월 17일 (토)', exact: true })).toBeEnabled();
+  await expect(s.getByRole('button', { name: '17, 10월 17일 (토)', exact: true })).toHaveAttribute(
     'aria-current',
     'date',
   );
@@ -51,8 +51,8 @@ test('날짜 선택은 달력 시트로 열리고, 지난 날짜는 고를 수 �
 test('날짜를 고르고 보기를 누르면 칩에 10월 20일 (화)가 표시된다', async ({ page }) => {
   await bar(page).getByRole('button', { name: '날짜 선택' }).click();
   const s = sheet(page);
-  await s.getByRole('button', { name: '10월 20일 (화)', exact: true }).click();
-  await expect(s.getByRole('button', { name: '10월 20일 (화)', exact: true })).toHaveAttribute(
+  await s.getByRole('button', { name: '20, 10월 20일 (화)', exact: true }).click();
+  await expect(s.getByRole('button', { name: '20, 10월 20일 (화)', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
@@ -79,7 +79,7 @@ test('다음 달로 넘겨 고를 수 있다', async ({ page }) => {
   await s.getByRole('button', { name: '다음 달' }).click();
   await expect(s.getByRole('heading', { name: '2026년 11월' })).toBeVisible();
   await expect(s.getByRole('button', { name: '이전 달' })).toBeEnabled();
-  await s.getByRole('button', { name: '11월 3일 (화)', exact: true }).click();
+  await s.getByRole('button', { name: '3, 11월 3일 (화)', exact: true }).click();
   await s.getByRole('button', { name: '11월 3일 (화) 보기' }).click();
   await expect(bar(page).getByRole('button', { name: '11월 3일 (화)', exact: true })).toBeVisible();
 });
@@ -87,7 +87,7 @@ test('다음 달로 넘겨 고를 수 있다', async ({ page }) => {
 test('닫기와 Escape는 고르지 않고 닫으며 포커스를 칩으로 돌려준다', async ({ page }) => {
   const pick = bar(page).getByRole('button', { name: '날짜 선택' });
   await pick.click();
-  await sheet(page).getByRole('button', { name: '10월 21일 (수)', exact: true }).click();
+  await sheet(page).getByRole('button', { name: '21, 10월 21일 (수)', exact: true }).click();
   await sheet(page).getByRole('button', { name: '닫기' }).click();
   await expect(sheet(page)).toBeHidden();
   await expect(pick).toBeFocused();
@@ -110,8 +110,8 @@ test('키보드만으로 날짜를 고른다', async ({ page }) => {
   const s = sheet(page);
   await expect(s).toBeVisible();
   // 열리면 포커스가 시트 안(오늘 칸)으로 간다
-  await expect(s.getByRole('button', { name: '10월 17일 (토)', exact: true })).toBeFocused();
-  await s.getByRole('button', { name: '10월 23일 (금)', exact: true }).focus();
+  await expect(s.getByRole('button', { name: '17, 10월 17일 (토)', exact: true })).toBeFocused();
+  await s.getByRole('button', { name: '23, 10월 23일 (금)', exact: true }).focus();
   await page.keyboard.press('Enter');
   await s.getByRole('button', { name: '10월 23일 (금) 보기' }).focus();
   await page.keyboard.press('Enter');
@@ -145,7 +145,7 @@ for (const tag of ['', '@desktop ']) {
     expect(chips.y - (n.y + n.height)).toBeLessThan(24);
     // 날짜를 바꿔도 그대로
     await bar(page).getByRole('button', { name: '날짜 선택' }).click();
-    await sheet(page).getByRole('button', { name: '10월 20일 (화)', exact: true }).click();
+    await sheet(page).getByRole('button', { name: '20, 10월 20일 (화)', exact: true }).click();
     await sheet(page).getByRole('button', { name: '10월 20일 (화) 보기' }).click();
     await expect(notice).toBeVisible();
   });

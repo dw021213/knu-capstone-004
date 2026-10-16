@@ -28,7 +28,6 @@ export function Legend({ mode }: { mode: DataSource['mode'] }) {
       <button
         type="button"
         className={styles.head}
-        aria-label="위험도 범례"
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => setOpen((o) => !o)}
@@ -40,6 +39,8 @@ export function Legend({ mode }: { mode: DataSource['mode'] }) {
             </span>
           ))}
         </span>
+        {/* 보이는 숫자가 이름 앞에 오게 aria-label 대신 숨김 글자로 이름을 붙인다 */}
+        <span className="sr-only"> 위험도 범례</span>
         <svg className={styles.chevron} viewBox="0 0 16 16" aria-hidden="true">
           <path d="M3.5 6 8 10.5 12.5 6" />
         </svg>

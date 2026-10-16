@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { addDays, chipLabel, kstNow, monthCells, shortLabel } from './kst';
+import { addDays, chipLabel, dayLabel, kstNow, monthCells, shortLabel } from './kst';
 
 describe('서울 시각', () => {
   it.each([
@@ -21,6 +21,11 @@ describe('칩 문구', () => {
     ['2026-11-01', '11월 1일 (일)'],
   ])('%s → %s', (d, label) => {
     expect(chipLabel(d)).toBe(label);
+  });
+
+  it('달력 칸 이름은 보이는 숫자로 시작한다', () => {
+    expect(dayLabel('2026-10-20')).toBe('20, 10월 20일 (화)');
+    expect(dayLabel('2026-11-01')).toBe('1, 11월 1일 (일)');
   });
 
   it('짧은 문구는 월·일만', () => {

@@ -47,6 +47,11 @@ export function chipLabel(d: string): string {
   return `${shortLabel(d)} (${WEEKDAY[weekday(d)]})`;
 }
 
+/** 달력 칸 이름. 보이는 숫자로 시작한다(예: '20, 10월 20일 (화)') */
+export function dayLabel(d: string): string {
+  return `${parts(d)[2]}, ${chipLabel(d)}`;
+}
+
 export const WEEKDAY_NAMES = WEEKDAY;
 
 /** 일요일부터 채운 달력 칸. 1일 앞 빈칸은 null */

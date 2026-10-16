@@ -97,7 +97,7 @@ test('달력 시트와 뒤 배경을 눌러도 지도 셀이 선택되지 않는
   const sheet = page.getByRole('dialog', { name: '날짜 선택' });
   await expect(sheet).toBeVisible();
   // 시트 안 날짜 칸
-  await sheet.getByRole('button', { name: '10월 31일 (토)', exact: true }).click();
+  await sheet.getByRole('button', { name: '31, 10월 31일 (토)', exact: true }).click();
   await expect(selected(page)).toHaveText(base);
   // 시트 밖 어두운 배경: 시트만 닫히고 셀은 그대로
   const box = (await sheet.boundingBox())!;

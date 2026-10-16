@@ -33,7 +33,7 @@ describe('처음 펼침 여부', () => {
   it('768px 미만이면 접혀 있다', () => {
     stubWidth(false);
     render(<Legend mode="snapshot" />);
-    expect(screen.getByRole('button', { name: '위험도 범례' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /위험도 범례/ })).toHaveAttribute(
       'aria-expanded',
       'false',
     );
@@ -42,7 +42,7 @@ describe('처음 펼침 여부', () => {
   it('768px 이상이면 펼쳐 있다', () => {
     stubWidth(true);
     render(<Legend mode="snapshot" />);
-    expect(screen.getByRole('button', { name: '위험도 범례' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /위험도 범례/ })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
