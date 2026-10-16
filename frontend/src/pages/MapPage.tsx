@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { dataSource, type DataSource } from '../data';
 import { DateChips } from '../features/date/DateChips';
 import { LayerPanel } from '../features/layers/LayerPanel';
+import { buildMarkerLayout } from '../features/layers/markerLayout';
 import { LAYER_TYPES, useLayers } from '../features/layers/useLayers';
 import { usePoiLayers } from '../features/layers/usePoiLayers';
 import { Legend } from '../features/legend/Legend';
@@ -20,13 +21,27 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
   useEffect(() => {
     pendingOn.forEach(off);
   });
+  // 켜고 받은 레이어만 지도에 그린다. 받아 둔 레이어 객체가 같으면 배치 함수도 같다
+  const [l0, l1, l2, l3, l4] = LAYER_TYPES.map((t) => {
+    const st = states[t];
+    return layers.on.has(t) && st.status === 'ready' ? st.layer : null;
+  });
+  const markerLayout = useMemo(
+    () => buildMarkerLayout([l0, l1, l2, l3, l4].filter((l) => l !== null)),
+    [l0, l1, l2, l3, l4],
+  );
   const count = LAYER_TYPES.filter(
     (t) => layers.on.has(t) && states[t].status !== 'pending',
   ).length;
 
   return (
     <main className={styles.page} aria-label="지도">
-      <MapView scores={scores} selected={selected} onCellSelect={(h3) => setSelected(h3)} />
+      <MapView
+        scores={scores}
+        selected={selected}
+        onCellSelect={(h3) => setSelected(h3)}
+        markers={markerLayout}
+      />
       {/* 지도 위에 얹는 층. MapView 밖(형제)에 두어 여기서 누른 것은 확대·셀 선택으로 가지 않는다 */}
       <div className={styles.overlay} data-testid="map-overlay">
         <header className={styles.top}>

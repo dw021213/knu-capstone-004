@@ -146,3 +146,161 @@ test("자료가 'pending'인 종류는 켜면 '준비 중'으로 비활성되고
   await sw(page, 'CCTV').click();
   await expect(page.getByTestId('layer-badge')).toHaveText('1');
 });
+
+// ── 지도 위 마커·클러스터 ──
+
+type Drawn = {
+  kind: 'cluster' | 'marker';
+  group: string;
+  x: number;
+  y: number;
+  id?: string;
+  count?: number;
+  label?: string;
+  box: [number, number, number, number];
+};
+const CITY_HALL: [number, number] = [126.5312, 33.4996];
+const drawn = (page: Page) => page.evaluate(() => window.__mapDebug!.markers() as Drawn[]);
+const zoomNow = (page: Page) => page.evaluate(() => window.__mapDebug!.zoom());
+const project = (page: Page, lng: number, lat: number) =>
+  page.evaluate(([a, b]) => window.__mapDebug!.project(a, b), [lng, lat] as const);
+
+async function turnOn(page: Page, ...names: string[]) {
+  await layerButton(page).click();
+  for (const n of names) {
+    await sw(page, n).click();
+    await expect(sw(page, n)).toHaveAttribute('aria-checked', 'true');
+  }
+  // 패널을 닫아 지도를 가리지 않게
+  await layerButton(page).click();
+  await expect(panel(page)).toBeHidden();
+}
+
+/** 레이어를 켜기 전에 [lng, lat]에서 두 번 누르기로 z 이상까지 확대 */
+async function zoomInAt(page: Page, at: [number, number], z: number) {
+  while ((await zoomNow(page)) < z) {
+    const z0 = await zoomNow(page);
+    const [x, y] = await project(page, ...at);
+    await page.mouse.dblclick(x, y);
+    await expect.poll(() => zoomNow(page)).toBeGreaterThan(z0 + 0.9);
+  }
+  await page.waitForTimeout(400);
+}
+
+/** 마커 canvas의 화면 점 (x, y) 픽셀 RGBA */
+async function markerPixel(page: Page, x: number, y: number) {
+  return page.evaluate(
+    ([px, py]) => {
+      const c = document.querySelector<HTMLCanvasElement>('[data-testid="marker-canvas"]')!;
+      const rect = c.getBoundingClientRect();
+      const dpr = c.width / rect.width;
+      const d = c
+        .getContext('2d')!
+        .getImageData(
+          Math.round((px - rect.left) * dpr),
+          Math.round((py - rect.top) * dpr),
+          1,
+          1,
+        ).data;
+      return [d[0], d[1], d[2], d[3]];
+    },
+    [x, y] as const,
+  );
+}
+
+for (const tag of ['', '@desktop ']) {
+  test(`${tag}낮은 줌에서 CCTV를 켜면 CCTV 숫자 클러스터가 생기고 합이 전체 수와 같다`, async ({
+    page,
+  }) => {
+    const cctv = (await (await page.request.get('/data/poi/cctv.json')).json()).items as {
+      lng: number;
+      lat: number;
+    }[];
+    await openMap(page);
+    expect(await zoomNow(page)).toBeLessThan(13);
+    // 전제: 첫 화면에 모든 CCTV가 들어온다
+    const vp = page.viewportSize()!;
+    const pts = await page.evaluate(
+      (ps) => ps.map((p) => window.__mapDebug!.project(p.lng, p.lat)),
+      cctv,
+    );
+    expect(pts.every(([x, y]) => x > 0 && x < vp.width && y > 0 && y < vp.height)).toBe(true);
+    expect(await drawn(page)).toEqual([]);
+
+    await turnOn(page, 'CCTV');
+    await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+    const items = await drawn(page);
+    expect(items.every((i) => i.group === 'cctv')).toBe(true);
+    const clusters = items.filter((i) => i.kind === 'cluster');
+    expect(clusters.length).toBeGreaterThan(3);
+    for (const c of clusters) {
+      expect(c.label).toBe('CCTV');
+      expect(c.count).toBeGreaterThan(1);
+    }
+    const sum = items.reduce((s, i) => s + (i.kind === 'cluster' ? i.count! : 1), 0);
+    expect(sum).toBe(cctv.length);
+    // 실제로 그렸다: 가장 큰 알약 왼쪽 안쪽은 검정 채움
+    const big = clusters.reduce((a, b) => (a.count! > b.count! ? a : b));
+    const [r, g, b, a] = await markerPixel(page, big.box[0] + 5, big.y);
+    expect(Math.max(r, g, b)).toBeLessThan(40);
+    expect(a).toBeGreaterThan(200);
+
+    // 끄면 사라진다
+    await layerButton(page).click();
+    await sw(page, 'CCTV').click();
+    await expect.poll(async () => (await drawn(page)).length).toBe(0);
+    expect((await markerPixel(page, big.box[0] + 5, big.y))[3]).toBe(0);
+  });
+}
+
+test('두 종류를 켜면 종류별로 따로 묶이고, 하나를 끄면 그 종류만 사라진다', async ({ page }) => {
+  await openMap(page);
+  await turnOn(page, 'CCTV', '편의점');
+  await expect.poll(async () => new Set((await drawn(page)).map((i) => i.group)).size).toBe(2);
+  const labels = new Set((await drawn(page)).filter((i) => i.label).map((i) => i.label));
+  expect(labels).toEqual(new Set(['CCTV', '편의점']));
+  await layerButton(page).click();
+  await sw(page, 'CCTV').click();
+  await expect
+    .poll(async () => [...new Set((await drawn(page)).map((i) => i.group))])
+    .toEqual(['convenience']);
+});
+
+test('줌 13 이상으로 확대하면 개별 마커로 풀린다', async ({ page }) => {
+  await openMap(page);
+  await zoomInAt(page, CITY_HALL, 13);
+  await turnOn(page, 'CCTV');
+  await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+  const items = await drawn(page);
+  expect(items.every((i) => i.kind === 'marker' && i.group === 'cctv' && i.id)).toBe(true);
+  // 화면 밖은 그리지 않는다
+  const vp = page.viewportSize()!;
+  for (const i of items) {
+    expect(i.x).toBeGreaterThan(-40);
+    expect(i.x).toBeLessThan(vp.width + 40);
+  }
+  // 마커 가운데는 검정 채움
+  const m = items.find((i) => i.x > 20 && i.x < vp.width - 20 && i.y > 120 && i.y < 600)!;
+  const [r, g, b, a] = await markerPixel(page, m.x, m.y);
+  expect(Math.max(r, g, b)).toBeLessThan(40);
+  expect(a).toBeGreaterThan(200);
+});
+
+test('클러스터를 누르면 그 위치로 2배 확대되고 셀 선택은 바뀌지 않는다', async ({ page }) => {
+  await openMap(page);
+  await turnOn(page, 'CCTV');
+  await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+  const z0 = await zoomNow(page);
+  const vp = page.viewportSize()!;
+  const c = (await drawn(page))
+    .filter((i) => i.kind === 'cluster' && i.y > 150 && i.y < vp.height - 150)
+    .reduce((a, b) => (a.count! > b.count! ? a : b));
+  await page.mouse.click(c.x, c.y);
+  await expect.poll(() => zoomNow(page)).toBeCloseTo(z0 + 1, 1);
+  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  // 누른 묶음 자리를 기준으로 확대해 그 자리에 다시 CCTV가 그려진다
+  await page.waitForTimeout(400);
+  const after = await drawn(page);
+  const near = after.filter((i) => Math.hypot(i.x - c.x, i.y - c.y) < 80);
+  expect(near.length).toBeGreaterThan(0);
+});

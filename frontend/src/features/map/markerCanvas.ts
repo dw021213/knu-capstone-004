@@ -69,7 +69,7 @@ export function placeMarkers(items: MarkerItem[], measure: (text: string) => num
       item.y + dy + PILL_H / 2,
     ];
     let box = at(0);
-    for (const dy of [0, step, -step, 2 * step, -2 * step]) {
+    for (const dy of [0, step, -step, 2 * step, -2 * step, 3 * step, -3 * step]) {
       const b = at(dy);
       if (!placed.some((p) => overlaps(p, b))) {
         box = b;

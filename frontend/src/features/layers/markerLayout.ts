@@ -6,7 +6,7 @@ import { LAYER_DEFS } from './layerDefs';
 /** 이 줌 미만이면 종류별 클러스터, 이상이면 개별 마커 */
 export const CLUSTER_MAX_Z = 13;
 /** 클러스터 격자 칸(px). 알약(`CCTV 128`) 폭에 맞춰 계획 기본값 48보다 넓게 */
-export const CLUSTER_PX = 72;
+export const CLUSTER_PX = 96;
 /** 화면 밖 여백(px). 이 밖은 그리지 않는다 */
 const MARGIN = 32;
 
