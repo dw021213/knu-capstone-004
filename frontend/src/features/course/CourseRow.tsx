@@ -4,13 +4,29 @@ import { courseLine, type CourseSummary } from '../../entities/course/summary';
 import { LevelBadge } from './LevelBadge';
 import styles from './CourseRow.module.css';
 
-/** 목록 한 줄: 등급 배지, 이름, 길이, 한 줄 이유(+ 데이터 부족이 많으면 한 줄). 누르면 상세 */
-export function CourseRow({ summary }: { summary: CourseSummary }) {
+/**
+ * 목록 한 줄: 등급 배지, 이름, 길이, 한 줄 이유(+ 데이터 부족이 많으면 한 줄). 누르면 상세.
+ * onPreview: 마우스를 올리거나 포커스하면 코스 id, 벗어나면 null(데스크톱 지도 미리 보기)
+ */
+export function CourseRow({
+  summary,
+  onPreview,
+}: {
+  summary: CourseSummary;
+  onPreview?: (id: string | null) => void;
+}) {
   const { course, level, cautionKm, noDataRatio } = summary;
   const noData = noDataLine(noDataRatio);
   return (
     <li className={styles.row} data-level={level ?? 'none'} data-caution-km={cautionKm.toFixed(3)}>
-      <Link to={`/courses/${course.id}`} className={styles.link}>
+      <Link
+        to={`/courses/${course.id}`}
+        className={styles.link}
+        onMouseEnter={() => onPreview?.(course.id)}
+        onMouseLeave={() => onPreview?.(null)}
+        onFocus={() => onPreview?.(course.id)}
+        onBlur={() => onPreview?.(null)}
+      >
         <LevelBadge level={level} />
         <div className={styles.body}>
           <h2 className={styles.name}>{course.name}</h2>

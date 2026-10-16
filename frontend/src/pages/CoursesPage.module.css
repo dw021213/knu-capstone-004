@@ -13,10 +13,35 @@
   overflow-y: auto;
 }
 
-/* 데스크톱: 가운데 한 줄(목록 너비) */
-.column {
-  max-width: calc(var(--touch) * 14);
-  margin: 0 auto;
+/* 데스크톱: 지도를 화면 전체에 깔고, 뒤로 막대는 위에, 목록은 오른쪽 패널 */
+.map {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .page {
+    position: relative;
+  }
+
+  .map {
+    display: block;
+    position: absolute;
+    inset: 0;
+  }
+
+  .bar {
+    position: relative;
+  }
+
+  .scroll {
+    position: absolute;
+    top: calc(var(--touch) + var(--space-2) + 1px);
+    right: 0;
+    bottom: 0;
+    width: var(--panel-size);
+    background: var(--white);
+    border-left: 1px solid var(--line);
+  }
 }
 
 .head {

@@ -224,3 +224,43 @@ for (const [w, h] of [
     });
   });
 }
+
+test.describe('U9-2 데스크톱 코스 화면', () => {
+  test('@desktop 1440 목록: 왼쪽에 지도와 코스 경로, 오른쪽 패널에 목록이 있다', async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(FIXED_NOW);
+    await page.goto('/courses');
+    await page.waitForFunction(() => window.__mapReady === true);
+    const list = page.getByRole('list', { name: '코스 목록' });
+    await expect(list.getByRole('listitem')).toHaveCount(3);
+    const l = (await list.boundingBox())!;
+    const bar = (await page.getByRole('button', { name: '뒤로' }).boundingBox())!;
+    // 본섬 가운데가 목록 왼쪽 지도 영역 안에, 뒤로 막대 아래에 온다
+    await expect
+      .poll(async () => {
+        const [x, y] = await page.evaluate(() => window.__mapDebug!.project(126.53, 33.38));
+        return x > 0 && x < l.x && y > bar.y + bar.height && y < 900;
+      })
+      .toBe(true);
+    // 처음에는 목록 맨 위(위험 등급이 가장 낮은) 코스 경로와 주의 지점을 그린다
+    const first = await page.evaluate(() => window.__mapDebug!.route());
+    expect(first.lines).toBeGreaterThan(6);
+    expect(first.marks.map((m) => m.label)).toEqual(['1', '2', '3', '4', '5', '6']);
+  });
+
+  test('@desktop 1440 목록: 코스 줄에 마우스를 올리거나 포커스하면 그 코스 경로와 주의 지점을 미리 보여 준다', async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(FIXED_NOW);
+    await page.goto('/courses');
+    await page.waitForFunction(() => window.__mapReady === true);
+    const link = (name: string) => page.getByRole('link', { name: new RegExp(name) });
+    const marks = async () => (await page.evaluate(() => window.__mapDebug!.route())).marks.length;
+    await link('제주올레 10코스').hover();
+    await expect.poll(marks).toBe(8);
+    await page.mouse.move(10, 450);
+    await link('제주올레 1코스').focus();
+    await expect.poll(marks).toBe(6);
+  });
+});

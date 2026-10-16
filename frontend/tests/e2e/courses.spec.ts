@@ -44,7 +44,7 @@ for (const tag of ['', '@desktop ']) {
   });
 }
 
-test('@desktop 데스크톱 목록은 머리와 목록이 같은 너비로 가운데 한 줄에 놓인다', async ({
+test('@desktop 데스크톱 목록은 머리와 목록이 같은 너비로 오른쪽 패널 한 줄에 놓인다', async ({
   page,
 }) => {
   await page.goto('/courses');
@@ -53,7 +53,9 @@ test('@desktop 데스크톱 목록은 머리와 목록이 같은 너비로 가�
   const vp = page.viewportSize()!;
   expect(Math.abs(head.x - list.x)).toBeLessThan(1);
   expect(Math.abs(head.width - list.width)).toBeLessThan(1);
-  expect(Math.abs(list.x + list.width / 2 - vp.width / 2)).toBeLessThan(2);
+  // U9-2: 목록은 오른쪽 400px 패널(왼쪽 선 1px 안쪽)에 오른쪽 끝을 붙인다
+  expect(Math.abs(list.x + list.width - vp.width)).toBeLessThan(1);
+  expect(Math.abs(list.width - 399)).toBeLessThan(2);
 });
 
 test('U8-3 행마다 등급 배지, 이름, 길이, 한 줄 이유가 있다', async ({ page }) => {
