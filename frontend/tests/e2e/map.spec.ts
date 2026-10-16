@@ -285,3 +285,17 @@ test('배경 타일은 채도를 낮춰 위험 색이 잘 보이게 한다', asy
   const tile = page.getByTestId('map').locator('img').first();
   await expect(tile).toHaveCSS('filter', /grayscale\(0\.85\)/);
 });
+
+test('@desktop 북쪽 끝까지 끌면 추자도 셀이 화면에 들어온다', async ({ page }) => {
+  await openMap(page);
+  const vp = page.viewportSize()!;
+  await mouseDrag(page, 0, 3000);
+  const [, ny] = await project(page, 126.3, 34.05);
+  expect(Math.abs(ny)).toBeLessThan(2);
+  const [lat, lng] = cellToLatLng(latLngToCell(33.96, 126.3, 8));
+  const [x, y] = await project(page, lng, lat);
+  expect(x).toBeGreaterThan(0);
+  expect(x).toBeLessThan(vp.width);
+  expect(y).toBeGreaterThan(0);
+  expect(y).toBeLessThan(vp.height);
+});

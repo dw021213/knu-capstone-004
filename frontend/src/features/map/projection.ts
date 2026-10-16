@@ -2,8 +2,8 @@ import { geoMercator, type GeoProjection } from 'd3';
 
 export const TILE = 256;
 
-/** 지도 이동을 묶어 두는 제주 경계(위경도) */
-export const JEJU_BOUNDS = { west: 125.9, east: 127.2, south: 32.9, north: 33.75 } as const;
+/** 지도 이동을 묶어 두는 제주 경계(위경도). 북쪽은 추자도(약 34.01N)까지 넣는다 */
+export const JEJU_BOUNDS = { west: 125.9, east: 127.2, south: 32.9, north: 34.05 } as const;
 
 /** 줌 z에서 세계 전체의 픽셀 너비 */
 export const worldSize = (z: number) => TILE * 2 ** z;

@@ -82,7 +82,16 @@ describe('fitView', () => {
     expect(zoomLevel(fitView(1440, 900))).toBeGreaterThan(zoomLevel(fitView(390, 844)));
   });
 
-  it('JEJU_BOUNDS는 계획 값 그대로', () => {
-    expect(JEJU_BOUNDS).toEqual({ west: 125.9, east: 127.2, south: 32.9, north: 33.75 });
+  it('JEJU_BOUNDS는 추자도까지 넣은 값(북쪽 34.05)', () => {
+    expect(JEJU_BOUNDS).toEqual({ west: 125.9, east: 127.2, south: 32.9, north: 34.05 });
+  });
+
+  it('점수 격자의 모든 셀 중심이 JEJU_BOUNDS 안이다(이동 경계 밖 셀이 없다)', () => {
+    const outside = ids.filter((h) => {
+      const [lng, lat] = cellCenter(h);
+      const b = JEJU_BOUNDS;
+      return lng < b.west || lng > b.east || lat < b.south || lat > b.north;
+    });
+    expect(outside).toEqual([]);
   });
 });
