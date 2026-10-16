@@ -43,6 +43,7 @@ function recorder() {
     moveTo: () => void points++,
     lineTo: () => void points++,
     arc: (...args: number[]) => ops.push({ op: 'arc', args }),
+    roundRect: (...args: number[]) => ops.push({ op: 'roundRect', args }),
     stroke: () =>
       ops.push({
         op: 'stroke',
@@ -59,7 +60,7 @@ function recorder() {
 }
 
 const view = fitView(390, 844);
-const STYLE = { white: '#ffffff', font: 'Noto Sans KR' };
+const STYLE = { white: '#ffffff', ink: '#111111', font: 'Noto Sans KR' };
 const route: MapRoute = {
   lines: [
     {
@@ -90,6 +91,7 @@ const route: MapRoute = {
 describe('drawRoute', () => {
   const { ctx, ops } = recorder();
   const hits = drawRoute(ctx, route, view, STYLE);
+  const markFill = ops.find((o) => o.op === 'fill' && o.fillStyle === CAUTION_MARK_COLOR);
   const strokes = ops.filter((o) => o.op === 'stroke');
 
   it('먼저 경로 전체에 흰 10px 밑선을 긋는다', () => {
@@ -114,20 +116,45 @@ describe('drawRoute', () => {
   });
 
   it('주의 지점은 빨간 원에 흰 번호를 찍고 화면 위치를 돌려준다', () => {
-    const fill = ops.find((o) => o.op === 'fill');
-    expect(fill!.fillStyle).toBe(CAUTION_MARK_COLOR);
+    expect(markFill).toBeDefined();
     expect(CAUTION_MARK_COLOR).toBe(RISK_COLOR[5]);
-    const text = ops.find((o) => o.op === 'fillText');
-    expect(text).toMatchObject({ text: '1', fillStyle: '#ffffff' });
+    const text = ops.find((o) => o.op === 'fillText' && o.text === '1');
+    expect(text).toMatchObject({ fillStyle: '#ffffff' });
     const [x, y] = lngLatToScreen(view, 126.525, 33.41);
-    expect(hits).toEqual([{ x, y, label: '1' }]);
+    expect(hits.marks).toEqual([{ x, y, label: '1' }]);
     // 점은 선 위에 그린다
-    expect(ops.indexOf(fill!)).toBeGreaterThan(ops.indexOf(strokes[3]));
+    expect(ops.indexOf(markFill!)).toBeGreaterThan(ops.indexOf(strokes[3]));
+  });
+
+  it('경로 처음에 시작, 마지막에 끝 표지(검정 채움에 흰 글자)를 그리고 위치를 돌려준다', () => {
+    const [sx, sy] = lngLatToScreen(view, 126.5, 33.4);
+    const [ex, ey] = lngLatToScreen(view, 126.53, 33.41);
+    expect(hits.ends).toEqual([
+      { x: sx, y: sy, label: '시작' },
+      { x: ex, y: ey, label: '끝' },
+    ]);
+    for (const label of ['시작', '끝']) {
+      const t = ops.find((o) => o.op === 'fillText' && o.text === label)!;
+      expect(t.fillStyle).toBe('#ffffff');
+      // 글자 바로 앞에 검정 바탕을 칠한다(흰 후광 글자가 아니다)
+      const chip = ops
+        .slice(0, ops.indexOf(t))
+        .filter((o) => o.op === 'fill')
+        .at(-1)!;
+      expect(chip.fillStyle).toBe('#111111');
+    }
+    // 시작·끝은 선 위, 주의 지점 아래
+    const startText = ops.findIndex((o) => o.op === 'fillText' && o.text === '시작');
+    expect(startText).toBeGreaterThan(ops.indexOf(strokes[3]));
+    expect(startText).toBeLessThan(ops.indexOf(markFill!));
   });
 
   it('구간이 없으면 아무것도 그리지 않는다', () => {
     const r = recorder();
-    expect(drawRoute(r.ctx, { lines: [], marks: [] }, view, STYLE)).toEqual([]);
+    expect(drawRoute(r.ctx, { lines: [], marks: [] }, view, STYLE)).toEqual({
+      marks: [],
+      ends: [],
+    });
     expect(r.ops).toEqual([]);
   });
 });

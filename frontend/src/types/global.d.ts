@@ -7,8 +7,13 @@ declare global {
       zoom(): number;
       /** 옮기기를 끝낸 마지막 맞춤(focus) key. 아직 없으면 null */
       focusDone(): number | null;
-      /** 지금 그린 코스 구간 수와 주의 지점(페이지 좌표) */
-      route(): { lines: number; marks: { x: number; y: number; label: string }[] };
+      /** 지금 그린 코스 구간 수, 주의 지점, 시작·끝 표지(페이지 좌표) */
+      route(): {
+        lines: number;
+        marks: { x: number; y: number; label: string }[];
+        /** 시작·끝 표지 */
+        ends: { x: number; y: number; label: string }[];
+      };
       /** 지금 그린 시설 마커·클러스터(페이지 좌표) */
       markers(): {
         kind: 'cluster' | 'marker';

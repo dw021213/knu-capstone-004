@@ -20,6 +20,7 @@ export interface MapRoute {
 /** canvas라 CSS 변수 값을 받아 쓴다 */
 export interface RouteStyle {
   white: string;
+  ink: string;
   font: string;
 }
 
@@ -27,6 +28,38 @@ export interface RouteMarkHit {
   x: number;
   y: number;
   label: string;
+}
+
+/** 그린 주의 지점과 시작·끝 표지의 화면 위치 */
+export interface RouteHits {
+  marks: RouteMarkHit[];
+  ends: RouteMarkHit[];
+}
+
+/** 시작·끝 표지: 검정 알약 + 흰 테두리 + 흰 글자(흰 후광 글자를 쓰지 않는다) */
+const END_H = 20;
+const END_PAD = 6;
+const END_CHAR = 12;
+
+function drawEnd(
+  ctx: CanvasRenderingContext2D,
+  [x, y]: [number, number],
+  label: string,
+  style: RouteStyle,
+) {
+  const w = END_CHAR * label.length + END_PAD * 2;
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - END_H / 2, w, END_H, END_H / 2);
+  ctx.fillStyle = style.ink;
+  ctx.fill();
+  ctx.strokeStyle = style.white;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = style.white;
+  ctx.font = `700 12px ${style.font}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y + 0.5);
 }
 
 function trace(
@@ -44,15 +77,15 @@ function trace(
 
 /**
  * 셀 위에 코스를 그린다(변환은 drawCells가 넣은 기기 배율 그대로).
- * 흰 밑선 → 구간 등급 색 선(데이터 부족은 회색 점선) → 주의 지점 빨간 원과 흰 번호
+ * 흰 밑선 → 구간 등급 색 선(데이터 부족은 회색 점선) → 시작·끝 표지 → 주의 지점 빨간 원과 흰 번호
  */
 export function drawRoute(
   ctx: CanvasRenderingContext2D,
   route: MapRoute,
   view: View,
   style: RouteStyle,
-): RouteMarkHit[] {
-  if (route.lines.length === 0) return [];
+): RouteHits {
+  if (route.lines.length === 0) return { marks: [], ends: [] };
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.setLineDash([]);
@@ -73,6 +106,19 @@ export function drawRoute(
   }
   ctx.setLineDash([]);
 
+  const first = route.lines[0].coords[0];
+  const lastLine = route.lines[route.lines.length - 1].coords;
+  const last = lastLine[lastLine.length - 1];
+  const ends: RouteMarkHit[] = [];
+  for (const [lngLat, label] of [
+    [first, '시작'],
+    [last, '끝'],
+  ] as const) {
+    const [x, y] = lngLatToScreen(view, ...lngLat);
+    drawEnd(ctx, [x, y], label, style);
+    ends.push({ x, y, label });
+  }
+
   const hits: RouteMarkHit[] = [];
   for (const m of route.marks) {
     const [x, y] = lngLatToScreen(view, ...m.lngLat);
@@ -90,5 +136,5 @@ export function drawRoute(
     ctx.fillText(m.label, x, y + 0.5);
     hits.push({ x, y, label: m.label });
   }
-  return hits;
+  return { marks: hits, ends };
 }

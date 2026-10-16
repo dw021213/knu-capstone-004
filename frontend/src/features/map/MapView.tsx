@@ -14,7 +14,7 @@ import { BASEMAP } from './basemap';
 import { cellAt } from './hitTest';
 import { TAP_DELAY } from './gesture';
 import { drawMarkers, hitTest, type MarkerHit, type MarkerLayout } from './markerCanvas';
-import { drawRoute, type MapRoute, type RouteMarkHit } from './routeCanvas';
+import { drawRoute, type MapRoute, type RouteHits } from './routeCanvas';
 import { tileUrl, visibleTiles } from './tiles';
 import { JEJU_BOUNDS } from './projection';
 import {
@@ -112,10 +112,11 @@ export function MapView({
     hits: [],
   });
   // 마지막으로 그린 코스 주의 지점(그린 변환 기준 화면 좌표)
-  const routeRef = useRef<{ view: View; lines: number; marks: RouteMarkHit[] }>({
+  const routeRef = useRef<{ view: View; lines: number } & RouteHits>({
     view: { k: 1, x: 0, y: 0 },
     lines: 0,
     marks: [],
+    ends: [],
   });
   const zoomRef = useRef<{
     behavior: ZoomBehavior<HTMLDivElement, unknown>;
@@ -257,13 +258,14 @@ export function MapView({
         : null,
       dim,
     });
-    const marks = route
+    const drawn = route
       ? drawRoute(ctx, route, settled, {
           white: cssVar(canvas, '--white'),
+          ink: cssVar(canvas, '--ink'),
           font: cssVar(canvas, '--font'),
         })
-      : [];
-    routeRef.current = { view: settled, lines: route?.lines.length ?? 0, marks };
+      : { marks: [], ends: [] };
+    routeRef.current = { view: settled, lines: route?.lines.length ?? 0, ...drawn };
     if (cells.length > 0) {
       performance.mark('cells-drawn');
       window.__mapReady = true;
@@ -325,15 +327,13 @@ export function MapView({
       route() {
         const v = viewRef.current;
         const rect = containerRef.current?.getBoundingClientRect();
-        const { view: drawnAt, lines, marks } = routeRef.current;
-        if (!v || !rect) return { lines, marks: [] };
-        return {
-          lines,
-          marks: marks.map((m) => {
-            const [x, y] = reproject(drawnAt, v, [m.x, m.y]);
-            return { x: rect.left + x, y: rect.top + y, label: m.label };
-          }),
+        const { view: drawnAt, lines, marks, ends } = routeRef.current;
+        if (!v || !rect) return { lines, marks: [], ends: [] };
+        const page = (m: { x: number; y: number; label: string }) => {
+          const [x, y] = reproject(drawnAt, v, [m.x, m.y]);
+          return { x: rect.left + x, y: rect.top + y, label: m.label };
         };
+        return { lines, marks: marks.map(page), ends: ends.map(page) };
       },
       markers() {
         const v = viewRef.current;

@@ -228,6 +228,27 @@ test.describe('U8-4 코스 상세', () => {
     }
   }
 
+  test('지도에 코스 시작(0km)과 끝 표지를 경로 양 끝에 그린다', async ({ page }) => {
+    const course = (
+      (await (await page.request.get('/data/courses.json')).json()).items as {
+        id: string;
+        coords: [number, number][];
+      }[]
+    ).find((c) => c.id === 'olle-1')!;
+    await openDetail(page);
+    await expect.poll(() => page.evaluate(() => window.__mapDebug!.focusDone())).toBe(0);
+    const { ends } = await page.evaluate(() => window.__mapDebug!.route());
+    expect(ends.map((e) => e.label)).toEqual(['시작', '끝']);
+    const want = await page.evaluate(
+      ([a, b]) => [window.__mapDebug!.project(...a), window.__mapDebug!.project(...b)],
+      [course.coords[0], course.coords[course.coords.length - 1]] as const,
+    );
+    ends.forEach((e, i) => {
+      expect(Math.abs(e.x - want[i][0])).toBeLessThan(1);
+      expect(Math.abs(e.y - want[i][1])).toBeLessThan(1);
+    });
+  });
+
   test('주의 구간을 누르면 지도가 그 구간으로 옮겨 확대한다(키보드로도)', async ({ page }) => {
     await openDetail(page);
     await expect.poll(async () => (await marks(page)).length).toBe(6);
