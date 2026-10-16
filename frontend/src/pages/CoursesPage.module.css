@@ -1,0 +1,69 @@
+/* 모바일 전체 화면. 데스크톱은 가운데 한 줄 */
+.page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--white);
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (min-width: 768px) {
+  .scroll > * {
+    max-width: calc(var(--touch) * 14);
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+.head {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--surf);
+}
+
+.date {
+  margin: 0;
+  font-size: var(--text-m);
+  font-weight: 700;
+}
+
+.notice {
+  display: inline-block;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-1) var(--space-3);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}
+
+.help {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-s);
+  color: var(--ink2);
+  word-break: keep-all;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source {
+  padding: var(--space-4);
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}
+
+.source a {
+  color: var(--ink2);
+}
