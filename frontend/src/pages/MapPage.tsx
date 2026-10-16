@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { dataSource, type DataSource } from '../data';
 import { DateChips } from '../features/date/DateChips';
+import { LayerPanel } from '../features/layers/LayerPanel';
+import { LAYER_TYPES, useLayers } from '../features/layers/useLayers';
+import { usePoiLayers } from '../features/layers/usePoiLayers';
 import { Legend } from '../features/legend/Legend';
 import { MapView } from '../features/map/MapView';
 import { useScores } from './useScores';
@@ -9,6 +12,17 @@ import styles from './MapPage.module.css';
 export function MapPage({ source = dataSource }: { source?: DataSource }) {
   const { data: scores } = useScores(source);
   const [selected, setSelected] = useState<string | null>(null);
+  const layers = useLayers();
+  const states = usePoiLayers(source, layers.on);
+  const { toggle, off } = layers;
+  // 켜서 받아 보니 아직 자료가 없는 종류는 끈다(패널에는 '준비 중'으로 남는다)
+  const pendingOn = LAYER_TYPES.filter((t) => layers.on.has(t) && states[t].status === 'pending');
+  useEffect(() => {
+    pendingOn.forEach(off);
+  });
+  const count = LAYER_TYPES.filter(
+    (t) => layers.on.has(t) && states[t].status !== 'pending',
+  ).length;
 
   return (
     <main className={styles.page} aria-label="지도">
@@ -23,6 +37,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
             </span>
           </div>
         </header>
+        <LayerPanel on={layers.on} toggle={toggle} count={count} states={states} />
         <Legend mode={source.mode} generatedAt={scores?.generatedAt} />
         <DateChips mode={source.mode} />
       </div>
