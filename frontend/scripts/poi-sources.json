@@ -63,8 +63,8 @@
       "limits": "대분류 '숙박' 전체라 펜션이 대부분이고 기숙사/고시원·캠핑장도 들어 있다. 24시간 운영 여부는 알 수 없다. detail.kind(소분류명)로 거를 수 있다"
     },
     "police": {
-      "status": "pending",
-      "label": "아직 내려받지 않음",
+      "status": "ready",
+      "label": "경찰청 지구대·파출소 주소 현황 2025-12-31(좌표: OpenStreetMap Nominatim)",
       "provider": "경찰청",
       "publicDataPk": "15077036",
       "page": "https://www.data.go.kr/data/15077036/fileData.do",
