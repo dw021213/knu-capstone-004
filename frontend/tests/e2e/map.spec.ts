@@ -234,3 +234,47 @@ test('지도 오른쪽 아래에 배경 지도 출처를 표기한다', async ({
   expect(box.x + box.width).toBeGreaterThan(map.x + map.width - 24);
   expect(box.y + box.height).toBeGreaterThan(map.y + map.height - 24);
 });
+
+test('6px 넘게 끌면 선택이 바뀌지 않고, 조금 흔들린 누르기는 선택된다', async ({ page }) => {
+  const cells = (await (await page.request.get('/data/scores.json')).json()).cells as Record<
+    string,
+    [number | null, number]
+  >;
+  const airport = latLngToCell(AIRPORT[1], AIRPORT[0], 8);
+  const graded = gridDisk(airport, 3).find(
+    (h) => h !== airport && cells[h]?.[0] != null && gridDisk(airport, 2).indexOf(h) < 0,
+  )!;
+  expect(graded).toBeDefined();
+  await openMap(page);
+  // 셀이 크게 보이도록 공항에서 두 번 누르기로 세 번 확대
+  for (let i = 0; i < 3; i++) {
+    const z = await zoomNow(page);
+    const [x, y] = await project(page, ...AIRPORT);
+    await page.mouse.dblclick(x, y);
+    await expect.poll(() => zoomNow(page)).toBeGreaterThan(z + 0.9);
+  }
+  const [ax, ay] = await project(page, ...AIRPORT);
+  await page.mouse.click(ax, ay);
+  await expect(page.getByTestId('selected-cell')).toHaveText(airport);
+
+  const gradedCenter = () => {
+    const [lat, lng] = cellToLatLng(graded);
+    return project(page, lng, lat);
+  };
+  // 등급 셀 위에서 눌러 20px 끌기: 선택은 공항 셀 그대로
+  let [gx, gy] = await gradedCenter();
+  await page.mouse.move(gx, gy);
+  await page.mouse.down();
+  for (let i = 1; i <= 5; i++) await page.mouse.move(gx + i * 4, gy);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  await expect(page.getByTestId('selected-cell')).toHaveText(airport);
+
+  // 2px 흔들린 누르기: 그 셀이 선택된다
+  [gx, gy] = await gradedCenter();
+  await page.mouse.move(gx, gy);
+  await page.mouse.down();
+  await page.mouse.move(gx + 2, gy + 1);
+  await page.mouse.up();
+  await expect(page.getByTestId('selected-cell')).toHaveText(graded);
+});
