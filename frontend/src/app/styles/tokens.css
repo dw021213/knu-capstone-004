@@ -8,6 +8,9 @@
   --risk-none: #bdbdbd;
   --risk-fill-opacity: 0.5;
 
+  /* 배경 지도 타일: 채도를 낮춰 위험 색이 먼저 보이게 */
+  --basemap-filter: grayscale(0.85) brightness(1.05) contrast(0.95);
+
   /* UI 색 */
   --ink: #111111;
   --ink2: #62626b;

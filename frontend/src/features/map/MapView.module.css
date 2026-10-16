@@ -18,6 +18,7 @@
 
 .tile {
   position: absolute;
+  filter: var(--basemap-filter);
   max-width: none;
   pointer-events: none;
   user-select: none;
