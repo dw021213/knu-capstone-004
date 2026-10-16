@@ -1,4 +1,6 @@
 /// <reference path="../../src/types/global.d.ts" />
+import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
+import { densify } from '../../src/entities/course/segments';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 
@@ -104,4 +106,167 @@ test('주소로 바로 들어와도 화면 뒤로 버튼은 지도 홈으로 간
   await page.getByRole('button', { name: '뒤로' }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.waitForFunction(() => window.__mapReady === true);
+});
+
+async function openDetail(page: Page, name = '제주올레 1코스') {
+  await page.goto('/courses');
+  await courseList(page)
+    .getByRole('link', { name: new RegExp(name) })
+    .click();
+  await page.waitForFunction(() => window.__mapReady === true);
+}
+
+const cautionList = (page: Page) => page.getByRole('list', { name: '주의 구간 목록' });
+const marks = (page: Page) => page.evaluate(() => window.__mapDebug!.route().marks);
+
+test.describe('U8-4 코스 상세', () => {
+  for (const tag of ['', '@desktop ']) {
+    test(`${tag}지도에 구간별 색 경로와 주의 지점 번호를 그리고, 시트에 등급·설명·주의 구간·출처가 있다`, async ({
+      page,
+    }) => {
+      await openDetail(page);
+      await expect(page).toHaveURL(/\/courses\/olle-1$/);
+      await expect(page.getByRole('heading', { level: 1, name: '제주올레 1코스' })).toBeVisible();
+      const sheet = page.getByTestId('course-sheet');
+      await expect(sheet.getByTestId('level-badge').first()).toHaveText('5 · 매우 높음');
+      await expect(sheet.getByTestId('course-reason')).toContainText(
+        '평균이 아니라 가장 위험한 구간을 기준',
+      );
+      const items = cautionList(page).getByRole('button');
+      await expect(items).toHaveCount(6);
+      await expect(items.first()).toContainText(/\d+\.\dkm|\d+\.\d~\d+\.\dkm/);
+      await expect(items.first()).toContainText('상위');
+      const route = await page.evaluate(() => window.__mapDebug!.route());
+      expect(route.lines).toBeGreaterThan(6);
+      expect(route.marks.map((m) => m.label)).toEqual(['1', '2', '3', '4', '5', '6']);
+      const chips = sheet.getByRole('list', { name: '출처' });
+      await expect(chips).toContainText('OpenStreetMap');
+      await expect(chips).toContainText('교통사고 도로 모델');
+      // 처음에는 코스 전체가 화면 안에 들어오고 주의 지점이 시트에 가리지 않는다
+      const vp = page.viewportSize()!;
+      const box = (await sheet.boundingBox())!;
+      await expect
+        .poll(async () =>
+          (await marks(page)).every(
+            (m) => m.x > 0 && m.x < vp.width && m.y > 0 && (tag ? m.x < box.x : m.y < box.y),
+          ),
+        )
+        .toBe(true);
+    });
+  }
+
+  test('주의 구간을 누르면 지도가 그 구간으로 옮겨 확대한다(키보드로도)', async ({ page }) => {
+    await openDetail(page);
+    await expect.poll(async () => (await marks(page)).length).toBe(6);
+    const before = await page.evaluate(() => window.__mapDebug!.zoom());
+    const items = cautionList(page).getByRole('button');
+    await items.nth(2).click();
+    await expect(items.nth(2)).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .poll(() => page.evaluate(() => window.__mapDebug!.zoom()))
+      .toBeGreaterThan(before + 1);
+    // 3번 지점이 화면 가운데 위쪽(시트 위)에 온다
+    const vp = page.viewportSize()!;
+    const sheetBox = (await page.getByTestId('course-sheet').boundingBox())!;
+    await expect
+      .poll(async () => {
+        const m = (await marks(page)).find((x) => x.label === '3')!;
+        return Math.abs(m.x - vp.width / 2) < vp.width * 0.15 && m.y > 0 && m.y < sheetBox.y;
+      })
+      .toBe(true);
+    // 키보드: 다음 항목으로 옮겨 Enter
+    await items.nth(4).focus();
+    await page.keyboard.press('Enter');
+    await expect(items.nth(4)).toHaveAttribute('aria-pressed', 'true');
+    await expect(items.nth(2)).toHaveAttribute('aria-pressed', 'false');
+    await expect
+      .poll(async () => {
+        const m = (await marks(page)).find((x) => x.label === '5')!;
+        return Math.abs(m.x - vp.width / 2) < vp.width * 0.15;
+      })
+      .toBe(true);
+  });
+
+  test('뒤로 가기(브라우저)로 목록, 한 번 더 뒤로 가면 지도 홈', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => window.__mapReady === true);
+    await page.getByRole('link', { name: '오늘 안전한 코스' }).click();
+    await courseList(page)
+      .getByRole('link', { name: /제주올레 10코스/ })
+      .click();
+    await expect(page.getByRole('heading', { level: 1, name: '제주올레 10코스' })).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/courses$/);
+    await expect(courseList(page)).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await page.waitForFunction(() => window.__mapReady === true);
+  });
+
+  test('화면 뒤로 버튼은 목록으로 간다(주소로 바로 들어와도)', async ({ page }) => {
+    await page.goto('/courses/olle-20');
+    await expect(page.getByRole('heading', { level: 1, name: '제주올레 20코스' })).toBeVisible();
+    await page.getByRole('button', { name: '뒤로' }).click();
+    await expect(page).toHaveURL(/\/courses$/);
+    await expect(courseList(page)).toBeVisible();
+  });
+
+  test('없는 코스 주소는 찾지 못했다고 하고 목록으로 가는 길을 준다', async ({ page }) => {
+    await page.goto('/courses/olle-99');
+    await expect(page.getByText('코스를 찾지 못했어요')).toBeVisible();
+    await page.getByRole('link', { name: '코스 목록 보기' }).click();
+    await expect(courseList(page)).toBeVisible();
+  });
+
+  test('지도를 눌러도 셀 시트를 열지 않는다(코스 화면은 구간 정보만)', async ({ page }) => {
+    await openDetail(page);
+    const vp = page.viewportSize()!;
+    await page.mouse.click(vp.width / 2, 120);
+    await page.waitForTimeout(600);
+    await expect(page.getByTestId('cell-sheet')).toHaveCount(0);
+  });
+
+  test('@desktop 경로가 지나지 않는 셀은 불투명도 0.15로 흐리게 칠한다', async ({ page }) => {
+    const get = async (u: string) => (await page.request.get(u)).json();
+    const cells = (await get('/data/scores.json')).cells as Record<string, [number | null, number]>;
+    const course = (await get('/data/courses.json')).items.find(
+      (c: { id: string }) => c.id === 'olle-1',
+    ) as { coords: [number, number][] };
+    const onRoute = new Set(densify(course.coords).map(([lng, lat]) => latLngToCell(lat, lng, 8)));
+    // 경로에서 두 칸 떨어진, 등급이 있는 셀
+    const off = [...onRoute]
+      .flatMap((h) => gridDisk(h, 2))
+      .find(
+        (h) =>
+          !onRoute.has(h) && gridDisk(h, 1).every((n) => !onRoute.has(n)) && cells[h]?.[0] != null,
+      )!;
+    expect(off).toBeDefined();
+    await openDetail(page);
+    await expect.poll(async () => (await marks(page)).length).toBe(6);
+    await page.waitForTimeout(400);
+    const [lat, lng] = cellToLatLng(off);
+    const [x, y] = await page.evaluate(([a, b]) => window.__mapDebug!.project(a, b), [
+      lng,
+      lat,
+    ] as const);
+    const alpha = await page.evaluate(
+      ([px, py]) => {
+        const c = document.querySelector<HTMLCanvasElement>('[data-testid="map"] canvas')!;
+        const rect = c.getBoundingClientRect();
+        const dpr = c.width / rect.width;
+        const d = c
+          .getContext('2d')!
+          .getImageData(
+            Math.round((px - rect.left) * dpr),
+            Math.round((py - rect.top) * dpr),
+            1,
+            1,
+          ).data;
+        return d[3];
+      },
+      [x, y] as const,
+    );
+    // 0.15 × 255 ≈ 38 (흐리지 않으면 0.5 × 255 ≈ 128)
+    expect(Math.abs(alpha - 38)).toBeLessThanOrEqual(4);
+  });
 });

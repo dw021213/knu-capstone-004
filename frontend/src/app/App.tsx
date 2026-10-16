@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { SelectedDateProvider } from '../features/date/SelectedDateProvider';
+import { CourseDetailPage } from '../pages/CourseDetailPage';
 import { CoursesPage } from '../pages/CoursesPage';
 import { MapPage } from '../pages/MapPage';
 import { SITE_NAME, usePageTitle } from '../shared/page/usePageTitle';
@@ -31,6 +32,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/courses" element={<CoursesPage />} />
+              <Route path="/courses/:id" element={<CourseDetailPage />} />
               <Route path="*" element={<Home />} />
             </Routes>
           </div>

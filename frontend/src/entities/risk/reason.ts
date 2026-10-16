@@ -20,7 +20,7 @@ export interface Reason {
   sources: string[];
 }
 
-const MODEL_SOURCE = '교통사고 도로 모델(2017~2021 사고 자료)';
+export const MODEL_SOURCE = '교통사고 도로 모델(2017~2021 사고 자료)';
 const ROAD_SOURCE: Partial<Record<RoadSource, string>> = {
   standard_link: '표준노드링크 2026-09-14',
   ngii_map: '수치지도 2025',
