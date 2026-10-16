@@ -112,6 +112,42 @@ describe('snapshot 구현', () => {
     expect(layer.items[0]).toMatchObject({ type: 'fire', name: '구좌119안전센터' });
   });
 
+  it('파일 안의 status가 pending이면 pending과 그 출처 문구', async () => {
+    server.use(
+      http.get(`${SNAPSHOT_BASE}/data/poi/lodging.json`, () =>
+        HttpResponse.json({
+          type: 'lodging',
+          status: 'pending',
+          source: '로그인이 필요해 내려받지 못함',
+          items: [],
+        }),
+      ),
+    );
+    expect(await makeSnapshot().getPoi('lodging')).toEqual({
+      type: 'lodging',
+      status: 'pending',
+      source: '로그인이 필요해 내려받지 못함',
+      items: [],
+    });
+  });
+
+  it('파일 안의 status가 ready면 ready', async () => {
+    server.use(
+      http.get(`${SNAPSHOT_BASE}/data/poi/police.json`, () =>
+        HttpResponse.json({
+          type: 'police',
+          status: 'ready',
+          source: '경찰청',
+          fetchedAt: '2026-10-17',
+          items: [{ id: 'police-1', type: 'police', name: '중앙지구대', lat: 33.5, lng: 126.5 }],
+        }),
+      ),
+    );
+    const layer = await makeSnapshot().getPoi('police');
+    expect(layer.status).toBe('ready');
+    expect(layer.items).toHaveLength(1);
+  });
+
   it('없는 파일에 HTML(SPA 폴백)이 200으로 와도 pending', async () => {
     server.use(
       http.get(
