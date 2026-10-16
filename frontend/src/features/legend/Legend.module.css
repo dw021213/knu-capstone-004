@@ -144,3 +144,9 @@
   font-size: var(--text-xs);
   color: var(--ink2);
 }
+
+.time {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}

@@ -90,3 +90,13 @@ test('@desktop 데스크톱 범례는 처음부터 펼친 우하단 카드다', 
   const credit = page.getByRole('link', { name: '© OpenStreetMap contributors' });
   await credit.click({ trial: true });
 });
+
+for (const tag of ['', '@desktop ']) {
+  test(`${tag}펼친 범례 아래에 점수 파일 생성일을 적는다`, async ({ page }) => {
+    await openMap(page);
+    const legend = page.getByTestId('legend');
+    const toggle = legend.getByRole('button', { name: '위험도 범례' });
+    if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+    await expect(legend.getByText('점수 기준 2026.10.12 생성', { exact: true })).toBeVisible();
+  });
+}

@@ -29,6 +29,27 @@ describe('범례 기준 문구', () => {
   });
 });
 
+describe('점수 기준 시각', () => {
+  it('snapshot 모드는 펼친 범례 아래에 점수 파일 생성일(서울)을 적는다', () => {
+    stubWidth(true);
+    render(<Legend mode="snapshot" generatedAt="2026-10-12T09:47:48.581628+09:00" />);
+    expect(screen.getByText('점수 기준 2026.10.12 생성')).toBeInTheDocument();
+  });
+
+  it('생성 시각은 서울 날짜로 바꿔 적는다', () => {
+    stubWidth(true);
+    render(<Legend mode="snapshot" generatedAt="2026-10-11T16:00:00Z" />);
+    expect(screen.getByText('점수 기준 2026.10.12 생성')).toBeInTheDocument();
+  });
+
+  it('생성 시각이 없거나 api 모드면 적지 않는다', () => {
+    stubWidth(true);
+    render(<Legend mode="snapshot" />);
+    render(<Legend mode="api" generatedAt="2026-10-12T09:47:48+09:00" />);
+    expect(screen.queryByText(/점수 기준/)).toBeNull();
+  });
+});
+
 describe('처음 펼침 여부', () => {
   it('768px 미만이면 접혀 있다', () => {
     stubWidth(false);

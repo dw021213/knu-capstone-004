@@ -36,6 +36,11 @@ export function weekday(d: string): number {
   return new Date(Date.UTC(y, m - 1, day)).getUTCDay();
 }
 
+/** '2026.10.12' */
+export function dotDate(d: string): string {
+  return d.replaceAll('-', '.');
+}
+
 /** '10월 20일' */
 export function shortLabel(d: string): string {
   const [, m, day] = parts(d);

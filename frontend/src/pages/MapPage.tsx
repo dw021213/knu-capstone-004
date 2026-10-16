@@ -23,7 +23,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
             </span>
           </div>
         </header>
-        <Legend mode={source.mode} />
+        <Legend mode={source.mode} generatedAt={scores?.generatedAt} />
         <DateChips mode={source.mode} />
       </div>
       {/* 셀 시트(U6) 전까지 선택 결과를 e2e와 보조기기에 알린다 */}

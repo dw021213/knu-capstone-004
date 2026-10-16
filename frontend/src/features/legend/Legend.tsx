@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { LEVEL_NAME, type Level } from '../../entities/risk/level';
 import type { DataSource } from '../../data/types';
+import { dotDate, kstNow } from '../date/kst';
 import styles from './Legend.module.css';
 
 const LEVELS_UP: Level[] = [1, 2, 3, 4, 5];
@@ -19,8 +20,23 @@ function isDesktop(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia(DESKTOP_QUERY).matches;
 }
 
-export function Legend({ mode }: { mode: DataSource['mode'] }) {
+/** 점수 파일 생성 시각 → '점수 기준 2026.10.12 생성'(서울 날짜). 읽을 수 없으면 null */
+function basisTime(generatedAt: string | undefined): string | null {
+  if (!generatedAt) return null;
+  const t = new Date(generatedAt);
+  if (Number.isNaN(t.getTime())) return null;
+  return `점수 기준 ${dotDate(kstNow(t).date)} 생성`;
+}
+
+interface LegendProps {
+  mode: DataSource['mode'];
+  /** snapshot 점수 파일의 생성 시각(ISO). api 모드는 at 시각 기준이라 적지 않는다 */
+  generatedAt?: string;
+}
+
+export function Legend({ mode, generatedAt }: LegendProps) {
   const [open, setOpen] = useState(isDesktop);
+  const time = mode === 'snapshot' ? basisTime(generatedAt) : null;
   const listId = useId();
 
   return (
@@ -65,6 +81,7 @@ export function Legend({ mode }: { mode: DataSource['mode'] }) {
           <span>데이터 부족(도로 자료 미확인)</span>
         </p>
         <p className={styles.basis}>{BASIS[mode]}</p>
+        {time && <p className={styles.time}>{time}</p>}
       </div>
     </section>
   );
