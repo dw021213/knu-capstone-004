@@ -5,6 +5,8 @@
   --overlay-top: calc(var(--header-h) + var(--space-3));
   /* 오른쪽 패널이 가리는 너비. 지도 위 조작과 지도 출처를 그만큼 왼쪽으로 옮긴다 */
   --panel-offset: 0px;
+  /* 데스크톱 범례 카드 아래 끝. 지도 영역이 좁으면(data-stack) 날짜 칩 묶음 위로 올린다 */
+  --legend-bottom: var(--space-8);
   position: relative;
   flex: 1;
   min-height: 0;
@@ -22,6 +24,10 @@
   position: absolute;
   inset: 0 var(--panel-offset) 0 0;
   pointer-events: none;
+}
+
+.page[data-stack='true'] {
+  --legend-bottom: calc(var(--space-8) + var(--date-h, 0px) + var(--space-3));
 }
 
 .page[data-panel='open'] {
@@ -114,7 +120,7 @@
   .locate {
     position: absolute;
     right: var(--space-4);
-    bottom: calc(var(--space-8) + var(--legend-h, 0px) + var(--space-2));
+    bottom: calc(var(--legend-bottom) + var(--legend-h, 0px) + var(--space-2));
   }
 
   .courseLink {

@@ -159,3 +159,68 @@ test.describe('U9-1 데스크톱 오른쪽 패널', () => {
     await expect(input).toBeFocused();
   });
 });
+
+type Box = { x: number; y: number; width: number; height: number };
+const intersects = (a: Box, b: Box) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+/** 핵심 요소 가운데 화면에 보이는 것의 상자 */
+async function visibleBoxes(page: Page) {
+  const items: Record<string, import('@playwright/test').Locator> = {
+    검색: page.getByRole('combobox', { name: '읍면동 검색' }),
+    레이어: page.getByTestId('layer-button'),
+    범례: page.getByTestId('legend'),
+    날짜칩: page.getByTestId('date-bar').getByRole('group', { name: '날짜' }),
+    날짜안내: page.getByTestId('date-bar').getByText('날씨 미반영 · 공간 점수는 날짜와 무관'),
+    내위치: page.getByRole('button', { name: '내 위치' }),
+    코스: page.getByRole('link', { name: '오늘 안전한 코스' }),
+    셀정보: page.getByTestId('cell-sheet'),
+    지도출처: page.getByRole('link', { name: '© OpenStreetMap contributors' }),
+  };
+  const out: [string, Box][] = [];
+  for (const [name, l] of Object.entries(items)) {
+    if ((await l.count()) === 0 || !(await l.first().isVisible())) continue;
+    out.push([name, (await l.first().boundingBox())!]);
+  }
+  return out;
+}
+
+function overlaps(boxes: [string, Box][]) {
+  const found: string[] = [];
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++)
+      if (intersects(boxes[i][1], boxes[j][1])) found.push(`${boxes[i][0]}×${boxes[j][0]}`);
+  return found;
+}
+
+for (const [w, h] of [
+  [390, 844],
+  [768, 1024],
+  [820, 1180],
+  [1024, 768],
+  [1440, 900],
+] as const) {
+  test.describe(`U9-3 ${w}×${h} 핵심 요소 겹침`, () => {
+    test.use({ viewport: { width: w, height: h } });
+
+    test(`@desktop ${w}px: 지도 홈과 셀을 고른 화면에서 검색·레이어·범례·날짜 칩·내 위치·셀 정보가 서로 겹치지 않는다`, async ({
+      page,
+    }) => {
+      await openMap(page);
+      const home = await visibleBoxes(page);
+      expect(home.map(([n]) => n)).toEqual(
+        expect.arrayContaining(['검색', '레이어', '범례', '날짜칩', '내위치', '코스']),
+      );
+      expect(overlaps(home)).toEqual([]);
+      await pickLandCell(page);
+      await expect(page.getByTestId('cell-sheet')).toBeVisible();
+      // 펼침·이동이 끝난 뒤 잰다
+      await page.waitForTimeout(300);
+      const picked = await visibleBoxes(page);
+      expect(picked.map(([n]) => n)).toEqual(
+        expect.arrayContaining(['검색', '레이어', '범례', '날짜칩', '셀정보']),
+      );
+      expect(overlaps(picked)).toEqual([]);
+    });
+  });
+}

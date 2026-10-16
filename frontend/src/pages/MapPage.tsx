@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useWide } from '../app/useBreakpoint';
+import { isWide, useWide } from '../app/useBreakpoint';
 import { dataSource, type DataSource } from '../data';
 import { CellSheet, type SheetTarget } from '../features/cell-sheet/CellSheet';
 import { useSheetData } from '../features/cell-sheet/useSheetData';
@@ -114,18 +114,28 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
     });
   }, []);
 
-  // 데스크톱 오른쪽 패널·내 위치 버튼이 범례 카드를 가리지 않게 범례 크기를 CSS 변수로 넘긴다.
+  // 데스크톱 내 위치 버튼을 범례 카드 바로 위에 두도록 범례 높이를 CSS 변수로 넘긴다.
   // 상단에 위치 안내 띠가 붙으면 그만큼 레이어 버튼·범례 줄(--overlay-top)을 아래로 민다
   useLayoutEffect(() => {
     const root = rootRef.current;
     const header = headerRef.current;
     const legend = root?.querySelector('[data-testid="legend"]');
     const layer = root?.querySelector('[data-testid="layer-button"]');
-    if (!root || !legend || !header || !layer) return;
+    const area = root?.querySelector('[data-testid="map-overlay"]');
+    const bar = root?.querySelector('[data-testid="date-bar"]');
+    if (!root || !legend || !header || !layer || !area || !bar) return;
     const ro = new ResizeObserver(() => {
       const box = legend.getBoundingClientRect();
       root.style.setProperty('--legend-h', `${box.height}px`);
-      root.style.setProperty('--legend-w', `${box.width}px`);
+      // 데스크톱: 지도 영역(패널 왼쪽)이 좁아 가운데 날짜 칩과 오른쪽 아래 범례가 한 줄에 들지 않으면
+      // 범례(와 그 위 내 위치)를 날짜 칩 묶음 위로 올린다(태블릿, 패널을 연 1024px 등)
+      const chips = bar.getBoundingClientRect();
+      const width = area.getBoundingClientRect().width;
+      const gap = parseFloat(getComputedStyle(root).getPropertyValue('--space-4')) || 0;
+      const fits = width / 2 + chips.width / 2 + gap <= width - gap - box.width;
+      root.style.setProperty('--date-h', `${chips.height}px`);
+      if (isWide() && !fits) root.dataset.stack = 'true';
+      else delete root.dataset.stack;
       // 데스크톱 '오늘 안전한 코스'를 레이어 버튼 바로 옆에 둔다(켠 개수 배지로 너비가 바뀐다)
       root.style.setProperty('--layer-w', `${layer.getBoundingClientRect().width}px`);
       root.style.setProperty('--header-h', `${header.getBoundingClientRect().height}px`);
@@ -133,6 +143,8 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
     ro.observe(legend);
     ro.observe(header);
     ro.observe(layer);
+    ro.observe(area);
+    ro.observe(bar);
     return () => ro.disconnect();
   }, []);
 
