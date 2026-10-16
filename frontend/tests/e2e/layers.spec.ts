@@ -424,3 +424,45 @@ test('카드를 연 채 레이어를 끄거나 지도를 누르면 카드가 닫
   await page.mouse.click(sx, sy);
   await expect(card(page)).toBeHidden();
 });
+
+// ── 기억 ──
+
+test('켠 레이어는 새로고침 뒤에도 켜져 있고 지도에 다시 그려진다', async ({ page }) => {
+  await openMap(page);
+  await turnOn(page, 'CCTV', '숙박');
+  await page.reload();
+  await page.waitForFunction(() => window.__mapReady === true);
+  await expect(page.getByTestId('layer-badge')).toHaveText('2');
+  await expect
+    .poll(async () => [...new Set((await drawn(page)).map((i) => i.group))].sort())
+    .toEqual(['cctv', 'lodging']);
+  await layerButton(page).click();
+  await expect(sw(page, 'CCTV')).toHaveAttribute('aria-checked', 'true');
+  await expect(sw(page, '숙박')).toHaveAttribute('aria-checked', 'true');
+  await expect(sw(page, '편의점')).toHaveAttribute('aria-checked', 'false');
+});
+
+test('localStorage를 쓸 수 없어도 레이어를 켜고 끌 수 있다', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('막힘', 'SecurityError');
+      },
+    });
+  });
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await openMap(page);
+  await turnOn(page, '편의점');
+  await expect(page.getByTestId('layer-badge')).toHaveText('1');
+  await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+  await layerButton(page).click();
+  await sw(page, '편의점').click();
+  await expect(page.getByTestId('layer-badge')).toHaveCount(0);
+  // 기억은 못 하므로 새로고침하면 모두 꺼진 처음 상태
+  await page.reload();
+  await page.waitForFunction(() => window.__mapReady === true);
+  await expect(page.getByTestId('layer-badge')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
