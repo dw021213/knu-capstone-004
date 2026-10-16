@@ -13,12 +13,10 @@
   overflow-y: auto;
 }
 
-@media (min-width: 768px) {
-  .scroll > * {
-    max-width: calc(var(--touch) * 14);
-    margin-left: auto;
-    margin-right: auto;
-  }
+/* 데스크톱: 가운데 한 줄(목록 너비) */
+.column {
+  max-width: calc(var(--touch) * 14);
+  margin: 0 auto;
 }
 
 .head {
