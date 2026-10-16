@@ -177,7 +177,12 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
           {my.noticeOpen && <LocationBanner state={my.state} onClose={my.dismiss} />}
         </header>
         <LayerPanel on={layers.on} toggle={toggle} count={count} states={states} />
-        <Legend mode={source.mode} generatedAt={scores?.generatedAt} disabled={loading} />
+        <Legend
+          mode={source.mode}
+          generatedAt={scores?.generatedAt}
+          disabled={loading}
+          weather={scores?.weather}
+        />
         {loading && <LoadingBanner />}
         {failed && <ErrorState onRetry={() => void refetch()} />}
         {/* 아래 묶음: 셀 시트를 날짜 칩 위에 쌓아 시트를 연 채로도 날짜를 바꿀 수 있다 */}
@@ -198,7 +203,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
               onClose={closeSheet}
             />
           )}
-          <DateChips mode={source.mode} disabled={loading} />
+          <DateChips mode={source.mode} disabled={loading} weather={scores?.weather} />
         </div>
         {pickedPoi && pickedLayer && (
           <PoiCard
