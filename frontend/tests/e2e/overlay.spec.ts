@@ -94,8 +94,9 @@ test('달력 시트와 뒤 배경을 눌러도 지도 셀이 선택되지 않는
   await zoomIntoLand(page);
   const vp = page.viewportSize()!;
   await page.mouse.click(vp.width / 2, vp.height / 2);
+  // 한 번 누르기는 두 번 누르기와 구별하려고 잠시 뒤에 셀을 고른다(U6). 골라질 때까지 기다린다
+  await expect(selected(page)).not.toHaveText('');
   const base = (await selected(page).textContent())!;
-  expect(base).not.toBe('');
 
   await page.getByRole('button', { name: '날짜 선택' }).click();
   const sheet = page.getByRole('dialog', { name: '날짜 선택' });
@@ -129,7 +130,7 @@ test('날짜 칩 영역의 빈 곳(안내 옆)은 지도로 통과한다', async
   const vp = page.viewportSize()!;
   const x = n.x + n.width + 40;
   expect(x).toBeLessThan(vp.width - 20);
-  // 확대하며 두 번 누른 곳의 셀이 골라져 있으므로 다른 셀로 바뀌는지 본다
+  // 두 번 누르기는 셀을 고르지 않으므로(U6) 보통 비어 있다. 골라져 있더라도 다른 셀로 바뀌는지 본다
   const base = (await selected(page).textContent()) ?? '';
   await page.mouse.click(x, n.y + n.height / 2);
   await expect(selected(page)).not.toHaveText('');

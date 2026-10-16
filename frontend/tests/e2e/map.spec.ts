@@ -300,3 +300,20 @@ test('@desktop 북쪽 끝까지 끌면 추자도 셀이 화면에 들어온다',
   expect(y).toBeGreaterThan(0);
   expect(y).toBeLessThan(vp.height);
 });
+
+test('두 번 누르면 확대만 하고 셀을 고르지 않는다(셀 시트가 두 번째 누르기를 가로채지 않게)', async ({
+  page,
+}) => {
+  await openMap(page);
+  // 모바일에서 셀 시트가 열리는 화면 아래쪽 땅(서귀포)
+  const at: [number, number] = [126.56, 33.26];
+  for (let i = 0; i < 2; i++) {
+    const z = await zoomNow(page);
+    const [x, y] = await project(page, ...at);
+    await page.mouse.dblclick(x, y);
+    await expect.poll(() => zoomNow(page)).toBeGreaterThan(z + 0.9);
+  }
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  await expect(page.getByTestId('cell-sheet')).toHaveCount(0);
+});

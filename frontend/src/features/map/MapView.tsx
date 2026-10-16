@@ -41,6 +41,11 @@ export interface MapViewProps {
 
 /** 이 거리(CSS px)보다 덜 움직이고 뗀 포인터만 셀 선택으로 본다 */
 const CLICK_SLOP = 6;
+/**
+ * 한 번 누르기는 이만큼 기다렸다가 셀 선택으로 본다. 그 안에 다시 누르면 두 번 누르기(확대)라 고르지 않는다.
+ * 바로 고르면 열린 셀 시트가 두 번째 누르기를 가로채 확대가 되지 않는다.
+ */
+const TAP_DELAY = 300;
 /** 클러스터를 누르면 이만큼 확대 */
 const CLUSTER_ZOOM_BY = 2;
 
@@ -250,13 +255,22 @@ export function MapView({
     const el = containerRef.current!;
     const downs = new Map<number, [number, number]>();
     let multi = false;
+    // 기다리는 한 번 누르기, 두 번째 누르기로 취소된 포인터
+    let pendingTap: number | null = null;
+    const secondTap = new Set<number>();
     const onDown = (e: PointerEvent) => {
       downs.set(e.pointerId, [e.clientX, e.clientY]);
       if (downs.size > 1) multi = true;
+      if (pendingTap !== null) {
+        window.clearTimeout(pendingTap);
+        pendingTap = null;
+        secondTap.add(e.pointerId);
+      }
     };
     const onUp = (e: PointerEvent) => {
       const start = downs.get(e.pointerId);
       downs.delete(e.pointerId);
+      const wasSecond = secondTap.delete(e.pointerId);
       const wasMulti = multi;
       if (downs.size === 0) multi = false;
       const v = viewRef.current;
@@ -280,17 +294,23 @@ export function MapView({
         }
         return;
       }
+      if (wasSecond) return;
       const lngLat = screenToLngLat(v, p);
-      selectRef.current?.(known ? cellAt(lngLat[0], lngLat[1], known) : null, lngLat);
+      pendingTap = window.setTimeout(() => {
+        pendingTap = null;
+        selectRef.current?.(known ? cellAt(lngLat[0], lngLat[1], known) : null, lngLat);
+      }, TAP_DELAY);
     };
     const onCancel = (e: PointerEvent) => {
       downs.delete(e.pointerId);
+      secondTap.delete(e.pointerId);
       if (downs.size === 0) multi = false;
     };
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onCancel);
     return () => {
+      if (pendingTap !== null) window.clearTimeout(pendingTap);
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', onCancel);
