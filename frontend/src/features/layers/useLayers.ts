@@ -28,8 +28,16 @@ function save(on: Set<PoiType>) {
   }
 }
 
+export interface Layers {
+  on: Set<PoiType>;
+  toggle(t: PoiType): void;
+  /** 켜져 있으면 끈다(자료가 아직 없는 종류를 끌 때) */
+  off(t: PoiType): void;
+  count: number;
+}
+
 /** 켠 시설 레이어. 처음엔 모두 꺼짐, 다음 방문에도 기억한다 */
-export function useLayers(): { on: Set<PoiType>; toggle(t: PoiType): void; count: number } {
+export function useLayers(): Layers {
   const [on, setOn] = useState(load);
   useEffect(() => save(on), [on]);
   const toggle = useCallback((t: PoiType) => {
@@ -39,5 +47,13 @@ export function useLayers(): { on: Set<PoiType>; toggle(t: PoiType): void; count
       return next;
     });
   }, []);
-  return { on, toggle, count: on.size };
+  const off = useCallback((t: PoiType) => {
+    setOn((prev) => {
+      if (!prev.has(t)) return prev;
+      const next = new Set(prev);
+      next.delete(t);
+      return next;
+    });
+  }, []);
+  return { on, toggle, off, count: on.size };
 }

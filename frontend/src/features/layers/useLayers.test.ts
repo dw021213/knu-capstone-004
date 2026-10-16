@@ -24,6 +24,15 @@ describe('useLayers', () => {
     expect(result.current.count).toBe(1);
   });
 
+  it('off는 켜져 있으면 끄고, 꺼져 있으면 그대로 둔다', () => {
+    const { result } = renderHook(() => useLayers());
+    act(() => result.current.toggle('police'));
+    act(() => result.current.off('police'));
+    act(() => result.current.off('police'));
+    expect(result.current.on.has('police')).toBe(false);
+    expect(result.current.count).toBe(0);
+  });
+
   it('켠 레이어를 저장하고 다음에 복원한다', () => {
     const first = renderHook(() => useLayers());
     act(() => first.result.current.toggle('convenience'));
