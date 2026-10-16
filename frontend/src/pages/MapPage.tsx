@@ -13,6 +13,7 @@ import { usePoiLayers } from '../features/layers/usePoiLayers';
 import { Legend } from '../features/legend/Legend';
 import { cellAt } from '../features/map/hitTest';
 import { MapView, type MapFocus } from '../features/map/MapView';
+import type { Insets } from '../features/map/view';
 import { PlaceSearch } from '../features/search/PlaceSearch';
 import { cellCenter } from '../shared/geo/h3';
 import type { PoiType } from '../data/types';
@@ -70,6 +71,20 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
     }
   };
 
+  // 첫 화면 맞춤: 상단(검색·탭)과 날짜 칩 묶음이 가리는 높이. 지도를 처음 맞추기 전에 잰다
+  const [insets, setInsets] = useState<Insets | null>(null);
+  useLayoutEffect(() => {
+    const overlay = overlayRef.current;
+    const header = overlay?.querySelector('header');
+    const bar = overlay?.querySelector('[data-testid="date-bar"]');
+    if (!overlay || !header || !bar) return;
+    const box = overlay.getBoundingClientRect();
+    setInsets({
+      top: header.getBoundingClientRect().bottom - box.top,
+      bottom: box.bottom - bar.getBoundingClientRect().top,
+    });
+  }, []);
+
   // 데스크톱 오른쪽 패널이 범례 카드를 가리지 않게 범례 높이를 CSS 변수로 넘긴다
   useLayoutEffect(() => {
     const overlay = overlayRef.current;
@@ -99,6 +114,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
         onMarkerSelect={(type, id) => setPicked({ type: type as PoiType, id })}
         highlight={pickedPoi?.id ?? null}
         focus={focus}
+        insets={insets}
       />
       {/* 지도 위에 얹는 층. MapView 밖(형제)에 두어 여기서 누른 것은 확대·셀 선택으로 가지 않는다 */}
       <div ref={overlayRef} className={styles.overlay} data-testid="map-overlay">

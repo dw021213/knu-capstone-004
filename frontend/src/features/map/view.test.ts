@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { zoomIdentity } from 'd3';
+import { zoom, zoomIdentity } from 'd3';
 import { cellCenter, cellPolygon } from '../../shared/geo/h3';
 import {
   lngLatToScreen,
@@ -10,6 +10,10 @@ import {
   zoomLevel,
   fitView,
   focusView,
+  homeView,
+  constrainView,
+  worldExtent,
+  ISLAND_CENTER,
 } from './view';
 import { cellAtScreen } from './hitTest';
 import { JEJU_BOUNDS } from './projection';
@@ -122,4 +126,102 @@ describe('focusView', () => {
     expect(z).toBeGreaterThan(12);
     expect(z).toBeLessThan(14);
   });
+});
+
+describe('homeView: 첫 화면은 본섬 중심을 위·아래 가림 사이 영역 가운데에 둔다', () => {
+  const cases = [
+    { w: 390, h: 844, top: 105, bottom: 111 },
+    { w: 1440, h: 900, top: 105, bottom: 119 },
+  ];
+  it.each(cases)('$w×$h', ({ w, h, top, bottom }) => {
+    const v = homeView(w, h, { top, bottom });
+    const [, y] = lngLatToScreen(v, ...ISLAND_CENTER);
+    expect(y).toBeCloseTo(top + (h - top - bottom) / 2, 6);
+    // 본섬 해안(서쪽 끝, 동쪽 성산, 남쪽 끝, 북쪽 끝)이 가림 사이 영역 안
+    for (const [lng, lat] of [
+      [126.16, 33.3],
+      [126.94, 33.46],
+      [126.3, 33.2],
+      [126.53, 33.56],
+    ] as const) {
+      const [px, py] = lngLatToScreen(v, lng, lat);
+      expect(px).toBeGreaterThanOrEqual(0);
+      expect(px).toBeLessThanOrEqual(w);
+      expect(py).toBeGreaterThanOrEqual(top);
+      expect(py).toBeLessThanOrEqual(h - bottom);
+    }
+  });
+
+  it('넓은 화면은 이동 경계 가로폭이 화면을 덮을 만큼 확대한다(끌면 경계에서 멈춘다)', () => {
+    const v = homeView(1440, 900, { top: 105, bottom: 119 });
+    const [[x0], [x1]] = worldExtent(JEJU_BOUNDS);
+    expect((x1 - x0) * v.k).toBeGreaterThanOrEqual(1440 - 1e-6);
+  });
+
+  it('가림이 없으면 화면 가운데', () => {
+    const v = homeView(390, 844);
+    const [x, y] = lngLatToScreen(v, ...ISLAND_CENTER);
+    expect(x).toBeCloseTo(195, 6);
+    expect(y).toBeCloseTo(422, 6);
+  });
+});
+
+describe('constrainView: 이동 경계 제한', () => {
+  const ext = worldExtent(JEJU_BOUNDS);
+  const d3Default = zoom().constrain();
+
+  it('경계가 화면보다 크면 d3 기본 제한과 같다', () => {
+    const extent: [[number, number], [number, number]] = [
+      [0, 0],
+      [1440, 900],
+    ];
+    for (const t of [
+      zoomIdentity.translate(-200000, -100000).scale(4),
+      zoomIdentity.translate(-200500, -100700).scale(4),
+      zoomIdentity.translate(0, 0).scale(4),
+      zoomIdentity.translate(-1e7, -1e7).scale(4),
+    ]) {
+      const a = constrainView(t, extent, ext);
+      const b = d3Default(t, extent, ext);
+      expect(a.k).toBe(b.k);
+      expect(a.x).toBeCloseTo(b.x, 6);
+      expect(a.y).toBeCloseTo(b.y, 6);
+    }
+  });
+
+  it('경계가 화면보다 작은 축은 가운데로 끌지 않고, 경계가 화면 안에 다 들면 그대로 둔다', () => {
+    const extent: [[number, number], [number, number]] = [
+      [0, 0],
+      [390, 844],
+    ];
+    const v = homeView(390, 844, { top: 105, bottom: 111 });
+    const t = zoomIdentity.translate(v.x, v.y).scale(v.k);
+    const out = constrainView(t, extent, ext);
+    expect(out.y).toBeCloseTo(t.y, 6);
+    // d3 기본은 세로를 가운데로 옮긴다(이 동작을 피하려는 것)
+    expect(Math.abs(d3Default(t, extent, ext).y - t.y)).toBeGreaterThan(10);
+  });
+
+  it('경계가 화면보다 작은 축에서 경계가 화면 밖으로 나가면 화면 끝까지만 민다', () => {
+    const extent: [[number, number], [number, number]] = [
+      [0, 0],
+      [390, 844],
+    ];
+    const k = 1.1;
+    const [[, y0], [, y1]] = ext;
+    // 경계 위쪽이 화면 위로 50px 나간 변환 → 경계 위쪽이 화면 위 끝(0)에 온다
+    const up = constrainView(zoomIdentity.translate(-x0Of(k), -y0 * k - 50).scale(k), extent, ext);
+    expect(y0 * up.k + up.y).toBeCloseTo(0, 6);
+    // 경계 아래쪽이 화면 아래로 나간 변환 → 경계 아래쪽이 화면 아래 끝(844)에 온다
+    const down = constrainView(
+      zoomIdentity.translate(-x0Of(k), 844 - y1 * k + 50).scale(k),
+      extent,
+      ext,
+    );
+    expect(y1 * down.k + down.y).toBeCloseTo(844, 6);
+  });
+
+  function x0Of(k: number) {
+    return ext[0][0] * k + 10;
+  }
 });
