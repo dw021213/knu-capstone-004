@@ -71,3 +71,16 @@ PR 전에 `npm run typecheck && npm run lint && npm run format:check && npm run 
 ## 지도 배경
 
 배경 타일은 CARTO Voyager이고 화면에 "© OpenStreetMap contributors © CARTO"를 표기합니다.
+
+## 지도 모듈
+
+`src/features/map/`이 투영(웹 메르카토르, 기준 줌 z9), 확대·이동(d3-zoom, z9~16, 제주 경계 안), 배경 타일, 셀 canvas 그리기, 셀 찾기를 맡습니다. 이 폴더 밖에서는 투영을 직접 쓰지 않습니다.
+
+e2e 테스트는 아래 읽기 전용 창구를 씁니다.
+
+| 이름                                 | 뜻                                                        |
+| ------------------------------------ | --------------------------------------------------------- |
+| `window.__mapReady`                  | 셀을 처음 그린 뒤 `true`                                  |
+| `window.__mapDebug.project(lng,lat)` | 위경도의 화면(뷰포트) 좌표 `[x, y]`                       |
+| `window.__mapDebug.zoom()`           | 지금 줌 단계(소수)                                        |
+| `performance` mark `cells-drawn`     | 셀을 그릴 때마다 남김. 첫 항목이 첫 화면 그리기 완료 시각 |
