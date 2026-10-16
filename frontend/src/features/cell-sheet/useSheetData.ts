@@ -12,6 +12,8 @@ export interface SheetData {
   facilities: Record<PoiType, LayerState>;
   emergency: EmergencyState;
   emd: EmdFile | null;
+  /** 읍면동 경계를 받지 못함(지역 이름 자리에 알린다) */
+  emdError: boolean;
 }
 
 /**
@@ -45,5 +47,5 @@ export function useSheetData(source: DataSource, enabled: boolean): SheetData {
     : er.isError
       ? { status: 'error' }
       : { status: 'loading' };
-  return { facilities, emergency, emd: emd.data ?? null };
+  return { facilities, emergency, emd: emd.data ?? null, emdError: !emd.data && emd.isError };
 }

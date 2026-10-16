@@ -245,3 +245,55 @@ test.describe('U7-2 내 위치', () => {
     expect(overlap).toBe(false);
   });
 });
+
+test.describe('시설·읍면동·응급실 일부 실패', () => {
+  test('CCTV·응급실·읍면동 파일을 받지 못해도 셀 시트의 나머지는 동작하고 그 부분만 불러오지 못했다고 한다', async ({
+    page,
+  }) => {
+    for (const f of ['**/data/poi/cctv.json', '**/data/poi/er.json', '**/data/emd.json']) {
+      await page.route(f, (r) => r.abort());
+    }
+    await openReady(page);
+    const [x, y] = await project(page, CITY_HALL);
+    await page.mouse.click(x, y);
+    const sheet = page.getByTestId('cell-sheet');
+    await expect(sheet.getByTestId('sheet-badge')).toBeVisible();
+    await expect(sheet.getByRole('row', { name: /CCTV/ })).toContainText('불러오지 못했어요');
+    await expect(sheet.getByRole('row', { name: /편의점/ })).not.toContainText('불러오지');
+    await expect(sheet.getByRole('row', { name: /편의점/ })).not.toContainText('…');
+    await expect(sheet.getByTestId('help-er')).toContainText('불러오지 못했어요');
+    await expect(sheet.getByTestId('help-fire')).toContainText('119안전센터');
+    await expect(sheet.getByTestId('help-fire')).not.toContainText('불러오지');
+    await expect(sheet.getByTestId('sheet-place-error')).toHaveText(
+      '지역 이름을 불러오지 못했어요',
+    );
+  });
+
+  test('레이어 파일을 받지 못하면 그 토글만 불러오지 못했다고 하고 다른 레이어는 켜진다', async ({
+    page,
+  }) => {
+    await page.route('**/data/poi/cctv.json', (r) => r.abort());
+    await openReady(page);
+    await page.getByRole('button', { name: /^레이어/ }).click();
+    const panel = page.getByRole('region', { name: '시설 레이어' });
+    await panel.getByRole('switch', { name: 'CCTV' }).click();
+    await expect(panel.getByRole('switch', { name: 'CCTV' })).toContainText('불러오지 못했어요');
+    await panel.getByRole('switch', { name: '편의점' }).click();
+    await expect(page.getByTestId('layer-badge')).toBeVisible();
+    await expect
+      .poll(async () => (await page.evaluate(() => window.__mapDebug!.markers())).length)
+      .toBeGreaterThan(0);
+  });
+
+  test('읍면동 목록을 받지 못하면 검색창 아래에 불러오지 못했다고 하고 지도는 그대로 쓴다', async ({
+    page,
+  }) => {
+    await page.route('**/data/emd.json', (r) => r.abort());
+    await openReady(page);
+    await page.getByRole('combobox', { name: '읍면동 검색' }).fill('애월');
+    await expect(page.getByText('읍면동 목록을 불러오지 못했어요')).toBeVisible();
+    const [x, y] = await project(page, CITY_HALL);
+    await page.mouse.click(x, y);
+    await expect(page.getByTestId('sheet-badge')).toBeVisible();
+  });
+});
