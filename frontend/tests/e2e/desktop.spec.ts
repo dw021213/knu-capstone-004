@@ -58,3 +58,28 @@ test.describe('U9-3 769px부터는 데스크톱 배치', () => {
     expect(link.x).toBeGreaterThan(layer.x + layer.width);
   });
 });
+
+test.describe('U9-1 데스크톱 헤더', () => {
+  test('@desktop 1440: 머리글에 서비스 이름, 400px 검색창, 종합 라벨이 보이고 지도는 main 안에 있다', async ({
+    page,
+  }) => {
+    await openMap(page);
+    const banner = page.getByRole('banner');
+    await expect(banner).toHaveCount(1);
+    const title = banner.getByRole('heading', { level: 1, name: '제주 안전지도' });
+    await expect(title).toBeVisible();
+    const t = (await title.boundingBox())!;
+    expect(t.width).toBeGreaterThan(40);
+    const search = banner.getByRole('combobox', { name: '읍면동 검색' });
+    const s = (await search.boundingBox())!;
+    expect(Math.abs(s.width - 400)).toBeLessThan(2);
+    // 이름 오른쪽 같은 줄
+    expect(s.x).toBeGreaterThan(t.x + t.width);
+    expect(Math.abs(s.y + s.height / 2 - (t.y + t.height / 2))).toBeLessThan(4);
+    await expect(banner.getByTestId('risk-tabs').getByText('종합', { exact: true })).toBeVisible();
+    // 지도와 지도 위 조작은 main('지도') 안
+    const main = page.getByRole('main', { name: '지도' });
+    await expect(main.getByTestId('map')).toBeVisible();
+    await expect(main.getByTestId('legend')).toBeVisible();
+  });
+});

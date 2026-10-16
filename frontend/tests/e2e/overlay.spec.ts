@@ -60,7 +60,9 @@ async function expectBlocks(page: Page, targets: Locator[]) {
   await expect(selected(page)).toHaveText(base);
 
   // (3) 대조: 오버레이를 숨기면 같은 점이 셀을 고른다
-  await page.addStyleTag({ content: '[data-testid="map-overlay"] { display: none !important; }' });
+  await page.addStyleTag({
+    content: '[data-testid="map-overlay"], [role="banner"], header { display: none !important; }',
+  });
   for (const [x, y] of points) {
     await page.mouse.click(x, y);
     await expect(selected(page)).not.toHaveText('');
