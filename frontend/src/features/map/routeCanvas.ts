@@ -36,10 +36,15 @@ export interface RouteHits {
   ends: RouteMarkHit[];
 }
 
-/** 시작·끝 표지: 검정 알약 + 흰 테두리 + 흰 글자(흰 후광 글자를 쓰지 않는다) */
+/**
+ * 시작·끝 표지: 경로 끝점에 검정 점, 그 위에 검정 알약 + 흰 테두리 + 흰 글자(흰 후광 글자를 쓰지 않는다).
+ * 첫·마지막 구간이 주의 구간이어도 빨간 점에 가리지 않게 알약을 점 위로 띄운다
+ */
 const END_H = 20;
 const END_PAD = 6;
 const END_CHAR = 12;
+const END_DOT = 4;
+const END_LIFT = CAUTION_MARK_RADIUS + END_H / 2 + 2;
 
 function drawEnd(
   ctx: CanvasRenderingContext2D,
@@ -47,19 +52,25 @@ function drawEnd(
   label: string,
   style: RouteStyle,
 ) {
-  const w = END_CHAR * label.length + END_PAD * 2;
   ctx.beginPath();
-  ctx.roundRect(x - w / 2, y - END_H / 2, w, END_H, END_H / 2);
+  ctx.arc(x, y, END_DOT, 0, Math.PI * 2);
   ctx.fillStyle = style.ink;
   ctx.fill();
   ctx.strokeStyle = style.white;
   ctx.lineWidth = 1.5;
   ctx.stroke();
+  const w = END_CHAR * label.length + END_PAD * 2;
+  const cy = y - END_LIFT;
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, cy - END_H / 2, w, END_H, END_H / 2);
+  ctx.fillStyle = style.ink;
+  ctx.fill();
+  ctx.stroke();
   ctx.fillStyle = style.white;
   ctx.font = `700 12px ${style.font}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, x, y + 0.5);
+  ctx.fillText(label, x, cy + 0.5);
 }
 
 function trace(

@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   CAUTION_MARK_COLOR,
+  CAUTION_MARK_RADIUS,
   NO_DATA_HATCH_COLOR,
   RISK_COLOR,
   ROUTE_UNDER_WIDTH,
@@ -143,6 +144,10 @@ describe('drawRoute', () => {
         .at(-1)!;
       expect(chip.fillStyle).toBe('#111111');
     }
+    // 첫 구간이 주의 구간이어도 빨간 점에 가리지 않도록 글자는 점보다 위에 띄운다
+    const startLabel = ops.find((o) => o.op === 'fillText' && o.text === '시작')!;
+    expect(startLabel.args![0]).toBeCloseTo(sx, 6);
+    expect(sy - startLabel.args![1]).toBeGreaterThanOrEqual(CAUTION_MARK_RADIUS + 10);
     // 시작·끝은 선 위, 주의 지점 아래
     const startText = ops.findIndex((o) => o.op === 'fillText' && o.text === '시작');
     expect(startText).toBeGreaterThan(ops.indexOf(strokes[3]));
