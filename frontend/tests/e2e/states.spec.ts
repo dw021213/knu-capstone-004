@@ -237,6 +237,21 @@ test.describe('U7-2 내 위치', () => {
     });
   }
 
+  for (const tag of ['', '@desktop ']) {
+    test(`${tag}셀 시트를 열면 모바일은 내 위치 버튼을 시트 뒤로 숨기고 데스크톱은 그대로 둔다`, async ({
+      page,
+    }) => {
+      await openReady(page);
+      const [x, y] = await project(page, CITY_HALL);
+      await page.mouse.click(x, y);
+      await expect(page.getByTestId('cell-sheet')).toBeVisible();
+      if (tag) await expect(locateButton(page)).toBeVisible();
+      else await expect(locateButton(page)).toBeHidden();
+      await page.getByTestId('cell-sheet').getByRole('button', { name: '닫기' }).click();
+      await expect(locateButton(page)).toBeVisible();
+    });
+  }
+
   test('@desktop 내 위치 버튼은 오른쪽 아래에 있고 범례 카드와 겹치지 않는다', async ({ page }) => {
     await openReady(page);
     const vp = page.viewportSize()!;

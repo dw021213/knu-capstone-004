@@ -187,7 +187,8 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
         {failed && <ErrorState onRetry={() => void refetch()} />}
         {/* 아래 묶음: 셀 시트를 날짜 칩 위에 쌓아 시트를 연 채로도 날짜를 바꿀 수 있다 */}
         <div className={styles.dock}>
-          <div className={styles.actions}>
+          {/* 모바일에서 셀 시트를 열면 지도를 덜 가리도록 숨긴다(데스크톱은 시트가 오른쪽 패널이라 그대로) */}
+          <div className={target ? `${styles.actions} ${styles.underSheet}` : styles.actions}>
             <LocateButton busy={my.state.status === 'locating'} onClick={my.locate} />
           </div>
           {target && (

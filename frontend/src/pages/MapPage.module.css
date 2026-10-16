@@ -31,6 +31,10 @@
   padding: 0 var(--space-3);
 }
 
+.underSheet {
+  display: none;
+}
+
 /* 데스크톱: 오른쪽 아래 범례 카드 왼쪽 */
 @media (min-width: 768px) {
   .actions {
@@ -38,6 +42,10 @@
     right: calc(var(--space-4) + var(--legend-w, 0px) + var(--space-2));
     bottom: var(--space-8);
     padding: 0;
+  }
+
+  .underSheet {
+    display: flex;
   }
 }
 
