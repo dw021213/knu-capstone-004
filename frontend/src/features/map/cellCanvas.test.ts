@@ -13,6 +13,8 @@ type Op = {
   strokeStyle?: unknown;
   lineWidth?: number;
   args?: number[];
+  text?: string;
+  font?: string;
 };
 
 /** 그리기 호출을 기록하는 가짜 2D 컨텍스트 */
@@ -23,6 +25,11 @@ function recorder() {
     fillStyle: '' as unknown,
     strokeStyle: '' as unknown,
     lineWidth: 1,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    fillText: (text: string, ...args: number[]) =>
+      ops.push({ op: 'fillText', text, args, fillStyle: ctx.fillStyle, font: ctx.font }),
     setTransform: (...args: number[]) => ops.push({ op: 'setTransform', args }),
     clearRect: (...args: number[]) => ops.push({ op: 'clearRect', args }),
     beginPath: () => {
@@ -119,5 +126,56 @@ describe('drawCells', () => {
     const strokes = ops.filter((o) => o.op === 'stroke');
     expect(strokes).toHaveLength(2);
     expect(strokes[1].lineWidth).toBeGreaterThan(1);
+  });
+
+  it('선택한 셀 위에 검정 바탕 흰 숫자 태그를 그린다(색각 이상 사용자용)', () => {
+    const { ctx, ops } = recorder();
+    drawCells(ctx, cells, view, {
+      width: 390,
+      height: 844,
+      dpr: 1,
+      hatch: HATCH,
+      selected: ring[2],
+      tag: { text: '5', ink: '#111111', white: '#ffffff', font: 'Noto Sans KR' },
+    });
+    const text = ops.filter((o) => o.op === 'fillText');
+    expect(text).toHaveLength(1);
+    expect(text[0]).toMatchObject({ text: '5', fillStyle: '#ffffff' });
+    expect(text[0].font).toContain('Noto Sans KR');
+    // 글자 바로 앞에 검정 바탕을 칠한다
+    const i = ops.indexOf(text[0]);
+    const chip = ops
+      .slice(0, i)
+      .filter((o) => o.op === 'fill')
+      .at(-1)!;
+    expect(chip.fillStyle).toBe('#111111');
+    // 태그는 셀 중심보다 위(셀 색을 가리지 않게)
+    const [, cy] = lngLatToScreen(view, ...cellCenter(ring[2]));
+    expect(text[0].args![1]).toBeLessThan(cy);
+  });
+
+  it('태그를 주지 않거나 선택한 셀이 화면 밖이면 숫자를 그리지 않는다', () => {
+    const tag = { text: '5', ink: '#111111', white: '#ffffff', font: 'x' };
+    let r = recorder();
+    drawCells(r.ctx, cells, view, {
+      width: 390,
+      height: 844,
+      dpr: 1,
+      hatch: HATCH,
+      selected: ring[2],
+    });
+    expect(r.ops.filter((o) => o.op === 'fillText')).toHaveLength(0);
+    r = recorder();
+    const [sx, sy] = lngLatToScreen(view, ...cellCenter(airport));
+    const far = { k: view.k, x: view.x - sx - 5000, y: view.y - sy - 5000 };
+    drawCells(r.ctx, cells, far, {
+      width: 390,
+      height: 844,
+      dpr: 1,
+      hatch: HATCH,
+      selected: ring[2],
+      tag,
+    });
+    expect(r.ops.filter((o) => o.op === 'fillText')).toHaveLength(0);
   });
 });

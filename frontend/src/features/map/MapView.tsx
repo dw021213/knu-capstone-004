@@ -149,18 +149,28 @@ export function MapView({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     if (hatchRef.current?.ctx !== ctx) hatchRef.current = { ctx, pattern: makeHatchPattern(ctx) };
+    // 선택한 셀 위 등급 숫자(데이터 부족 셀은 숫자 없이 테두리만)
+    const level = selected ? scores?.cells.get(selected)?.level : null;
     drawCells(ctx, cells, settled, {
       width: size.w,
       height: size.h,
       dpr,
       hatch: hatchRef.current.pattern,
       selected,
+      tag: level
+        ? {
+            text: String(level),
+            ink: cssVar(canvas, '--ink'),
+            white: cssVar(canvas, '--white'),
+            font: cssVar(canvas, '--font'),
+          }
+        : null,
     });
     if (cells.length > 0) {
       performance.mark('cells-drawn');
       window.__mapReady = true;
     }
-  }, [cells, settled, size, selected]);
+  }, [cells, settled, size, selected, scores]);
 
   // 시설 마커(조작이 끝났을 때, 크기·마커·강조가 바뀔 때). 셀 canvas와 같은 방식
   useLayoutEffect(() => {

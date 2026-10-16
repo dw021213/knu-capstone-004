@@ -10,7 +10,7 @@ import {
   RISK_COLOR,
   SELECTED_STROKE_COLOR,
 } from '../../entities/risk/colors';
-import { cellPolygon } from '../../shared/geo/h3';
+import { cellCenter, cellPolygon } from '../../shared/geo/h3';
 import { lngLatToScreen, viewProjection, type View } from './view';
 
 export interface PreparedCell {
@@ -68,12 +68,48 @@ export function makeHatchPattern(ctx: CanvasRenderingContext2D, size = 6): Canva
   return ctx.createPattern(c, 'repeat');
 }
 
+/** 선택한 셀 위 숫자 태그(등급). 색은 canvas라 CSS 변수 값을 받아 쓴다 */
+export interface CellTag {
+  text: string;
+  ink: string;
+  white: string;
+  font: string;
+}
+
 export interface DrawOptions {
   width: number;
   height: number;
   dpr: number;
   hatch: CanvasPattern | null;
   selected?: string | null;
+  tag?: CellTag | null;
+}
+
+/** 숫자 태그 반지름과 셀 꼭대기에서 띄우는 거리(CSS px) */
+export const TAG_RADIUS = 10;
+export const TAG_GAP = 4;
+
+/** 셀 꼭대기 위에 검정 원 + 흰 테두리 + 흰 숫자. 글자에 흰 후광을 두르지 않는다 */
+function drawTag(ctx: CanvasRenderingContext2D, view: View, cell: PreparedCell, tag: CellTag) {
+  let top: [number, number] = [0, Infinity];
+  for (const [lng, lat] of cell.polygon.coordinates[0]) {
+    const p = lngLatToScreen(view, lng, lat);
+    if (p[1] < top[1]) top = p;
+  }
+  const [cx] = lngLatToScreen(view, ...cellCenter(cell.h3));
+  const cy = top[1] - TAG_GAP - TAG_RADIUS;
+  ctx.beginPath();
+  ctx.arc(cx, cy, TAG_RADIUS, 0, Math.PI * 2);
+  ctx.fillStyle = tag.ink;
+  ctx.fill();
+  ctx.strokeStyle = tag.white;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = tag.white;
+  ctx.font = `700 12px ${tag.font}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(tag.text, cx, cy + 0.5);
 }
 
 /** 셀을 화면 좌표로 그린다. 변환에는 기기 배율만 넣어 선 두께가 화면 기준이 된다 */
@@ -81,7 +117,7 @@ export function drawCells(
   ctx: CanvasRenderingContext2D,
   cells: PreparedCell[],
   view: View,
-  { width, height, dpr, hatch, selected }: DrawOptions,
+  { width, height, dpr, hatch, selected, tag }: DrawOptions,
 ): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
@@ -123,5 +159,6 @@ export function drawCells(
     ctx.strokeStyle = SELECTED_STROKE_COLOR;
     ctx.lineWidth = 2;
     ctx.stroke();
+    if (tag) drawTag(ctx, view, sel, tag);
   }
 }

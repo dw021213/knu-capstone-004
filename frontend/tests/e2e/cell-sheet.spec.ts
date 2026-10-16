@@ -1,5 +1,5 @@
 /// <reference path="../../src/types/global.d.ts" />
-import { cellToLatLng, latLngToCell } from 'h3-js';
+import { cellToBoundary, cellToLatLng, latLngToCell } from 'h3-js';
 import { distanceMeters, formatDistance } from '../../src/shared/geo/distance';
 import { placeAt, placeLabel, type EmdFile } from '../../src/entities/place/emd';
 import { LEVEL_NAME, levelFromPercentile } from '../../src/entities/risk/level';
@@ -280,4 +280,41 @@ test('시설 카드와 셀 시트는 함께 보이지 않는다: 카드가 뜨�
   await expect(card).toBeHidden();
   await expect(sheet(page)).toBeVisible();
   await expect(sheet(page).getByTestId('sheet-badge')).toHaveText('5 · 매우 높음');
+});
+
+test('선택한 셀 위에 등급 숫자 태그(검정 바탕)를 그린다', async ({ page }) => {
+  const hall = latLngToCell(CITY_HALL[1], CITY_HALL[0], 8);
+  await openMap(page);
+  await clickCell(page, hall);
+  // 셀 꼭대기 꼭짓점 위 4px에 반지름 10px 원(cellCanvas TAG_GAP, TAG_RADIUS)
+  const ring = cellToBoundary(hall, true) as [number, number][];
+  let top = Infinity;
+  for (const [lng, lat] of ring) top = Math.min(top, (await project(page, lng, lat))[1]);
+  const [cx] = await project(page, ...center(hall));
+  const cy = top - 4 - 10;
+  const pixel = () =>
+    page.evaluate(
+      ([px, py]) => {
+        const c = document.querySelector<HTMLCanvasElement>('[data-testid="map"] canvas')!;
+        const rect = c.getBoundingClientRect();
+        const dpr = c.width / rect.width;
+        const d = c
+          .getContext('2d')!
+          .getImageData(
+            Math.round((px - rect.left) * dpr),
+            Math.round((py - rect.top) * dpr),
+            1,
+            1,
+          ).data;
+        return [d[0], d[1], d[2], d[3]];
+      },
+      [cx - 7, cy] as const,
+    );
+  // 숫자 왼쪽 검정 바탕
+  await expect.poll(async () => (await pixel())[3]).toBe(255);
+  const [r, g, b] = await pixel();
+  expect(Math.max(r, g, b)).toBeLessThan(40);
+  // 시트를 닫으면 태그도 사라진다
+  await sheet(page).getByRole('button', { name: '닫기' }).click();
+  await expect.poll(async () => (await pixel())[3]).toBeLessThan(255);
 });
