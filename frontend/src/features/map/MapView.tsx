@@ -1,9 +1,19 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { select, zoom, zoomIdentity, type D3ZoomEvent, type ZoomTransform } from 'd3';
 import type { Scores } from '../../data/types';
 import { drawCells, makeHatchPattern, prepareCells } from './cellCanvas';
 import { cellAt } from './hitTest';
 import { tileUrl, visibleTiles } from './tiles';
-import { fitView, lngLatToScreen, screenToLngLat, zoomLevel, type View } from './view';
+import { JEJU_BOUNDS } from './projection';
+import {
+  SCALE_EXTENT,
+  fitView,
+  lngLatToScreen,
+  screenToLngLat,
+  worldExtent,
+  zoomLevel,
+  type View,
+} from './view';
 import styles from './MapView.module.css';
 
 export interface MapViewProps {
@@ -43,13 +53,33 @@ export function MapView({ scores, selected = null, onCellSelect, overlays }: Map
     return () => ro.disconnect();
   }, []);
 
-  // 처음 화면: 제주 본섬에 맞춘다
+  // 확대·이동: d3-zoom(휠, 핀치, 드래그, 두 번 누르기). 처음에는 제주 본섬에 맞춘다
   useEffect(() => {
-    if (!size || viewRef.current) return;
-    const v = fitView(size.w, size.h);
-    viewRef.current = v;
-    setView(v);
-    setSettled(v);
+    if (!size) return;
+    const el = containerRef.current!;
+    const extent: [[number, number], [number, number]] = [
+      [0, 0],
+      [size.w, size.h],
+    ];
+    const toView = ({ k, x, y }: ZoomTransform): View => ({ k, x, y });
+    const behavior = zoom<HTMLDivElement, unknown>()
+      .scaleExtent(SCALE_EXTENT)
+      .translateExtent(worldExtent(JEJU_BOUNDS))
+      .extent(extent)
+      .on('zoom', (e: D3ZoomEvent<HTMLDivElement, unknown>) => {
+        const v = toView(e.transform);
+        viewRef.current = v;
+        setView(v);
+      })
+      .on('end', (e: D3ZoomEvent<HTMLDivElement, unknown>) => setSettled(toView(e.transform)));
+    const sel = select(el).call(behavior);
+    const start = viewRef.current ?? fitView(size.w, size.h);
+    const t = zoomIdentity.translate(start.x, start.y).scale(start.k);
+    // zoom.transform은 경계를 적용하지 않으므로 먼저 constrain을 거친다
+    sel.call(behavior.transform, behavior.constrain()(t, extent, worldExtent(JEJU_BOUNDS)));
+    return () => {
+      sel.on('.zoom', null);
+    };
   }, [size]);
 
   // 셀 그리기(조작이 끝났을 때, 크기·데이터·선택이 바뀔 때)
