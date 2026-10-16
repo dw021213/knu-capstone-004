@@ -58,9 +58,17 @@ export interface EmergencyList {
 export interface Course {
   id: string;
   name: string;
+  /** 경로 선(coords) 하버사인 길이 */
   lengthKm: number;
   /** [lng, lat] */
   coords: [number, number][];
+  /** 제주올레 공식 길이(km) */
+  officialKm?: number;
+  /** OpenStreetMap relation id */
+  osmRelation?: number;
+  /** OSM way를 이을 때 끊긴 곳 수와 가장 큰 간격(m). 끊긴 곳은 직선으로 이었다 */
+  gaps?: number;
+  maxGapM?: number;
 }
 
 export interface CourseList {
@@ -104,8 +112,11 @@ export interface EmergencyFile {
   items: EmergencyRoom[];
 }
 
-/** public/data/courses.json */
+/** public/data/courses.json (scripts/build-courses.mjs 생성물). status가 없으면 ready로 본다 */
 export interface CourseFile {
+  status?: 'ready' | 'pending';
   source: string;
+  /** OSM 원본을 받은 날(YYYY-MM-DD) */
+  fetchedAt?: string;
   items: Course[];
 }

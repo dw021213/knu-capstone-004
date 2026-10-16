@@ -69,7 +69,7 @@ export function createSnapshotSource(base = ''): DataSource {
     async getCourses(): Promise<CourseList> {
       const file = await fetchOptionalJson<CourseFile>(`${base}/data/courses.json`);
       if (!file) return { status: 'pending', source: '', items: [] };
-      return { status: 'ready', source: file.source, items: file.items };
+      return { status: file.status ?? 'ready', source: file.source, items: file.items };
     },
   };
 }

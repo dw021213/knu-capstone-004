@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
@@ -194,6 +195,27 @@ describe('snapshot 구현', () => {
     const courses = await makeSnapshot().getCourses();
     expect(courses.status).toBe('ready');
     expect(courses.items[0].name).toBe('제주올레 1코스');
+  });
+
+  it('코스 파일의 status가 pending이면 pending(코스를 다 빼서 만든 파일)', async () => {
+    server.use(
+      http.get(`${SNAPSHOT_BASE}/data/courses.json`, () =>
+        HttpResponse.json({ status: 'pending', source: 'OpenStreetMap', items: [] }),
+      ),
+    );
+    expect(await makeSnapshot().getCourses()).toMatchObject({ status: 'pending', items: [] });
+  });
+
+  it('배포본 courses.json(빌드 스크립트 출력)을 그대로 읽는다', async () => {
+    const file = JSON.parse(
+      readFileSync(new URL('../../public/data/courses.json', import.meta.url), 'utf8'),
+    );
+    server.use(http.get(`${SNAPSHOT_BASE}/data/courses.json`, () => HttpResponse.json(file)));
+    const courses = await makeSnapshot().getCourses();
+    expect(courses.status).toBe('ready');
+    expect(courses.source).toContain('OpenStreetMap');
+    expect(courses.items.map((c) => c.id)).toEqual(['olle-1', 'olle-10', 'olle-20']);
+    expect(courses.items[0].coords[0]).toHaveLength(2);
   });
 
   it('점수 파일을 못 받으면 실패한다', async () => {
