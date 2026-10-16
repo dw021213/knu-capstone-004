@@ -2,7 +2,13 @@
 import { describe, it, expect } from 'vitest';
 import { latLngToCell, gridDisk } from 'h3-js';
 import { toCellScore } from '../../data/snapshot';
-import { RISK_COLOR, CELL_STROKE_COLOR, CELL_STROKE_WIDTH } from '../../entities/risk/colors';
+import {
+  RISK_COLOR,
+  CELL_FILL_OPACITY,
+  CELL_STROKE_COLOR,
+  CELL_STROKE_WIDTH,
+  DIM_FILL_OPACITY,
+} from '../../entities/risk/colors';
 import { cellFillColor, drawCells, prepareCells } from './cellCanvas';
 import { fitView, lngLatToScreen } from './view';
 import { cellCenter } from '../../shared/geo/h3';
@@ -15,6 +21,7 @@ type Op = {
   args?: number[];
   text?: string;
   font?: string;
+  globalAlpha?: number;
 };
 
 /** 그리기 호출을 기록하는 가짜 2D 컨텍스트 */
@@ -25,6 +32,7 @@ function recorder() {
     fillStyle: '' as unknown,
     strokeStyle: '' as unknown,
     lineWidth: 1,
+    globalAlpha: 1,
     font: '',
     textAlign: '',
     textBaseline: '',
@@ -39,7 +47,13 @@ function recorder() {
     lineTo: () => void pathPoints++,
     closePath: () => {},
     arc: () => {},
-    fill: () => ops.push({ op: 'fill', fillStyle: ctx.fillStyle, args: [pathPoints] }),
+    fill: () =>
+      ops.push({
+        op: 'fill',
+        fillStyle: ctx.fillStyle,
+        globalAlpha: ctx.globalAlpha,
+        args: [pathPoints],
+      }),
     stroke: () =>
       ops.push({
         op: 'stroke',
@@ -177,5 +191,26 @@ describe('drawCells', () => {
       tag,
     });
     expect(r.ops.filter((o) => o.op === 'fillText')).toHaveLength(0);
+  });
+
+  it('dim을 주면 그 밖의 셀은 채움 불투명도 0.15로 흐리게, 안의 셀은 그대로 칠한다', () => {
+    const { ctx, ops } = recorder();
+    drawCells(ctx, cells, view, {
+      width: 390,
+      height: 844,
+      dpr: 1,
+      hatch: HATCH,
+      dim: new Set([ring[1]]),
+    });
+    const fills = ops.filter((o) => o.op === 'fill');
+    const kept = fills.filter((f) => f.globalAlpha === 1);
+    expect(kept.map((f) => f.fillStyle)).toEqual([cellFillColor(4)]);
+    const dimmed = fills.filter((f) => f.globalAlpha !== 1);
+    expect(dimmed.length).toBeGreaterThan(0);
+    for (const f of dimmed)
+      expect(f.globalAlpha! * CELL_FILL_OPACITY).toBeCloseTo(DIM_FILL_OPACITY, 6);
+    expect(DIM_FILL_OPACITY).toBe(0.15);
+    // 다음 그리기에 흐림이 남지 않는다
+    expect(ctx.globalAlpha).toBe(1);
   });
 });

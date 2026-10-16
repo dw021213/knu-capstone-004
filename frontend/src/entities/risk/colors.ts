@@ -14,6 +14,9 @@ export const NO_DATA_COLOR = '#BDBDBD';
 
 export const CELL_FILL_OPACITY = 0.5;
 
+/** 코스 화면에서 경로가 지나지 않는 셀의 채움 불투명도(멘토 회의: 나머지는 가린다) */
+export const DIM_FILL_OPACITY = 0.15;
+
 /** 데이터 부족 빗금 선. 바탕(NO_DATA_COLOR)보다 진한 회색 */
 export const NO_DATA_HATCH_COLOR = '#8E8E8E';
 
