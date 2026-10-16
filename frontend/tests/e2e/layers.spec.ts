@@ -71,7 +71,8 @@ test('토글을 켜면 검정으로 채워지고 버튼에 켠 개수 배지가 
   await expect(page.getByTestId('layer-badge')).toHaveText('1');
   await sw(page, '119안전센터').click();
   await expect(page.getByTestId('layer-badge')).toHaveText('2');
-  await expect(layerButton(page)).toHaveAccessibleName('레이어 2개 켜짐');
+  // 숨김 글자는 브라우저가 띄어 읽을 수 있다('레이어 2 개 켜짐')
+  await expect(layerButton(page)).toHaveAccessibleName(/^레이어 2 ?개 켜짐$/);
   // 켜진 토글은 검정 채움(ink), 꺼진 토글은 흰 바탕
   const ink = 'rgb(17, 17, 17)';
   await expect(sw(page, 'CCTV').getByTestId('switch-track')).toHaveCSS('background-color', ink);

@@ -43,8 +43,6 @@ export function LayerPanel({ on, toggle, count, states }: LayerPanelProps) {
         className={styles.button}
         aria-expanded={open}
         aria-controls={panelId}
-        // 보이는 글자('레이어 2')로 시작하는 이름
-        aria-label={count > 0 ? `레이어 ${count}개 켜짐` : '레이어'}
         onClick={() => setOpen((o) => !o)}
       >
         <svg className={styles.icon} viewBox="0 0 16 16" aria-hidden="true">
@@ -52,10 +50,15 @@ export function LayerPanel({ on, toggle, count, states }: LayerPanelProps) {
           <path d="M1.5 8 8 11.25 14.5 8M1.5 11 8 14.25 14.5 11" />
         </svg>
         레이어
+        {/* 이름은 보이는 글자 그대로 '레이어 2' + 숨김 글자 '개 켜짐' */}
         {count > 0 && (
-          <span className={styles.badge} data-testid="layer-badge">
-            {count}
-          </span>
+          <>
+            {' '}
+            <span className={styles.badge} data-testid="layer-badge">
+              {count}
+            </span>
+            <span className="sr-only">개 켜짐</span>
+          </>
         )}
       </button>
       <section id={panelId} className={styles.panel} aria-label="시설 레이어" hidden={!open}>
