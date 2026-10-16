@@ -308,6 +308,33 @@ test('클러스터를 누르면 그 위치로 2배 확대되고 셀 선택은 �
   expect(near.length).toBeGreaterThan(0);
 });
 
+test('@desktop 지도를 끌어 옮기는 동안에는 마커를 다시 그리지 않고 옮기기만 하며, 놓으면 한 번 다시 그린다', async ({
+  page,
+}) => {
+  const draws = () => page.evaluate(() => performance.getEntriesByName('markers-drawn').length);
+  await openMap(page);
+  await turnOn(page, 'CCTV');
+  await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+  await page.waitForTimeout(300);
+  const n0 = await draws();
+  const before = await drawn(page);
+  const vp = page.viewportSize()!;
+  // 빈 바다에서 눌러 끌기만 한다(놓지 않음)
+  const [sx, sy] = [vp.width - 200, 200];
+  await page.mouse.move(sx, sy);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) await page.mouse.move(sx - i * 10, sy + i * 6);
+  await page.waitForTimeout(200);
+  expect(await draws()).toBe(n0);
+  await expect(page.getByTestId('marker-canvas')).toHaveAttribute('style', /translate/);
+  // 그린 자리는 끈 만큼 함께 옮겨진다
+  const moving = await drawn(page);
+  expect(moving[0].x - before[0].x).toBeCloseTo(-100, 0);
+  expect(moving[0].y - before[0].y).toBeCloseTo(60, 0);
+  await page.mouse.up();
+  await expect.poll(draws).toBe(n0 + 1);
+});
+
 // ── 시설 카드 ──
 
 type Item = {
