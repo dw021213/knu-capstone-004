@@ -2,6 +2,9 @@ import { createSnapshotSource, fetchScoresFile, roadSourceFromCode, toCellScore 
 import type { CellScore, DataSource, Poi, PoiLayer, PoiType, RoadSource, Scores } from './types';
 
 // 백엔드 /api/grid 응답에서 읽는 필드만 적는다. 색은 유동인구를 끈 교통 모델 백분위(hazard_percentile)로 칠한다.
+// weather=on으로 부르므로 hazard_percentile에는 at 시각의 기상 가산(AWS 관측, 최대 0.3)이 들어가 있다.
+// 가산 전 값은 base_percentile이고, weather.status가 no_data면 가산이 0이다(backend/docs/FRONTEND_API.md).
+// snapshot 모드의 백분위는 기상을 반영하지 않은 날짜 무관 공간 점수라 두 모드 값이 다를 수 있다.
 interface GridProperties {
   h3: string;
   hazard_percentile?: number | null;
