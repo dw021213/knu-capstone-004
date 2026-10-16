@@ -368,8 +368,21 @@ async function items(page: Page, type: string) {
   return (await (await page.request.get(`/data/poi/${type}.json`)).json()).items as Item[];
 }
 
-/** 이웃과 떨어져 있어 눌러도 헷갈리지 않는 마커 */
-function lonelyMarker(list: Drawn[], vp: { width: number; height: number }, group: string) {
+type Box = { x: number; y: number; width: number; height: number };
+
+/** 이웃과 떨어져 있어 눌러도 헷갈리지 않는 마커. avoid(열린 셀 시트 등)에 가린 마커는 고르지 않는다 */
+function lonelyMarker(
+  list: Drawn[],
+  vp: { width: number; height: number },
+  group: string,
+  avoid: Box | null = null,
+) {
+  const hidden = (m: Drawn) =>
+    avoid !== null &&
+    m.x > avoid.x - 20 &&
+    m.x < avoid.x + avoid.width + 20 &&
+    m.y > avoid.y - 20 &&
+    m.y < avoid.y + avoid.height + 20;
   return list.find(
     (m) =>
       m.kind === 'marker' &&
@@ -378,6 +391,7 @@ function lonelyMarker(list: Drawn[], vp: { width: number; height: number }, grou
       m.x < vp.width - 40 &&
       m.y > 160 &&
       m.y < vp.height - 200 &&
+      !hidden(m) &&
       list.every((o) => o === m || Math.hypot(o.x - m.x, o.y - m.y) > 30),
   );
 }
@@ -427,7 +441,10 @@ for (const tag of ['', '@desktop ']) {
     await turnOn(page, 'CCTV');
     await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
     const vp = page.viewportSize()!;
-    const m = lonelyMarker(await drawn(page), vp, 'cctv');
+    // 셀을 고르면 셀 시트가 열려 있으므로 시트에 가린 마커는 고르지 않는다(U6)
+    const sheetBox = await page.getByTestId('cell-sheet').boundingBox();
+    expect(sheetBox).not.toBeNull();
+    const m = lonelyMarker(await drawn(page), vp, 'cctv', sheetBox);
     expect(m).toBeDefined();
     await page.mouse.click(m!.x, m!.y);
     const c = card(page);
