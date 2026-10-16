@@ -134,3 +134,19 @@ test('@desktop 데스크톱에서도 날짜 칩이 지도 아래쪽 가운데에
   await bar(page).getByRole('button', { name: '날짜 선택' }).click();
   await expect(sheet(page)).toBeVisible();
 });
+
+for (const tag of ['', '@desktop ']) {
+  test(`${tag}배포본(snapshot)은 칩 바로 위에 날씨 미반영 안내를 보인다`, async ({ page }) => {
+    const notice = page.getByText('날씨 미반영 · 공간 점수는 날짜와 무관');
+    await expect(notice).toBeVisible();
+    const n = (await notice.boundingBox())!;
+    const chips = (await bar(page).getByRole('group', { name: '날짜' }).boundingBox())!;
+    expect(n.y + n.height).toBeLessThanOrEqual(chips.y + 1);
+    expect(chips.y - (n.y + n.height)).toBeLessThan(24);
+    // 날짜를 바꿔도 그대로
+    await bar(page).getByRole('button', { name: '날짜 선택' }).click();
+    await sheet(page).getByRole('button', { name: '10월 20일 (화)', exact: true }).click();
+    await sheet(page).getByRole('button', { name: '10월 20일 (화) 보기' }).click();
+    await expect(notice).toBeVisible();
+  });
+}

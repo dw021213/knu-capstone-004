@@ -75,3 +75,21 @@
   color: var(--ink2);
   white-space: nowrap;
 }
+
+/* 칩 바로 위 안내. 흰 후광 글자 대신 흰 바탕 알약 */
+.notice {
+  align-self: flex-start;
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}
+
+@media (min-width: 768px) {
+  .notice {
+    align-self: center;
+  }
+}

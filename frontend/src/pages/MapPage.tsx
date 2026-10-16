@@ -1,16 +1,13 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { dataSource } from '../data';
+import { dataSource, type DataSource } from '../data';
 import { DateChips } from '../features/date/DateChips';
 import { Legend } from '../features/legend/Legend';
 import { MapView } from '../features/map/MapView';
+import { useScores } from './useScores';
 import styles from './MapPage.module.css';
 
-export function MapPage() {
-  const { data: scores } = useQuery({
-    queryKey: ['scores'],
-    queryFn: () => dataSource.getScores(),
-  });
+export function MapPage({ source = dataSource }: { source?: DataSource }) {
+  const { data: scores } = useScores(source);
   const [selected, setSelected] = useState<string | null>(null);
 
   return (
@@ -26,8 +23,8 @@ export function MapPage() {
             </span>
           </div>
         </header>
-        <Legend mode={dataSource.mode} />
-        <DateChips mode={dataSource.mode} />
+        <Legend mode={source.mode} />
+        <DateChips mode={source.mode} />
       </div>
       {/* 셀 시트(U6) 전까지 선택 결과를 e2e와 보조기기에 알린다 */}
       <output className="sr-only" data-testid="selected-cell">

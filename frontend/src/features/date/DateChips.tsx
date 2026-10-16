@@ -20,6 +20,10 @@ export function DateChips({ mode }: { mode: DataSource['mode'] }) {
 
   return (
     <div className={styles.bar} data-testid="date-bar">
+      {/* 배포본은 날씨를 반영하지 않는다(api 모드는 백엔드 기상 가산이 들어간 값) */}
+      {mode === 'snapshot' && (
+        <p className={styles.notice}>날씨 미반영 · 공간 점수는 날짜와 무관</p>
+      )}
       <div className={styles.chips} role="group" aria-label="날짜">
         <button
           type="button"
