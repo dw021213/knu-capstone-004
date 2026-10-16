@@ -42,18 +42,20 @@ VITE_DATA_MODE=api VITE_API_BASE=http://localhost:8000 npm run dev
 
 ## 스크립트
 
-| 명령                   | 하는 일                                                                                              |
-| ---------------------- | ---------------------------------------------------------------------------------------------------- |
-| `npm run dev`          | 개발 서버                                                                                            |
-| `npm run build`        | 타입 검사(`tsc -b`) 후 `dist/`로 빌드                                                                |
-| `npm run preview`      | `dist/`를 4173 포트로 띄움                                                                           |
-| `npm run typecheck`    | 타입 검사만                                                                                          |
-| `npm run lint`         | ESLint                                                                                               |
-| `npm run format`       | Prettier로 고침                                                                                      |
-| `npm run format:check` | Prettier 검사만                                                                                      |
-| `npm run test`         | Vitest 단위 테스트                                                                                   |
-| `npm run test:e2e`     | Playwright e2e(모바일 390×844, 데스크톱 1440×900). `PLAYWRIGHT_BASE_URL`을 주면 그 주소를 검사합니다 |
-| `npm run data:scores`  | `data-src/risk_scores.csv`(교통 모델 전달본)로 `public/data/scores.json`을 다시 만듦                 |
+| 명령                     | 하는 일                                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `npm run dev`            | 개발 서버                                                                                            |
+| `npm run build`          | 타입 검사(`tsc -b`) 후 `dist/`로 빌드                                                                |
+| `npm run preview`        | `dist/`를 4173 포트로 띄움                                                                           |
+| `npm run typecheck`      | 타입 검사만                                                                                          |
+| `npm run lint`           | ESLint                                                                                               |
+| `npm run format`         | Prettier로 고침                                                                                      |
+| `npm run format:check`   | Prettier 검사만                                                                                      |
+| `npm run test`           | Vitest 단위 테스트                                                                                   |
+| `npm run test:e2e`       | Playwright e2e(모바일 390×844, 데스크톱 1440×900). `PLAYWRIGHT_BASE_URL`을 주면 그 주소를 검사합니다 |
+| `npm run data:scores`    | `data-src/risk_scores.csv`(교통 모델 전달본)로 `public/data/scores.json`을 다시 만듦                 |
+| `npm run data:poi`       | 커밋된 `data-src/poi/` 원본으로 `public/data/poi/*.json`을 다시 만듦(네트워크 안 씀)                 |
+| `npm run data:poi:fetch` | 시설 원본을 공공데이터포털·Nominatim에서 다시 받음. `-- --only police,er` 처럼 종류를 고를 수 있음   |
 
 PR 전에 `npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build`와 `CI=1 npm run test:e2e`가 통과해야 합니다.
 

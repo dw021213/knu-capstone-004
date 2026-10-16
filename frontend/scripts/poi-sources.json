@@ -1,0 +1,118 @@
+{
+  "geocodeCache": "geocode-nominatim.json",
+  "geocoder": {
+    "service": "OpenStreetMap Nominatim (https://nominatim.openstreetmap.org/search)",
+    "policy": "1초에 1건, User-Agent에 저장소 주소",
+    "license": "좌표는 OpenStreetMap 데이터(ODbL 1.0, © OpenStreetMap contributors)"
+  },
+  "kinds": {
+    "cctv": {
+      "status": "pending",
+      "label": "아직 내려받지 않음",
+      "provider": "행정안전부(지방자치단체 등록 자료)",
+      "publicDataPk": "15013094",
+      "page": "https://www.data.go.kr/data/15013094/standard.do",
+      "fetchedAt": "2026-10-17",
+      "download": "https://www.data.go.kr/download/standard.json?publicDataPk=15013094",
+      "license": "공공데이터포털 이용허락범위: 제한 없음(공공누리 유형 표시 없음)",
+      "raw": {
+        "file": "raw-datagokr-cctv/전국CCTV표준데이터_제주.csv",
+        "encoding": "utf-8",
+        "note": "포털 표준데이터 화면의 CSV 내려받기와 같은 JSON(/download/standard.json)을 쪽마다 받아 관리·제공기관명에 '제주'가 있거나 주소가 '제주'로 시작하는 행만 남김. 관리기관전화번호는 기관 대표번호라 원본에 그대로 두고 정제본에는 넣지 않음",
+        "rows": 1365,
+        "nationalRows": 114829
+      },
+      "limits": "포털 JSON은 전국 114,829행뿐이고(페이지 표기 353,263행) 기관마다 500행에서 끊긴 곳이 많다(제주특별자치도·서귀포시 각 500행). 기준일 2020-07~12. 실제 CCTV보다 적다. 원본 파일 주소 https://file.localdata.go.kr/file/cctv_info/info 는 이 환경에서 403"
+    },
+    "convenience": {
+      "status": "pending",
+      "label": "아직 내려받지 않음",
+      "provider": "소상공인시장진흥공단",
+      "publicDataPk": "15083033",
+      "page": "https://www.data.go.kr/data/15083033/fileData.do",
+      "fetchedAt": "2026-10-17",
+      "download": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003695831&fileDetailSn=1&insertDataPrcus=N",
+      "license": "공공데이터포털 이용허락범위: 제한 없음(공공누리 유형 표시 없음)",
+      "raw": {
+        "file": "raw-semas-shop/소상공인시장진흥공단_상가(상권)정보_제주_202606_편의점숙박.csv",
+        "encoding": "utf-8",
+        "note": "전국 zip(약 350MB) 안의 제주 파일(약 34MB)에서 상권업종소분류명 '편의점' 또는 상권업종대분류명 '숙박' 행만 남긴 축약본. 열은 원본 그대로이며 대표자명·전화번호 열은 원본에 없음",
+        "rows": 8849,
+        "sourceFile": "소상공인시장진흥공단_상가(상권)정보_제주_202606.csv",
+        "sourceRows": 59009
+      },
+      "limits": "등재 자료라 폐업·영업시간(24시간 여부)을 보증하지 않는다"
+    },
+    "lodging": {
+      "status": "pending",
+      "label": "아직 내려받지 않음",
+      "provider": "소상공인시장진흥공단",
+      "publicDataPk": "15083033",
+      "page": "https://www.data.go.kr/data/15083033/fileData.do",
+      "fetchedAt": "2026-10-17",
+      "download": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003695831&fileDetailSn=1&insertDataPrcus=N",
+      "license": "공공데이터포털 이용허락범위: 제한 없음(공공누리 유형 표시 없음)",
+      "raw": {
+        "file": "raw-semas-shop/소상공인시장진흥공단_상가(상권)정보_제주_202606_편의점숙박.csv",
+        "encoding": "utf-8",
+        "note": "편의점과 같은 축약본",
+        "rows": 8849,
+        "sourceFile": "소상공인시장진흥공단_상가(상권)정보_제주_202606.csv",
+        "sourceRows": 59009
+      },
+      "limits": "대분류 '숙박' 전체라 펜션이 대부분이고 기숙사/고시원·캠핑장도 들어 있다. 24시간 운영 여부는 알 수 없다. detail.kind(소분류명)로 거를 수 있다"
+    },
+    "police": {
+      "status": "pending",
+      "label": "아직 내려받지 않음",
+      "provider": "경찰청",
+      "publicDataPk": "15077036",
+      "page": "https://www.data.go.kr/data/15077036/fileData.do",
+      "fetchedAt": "2026-10-17",
+      "download": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003600631&fileDetailSn=1&insertDataPrcus=N",
+      "license": "주소: 공공데이터포털 이용허락범위 제한 없음(공공누리 유형 표시 없음). 좌표: OpenStreetMap Nominatim(ODbL 1.0)",
+      "raw": {
+        "file": "raw-police/경찰청_전국 지구대 파출소 주소현황_20251231.csv",
+        "encoding": "euc-kr",
+        "note": "포털 파일을 바이트 그대로 저장(전국, CP949). 정제 때 시도청 '제주청' 행만 쓴다",
+        "rows": 2047
+      },
+      "limits": "경찰서 본서는 목록에 없다. 좌표는 주소 또는 관서 이름을 지오코딩한 값이라 건물 입구와 다를 수 있다"
+    },
+    "fire": {
+      "status": "ready",
+      "label": "소방청 119안전센터 목록(백엔드 지오코딩본)",
+      "provider": "소방청(공공데이터포털 15065056), 좌표는 백엔드 팀이 Nominatim과 수동 보정으로 붙임",
+      "publicDataPk": "15065056",
+      "page": "https://www.data.go.kr/data/15065056/fileData.do",
+      "copiedFrom": "backend/data/processed/fire_stations_geocoded.csv",
+      "fetchedAt": "2026-10-17",
+      "download": "",
+      "license": "주소: 공공데이터포털 이용허락범위 제한 없음. 좌표: Nominatim(ODbL 1.0)과 일부 수동 보정(geocode_query 열에 근거)",
+      "raw": {
+        "file": "raw-backend-fire/fire_stations_geocoded.csv",
+        "encoding": "utf-8",
+        "note": "저장소 backend/data/processed/fire_stations_geocoded.csv를 그대로 복사",
+        "rows": 24
+      },
+      "limits": "119안전센터만 있고 소방서 본서·119지역대는 없다"
+    },
+    "er": {
+      "status": "pending",
+      "label": "아직 내려받지 않음",
+      "provider": "제주특별자치도",
+      "publicDataPk": "15056000",
+      "page": "https://www.data.go.kr/data/15056000/fileData.do",
+      "fetchedAt": "2026-10-17",
+      "download": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000007667084&fileDetailSn=1&insertDataPrcus=N",
+      "license": "주소: 공공데이터포털 이용허락범위 제한 없음(공공누리 유형 표시 없음). 좌표: OpenStreetMap Nominatim(ODbL 1.0)",
+      "raw": {
+        "file": "raw-jeju-er/제주특별자치도_응급의료기관현황_20251231.csv",
+        "encoding": "euc-kr",
+        "note": "포털 파일을 바이트 그대로 저장(CP949). 전화번호는 병원 대표번호라 원본에 두고 정제본에는 넣지 않음",
+        "rows": 6
+      },
+      "limits": "법정 응급의료기관 6곳(권역 1, 지역센터 4, 지역기관 1)만 있다. 응급실 운영 의료기관 전체가 아니다"
+    }
+  }
+}
