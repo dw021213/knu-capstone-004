@@ -250,3 +250,8 @@
   font-size: var(--text-xs);
   color: var(--ink2);
 }
+
+/* 바다 시트: 가까운 도움 아래 출처 */
+.help ~ .chips {
+  margin: var(--space-3) 0 0;
+}

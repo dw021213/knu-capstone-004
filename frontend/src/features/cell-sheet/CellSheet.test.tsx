@@ -156,6 +156,18 @@ describe('CellSheet', () => {
     expect(screen.getByRole('region', { name: '가까운 도움' })).toBeInTheDocument();
   });
 
+  it('바다: 출처는 가까운 도움에 쓴 것(119·응급실·좌표·읍면동)만, 가까운 도움 아래에 둔다', () => {
+    renderSheet({ target: { kind: 'sea', lngLat: [126.3, 33.7] }, cell: undefined });
+    const list = screen.getByRole('list', { name: '출처' });
+    expect(list).toHaveTextContent('119안전센터: 소방청');
+    expect(list).toHaveTextContent('응급실');
+    expect(list).toHaveTextContent('© OpenStreetMap contributors');
+    expect(list).not.toHaveTextContent('CCTV');
+    expect(list).not.toHaveTextContent('편의점');
+    const help = screen.getByRole('region', { name: '가까운 도움' });
+    expect(help.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('Esc와 닫기 버튼은 onClose를 부른다', async () => {
     const { onClose } = renderSheet();
     await userEvent.keyboard('{Escape}');

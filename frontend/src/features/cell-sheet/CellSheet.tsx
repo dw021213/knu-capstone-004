@@ -97,7 +97,15 @@ export function CellSheet({
           poiSources,
         })
       : null;
-  const sources = reason ? reason.sources : poiSources;
+  // 바다: 위험도·주변 시설이 없으므로 가까운 도움에 쓴 자료의 출처만
+  const fireReady = fireState.status === 'ready';
+  const seaSources = [
+    ...(fireReady ? [`${LAYER_DEFS.fire.name}: ${LAYER_DEFS.fire.source}`] : []),
+    ...(erReady ? [ER_SOURCE] : []),
+    ...(fireReady || erReady ? [OSM_SOURCE] : []),
+    ...(data.emd ? [EMD_SOURCE] : []),
+  ];
+  const sources = reason ? reason.sources : seaSources;
 
   const fireNear = fireState.status === 'ready' ? nearest(from, fireState.layer) : null;
   const erNear = erReady ? nearest(from, emergency.list) : null;
@@ -108,6 +116,21 @@ export function CellSheet({
       : place
         ? placeLabel(place)
         : '선택한 셀';
+
+  const heading = (
+    <h2 id={titleId} className={styles.title}>
+      {title}
+    </h2>
+  );
+  const chips = sources.length > 0 && (
+    <ul className={styles.chips} aria-label="출처">
+      {sources.map((s) => (
+        <li key={s} className={styles.chip}>
+          {s}
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <section
@@ -138,7 +161,7 @@ export function CellSheet({
             {cell.level === null && <span className={styles.badgeNote}>도로 자료 미확인</span>}
           </p>
         ) : (
-          <span />
+          heading
         )}
         <button type="button" className={styles.close} aria-label="닫기" onClick={onClose}>
           <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -147,9 +170,7 @@ export function CellSheet({
         </button>
       </div>
 
-      <h2 id={titleId} className={styles.title}>
-        {title}
-      </h2>
+      {target.kind === 'cell' && heading}
       {target.kind === 'sea' && place && (
         <p className={styles.basis}>가까운 지역: {placeLabel({ ...place, inside: true })}</p>
       )}
@@ -165,15 +186,7 @@ export function CellSheet({
         </>
       )}
 
-      {sources.length > 0 && (
-        <ul className={styles.chips} aria-label="출처">
-          {sources.map((s) => (
-            <li key={s} className={styles.chip}>
-              {s}
-            </li>
-          ))}
-        </ul>
-      )}
+      {target.kind === 'cell' && chips}
 
       {target.kind === 'cell' && (
         <table className={styles.table}>
@@ -244,6 +257,7 @@ export function CellSheet({
           {target.kind === 'cell' ? '셀 중심에서' : '누른 곳에서'} 직선거리
         </p>
       </section>
+      {target.kind === 'sea' && chips}
     </section>
   );
 }
