@@ -1,5 +1,7 @@
 /// <reference path="../../src/types/global.d.ts" />
-import { latLngToCell } from 'h3-js';
+import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
+import { RISK_COLOR } from '../../src/entities/risk/colors';
+import { levelFromPercentile } from '../../src/entities/risk/level';
 import { test, expect } from './fixtures';
 
 const AIRPORT: [number, number] = [126.493, 33.5113];
@@ -42,6 +44,8 @@ test('첫 화면 셀 그리기가 1.5초 안에 끝난다', async ({ page }) => 
 const CENTER: [number, number] = [126.53, 33.38];
 const zoomNow = (page: import('@playwright/test').Page) =>
   page.evaluate(() => window.__mapDebug!.zoom());
+const drawCount = (page: import('@playwright/test').Page) =>
+  page.evaluate(() => performance.getEntriesByName('cells-drawn').length);
 
 async function mouseDrag(page: import('@playwright/test').Page, dx: number, dy: number) {
   const vp = page.viewportSize()!;
@@ -141,4 +145,82 @@ test('핀치로 확대되고 한 손가락으로 끌면 이동한다', async ({ 
   const after = await project(page, ...CENTER);
   expect(after[1]).toBeLessThan(before[1] - 30);
   await expect(page.getByTestId('selected-cell')).toHaveText('');
+});
+
+/** canvas에서 화면 점 (x, y) 둘레 한 변 2r+1 CSS px 정사각형의 RGBA 픽셀 */
+async function canvasPixels(page: import('@playwright/test').Page, x: number, y: number, r = 0) {
+  return page.evaluate(
+    ([px, py, rr]) => {
+      const c = document.querySelector<HTMLCanvasElement>('[data-testid="map"] canvas')!;
+      const rect = c.getBoundingClientRect();
+      const dpr = c.width / rect.width;
+      const ctx = c.getContext('2d')!;
+      const out: number[][] = [];
+      for (let dy = -rr; dy <= rr; dy++) {
+        for (let dx = -rr; dx <= rr; dx++) {
+          const d = ctx.getImageData(
+            Math.round((px + dx - rect.left) * dpr),
+            Math.round((py + dy - rect.top) * dpr),
+            1,
+            1,
+          ).data;
+          out.push([d[0], d[1], d[2], d[3]]);
+        }
+      }
+      return out;
+    },
+    [x, y, r] as const,
+  );
+}
+
+test('@desktop 데이터 부족 셀은 회색 빗금, 등급 셀은 램프 색 0.5로 칠한다', async ({ page }) => {
+  const cells = (await (await page.request.get('/data/scores.json')).json()).cells as Record<
+    string,
+    [number | null, number]
+  >;
+  const airport = latLngToCell(AIRPORT[1], AIRPORT[0], 8);
+  const near = gridDisk(airport, 3).filter((h) => cells[h]);
+  const noData = near.find((h) => cells[h][0] === null)!;
+  const graded = near.find((h) => cells[h][0] !== null)!;
+  expect(noData).toBeDefined();
+  expect(graded).toBeDefined();
+
+  await openMap(page);
+  // 셀이 충분히 크게 보이도록 공항에서 확대하고 다시 그려질 때까지 기다린다
+  const n0 = await drawCount(page);
+  const [ax, ay] = await project(page, ...AIRPORT);
+  await page.mouse.move(ax, ay);
+  await page.mouse.wheel(0, -1000);
+  await expect.poll(() => zoomNow(page)).toBeGreaterThan(12.5);
+  await expect.poll(() => drawCount(page)).toBeGreaterThan(n0);
+
+  const center = async (h: string) => {
+    const [lat, lng] = cellToLatLng(h);
+    return project(page, lng, lat);
+  };
+
+  // 데이터 부족: 모든 픽셀이 무채색 회색이고, 빗금이라 밝기가 섞여 있다
+  const [nx, ny] = await center(noData);
+  const grey = await canvasPixels(page, nx, ny, 5);
+  for (const [r, g, b, a] of grey) {
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThan(10);
+    expect(a).toBeGreaterThan(100);
+    expect(r).toBeLessThan(230);
+  }
+  const shades = new Set(grey.map(([r, , , a]) => `${r}/${a}`));
+  expect(shades.size).toBeGreaterThan(1);
+
+  // 등급 셀: 램프 색, 불투명도 0.5
+  const lv = levelFromPercentile(cells[graded][0])!;
+  const hex = RISK_COLOR[lv];
+  const want = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const [gx, gy] = await center(graded);
+  const [[r, g, b, a]] = await canvasPixels(page, gx, gy);
+  expect(Math.abs(a - 128)).toBeLessThanOrEqual(3);
+  expect(Math.abs(r - want[0])).toBeLessThanOrEqual(3);
+  expect(Math.abs(g - want[1])).toBeLessThanOrEqual(3);
+  expect(Math.abs(b - want[2])).toBeLessThanOrEqual(3);
+  // 흰 바탕에 섞으면 램프 색과 흰색의 중간
+  const mixed = [r, g, b].map((c) => (c * a) / 255 + 255 * (1 - a / 255));
+  mixed.forEach((c, i) => expect(Math.abs(c - (want[i] * 0.5 + 127.5))).toBeLessThanOrEqual(4));
 });
