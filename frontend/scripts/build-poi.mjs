@@ -109,15 +109,18 @@ export function buildCctv(rows) {
     }));
 }
 
+/** 숙박 레이어에 남기는 소분류. 밤에도 프런트가 열려 있는 곳만(펜션·캠핑·기숙사 등은 뺀다) */
+export const LODGING_KINDS = ['호텔/리조트', '여관/모텔'];
+
 /**
- * 상가(상권)정보 → 편의점(소분류 '편의점') 또는 숙박(대분류 '숙박' 전체).
+ * 상가(상권)정보 → 편의점(소분류 '편의점') 또는 숙박(대분류 '숙박' 중 LODGING_KINDS).
  * 같은 상가업소번호는 한 번만, 좌표와 상호가 모두 같으면 하나만 남긴다. 같은 건물의 다른 업소는 남는다.
  */
 export function buildShop(rows, kind) {
   const pick =
     kind === 'convenience'
       ? (r) => r['상권업종소분류명'] === '편의점'
-      : (r) => r['상권업종대분류명'] === '숙박';
+      : (r) => r['상권업종대분류명'] === '숙박' && LODGING_KINDS.includes(r['상권업종소분류명']);
   const seenNo = new Set();
   const seenPlace = new Set();
   const items = [];

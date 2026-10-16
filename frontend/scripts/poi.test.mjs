@@ -62,6 +62,14 @@ describe('public/data/poi 정제본', () => {
     expect(file.items).toHaveLength(24);
   });
 
+  it('숙박은 호텔/리조트와 여관/모텔 두 가지만 1,153곳', () => {
+    const file = read('lodging');
+    expect(new Set(file.items.map((i) => i.detail.kind))).toEqual(
+      new Set(['호텔/리조트', '여관/모텔']),
+    );
+    expect(file.items).toHaveLength(1153);
+  });
+
   it('CCTV 항목은 목적과 대수를 가진다', () => {
     const file = read('cctv');
     for (const item of file.items) {
@@ -156,19 +164,33 @@ describe('buildShop', () => {
     ]);
   });
 
-  it('숙박은 대분류 숙박 전체이고 소분류를 kind로 남긴다. 좌표와 상호가 같으면 하나만', () => {
+  it('숙박은 24시간 운영하는 호텔/리조트와 여관/모텔만 남기고 소분류를 kind로 둔다', () => {
     const items = buildShop(
       [
         shop('B1', '바다펜션', '', '숙박', '펜션'),
-        shop('B2', '바다펜션', '', '숙박', '펜션'),
         shop('B3', '한라호텔', '', '숙박', '호텔/리조트'),
+        shop('B4', '별모텔', '', '숙박', '여관/모텔'),
+        shop('B5', '숲캠핑', '', '숙박', '캠핑/글램핑'),
+        shop('B6', '학생관', '', '숙박', '기숙사/고시원'),
+        shop('B7', '기타숙소', '', '숙박', '그 외 기타 숙박업'),
       ],
       'lodging',
     );
     expect(items.map((i) => [i.id, i.detail.kind])).toEqual([
-      ['lodging-B1', '펜션'],
       ['lodging-B3', '호텔/리조트'],
+      ['lodging-B4', '여관/모텔'],
     ]);
+  });
+
+  it('숙박도 좌표와 상호가 같으면 하나만 남긴다', () => {
+    const items = buildShop(
+      [
+        shop('B1', '한라호텔', '', '숙박', '호텔/리조트'),
+        shop('B2', '한라호텔', '', '숙박', '호텔/리조트'),
+      ],
+      'lodging',
+    );
+    expect(items.map((i) => i.id)).toEqual(['lodging-B1']);
   });
 });
 
