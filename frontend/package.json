@@ -16,7 +16,9 @@
     "data:scores": "node scripts/build-scores.mjs",
     "data:poi": "node scripts/build-poi.mjs data-src/poi",
     "data:poi:fetch": "node scripts/fetch-poi.mjs",
-    "data:emd": "node scripts/build-emd.mjs"
+    "data:emd": "node scripts/build-emd.mjs",
+    "data:courses": "node scripts/build-courses.mjs",
+    "data:courses:fetch": "node scripts/fetch-courses.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.3",
