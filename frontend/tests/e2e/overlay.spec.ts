@@ -1,5 +1,5 @@
 /// <reference path="../../src/types/global.d.ts" />
-import { test, expect } from './fixtures';
+import { test, expect, expectSelectionStays } from './fixtures';
 import type { Locator, Page } from '@playwright/test';
 
 // 지도 위 범례·칩·안내·시트를 누르거나 굴려도 지도 확대·셀 선택이 일어나지 않아야 한다.
@@ -49,7 +49,7 @@ async function expectBlocks(page: Page, targets: Locator[]) {
   const z0 = await zoomNow(page);
   for (const [x, y] of points) {
     await page.mouse.click(x, y);
-    await expect(selected(page)).toHaveText(base);
+    await expectSelectionStays(page, base);
   }
   // 두 번 누르기·휠도 지도로 가지 않는다
   await page.mouse.dblclick(...points[0]);
@@ -103,12 +103,12 @@ test('달력 시트와 뒤 배경을 눌러도 지도 셀이 선택되지 않는
   await expect(sheet).toBeVisible();
   // 시트 안 날짜 칸
   await sheet.getByRole('button', { name: '31, 10월 31일 (토)', exact: true }).click();
-  await expect(selected(page)).toHaveText(base);
+  await expectSelectionStays(page, base);
   // 시트 밖 어두운 배경: 시트만 닫히고 셀은 그대로
   const box = (await sheet.boundingBox())!;
   await page.mouse.click(vp.width / 3, box.y / 2);
   await expect(sheet).toBeHidden();
-  await expect(selected(page)).toHaveText(base);
+  await expectSelectionStays(page, base);
 });
 
 for (const tag of ['', '@desktop ']) {

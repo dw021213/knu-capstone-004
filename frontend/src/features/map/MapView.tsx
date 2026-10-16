@@ -12,6 +12,7 @@ import type { Scores } from '../../data/types';
 import { drawCells, makeHatchPattern, prepareCells } from './cellCanvas';
 import { BASEMAP } from './basemap';
 import { cellAt } from './hitTest';
+import { TAP_DELAY } from './gesture';
 import { drawMarkers, hitTest, type MarkerHit, type MarkerLayout } from './markerCanvas';
 import { tileUrl, visibleTiles } from './tiles';
 import { JEJU_BOUNDS } from './projection';
@@ -52,11 +53,6 @@ export interface MapFocus {
 
 /** 이 거리(CSS px)보다 덜 움직이고 뗀 포인터만 셀 선택으로 본다 */
 const CLICK_SLOP = 6;
-/**
- * 한 번 누르기는 이만큼 기다렸다가 셀 선택으로 본다. 그 안에 다시 누르면 두 번 누르기(확대)라 고르지 않는다.
- * 바로 고르면 열린 셀 시트가 두 번째 누르기를 가로채 확대가 되지 않는다.
- */
-const TAP_DELAY = 300;
 /** 클러스터를 누르면 이만큼 확대 */
 const CLUSTER_ZOOM_BY = 2;
 

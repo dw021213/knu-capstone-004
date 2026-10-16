@@ -3,7 +3,7 @@ import { cellToBoundary, cellToLatLng, latLngToCell } from 'h3-js';
 import { distanceMeters, formatDistance } from '../../src/shared/geo/distance';
 import { placeAt, placeLabel, type EmdFile } from '../../src/entities/place/emd';
 import { LEVEL_NAME, levelFromPercentile } from '../../src/entities/risk/level';
-import { test, expect } from './fixtures';
+import { test, expect, expectSelectionStays } from './fixtures';
 import type { Page } from '@playwright/test';
 
 // 날짜 칩을 누르는 테스트가 있어 서울 2026-10-17(토) 10시로 고정한다
@@ -273,7 +273,7 @@ test('시설 카드와 셀 시트는 함께 보이지 않는다: 카드가 뜨�
   await expect(card).toBeVisible();
   await expect(sheet(page)).toBeHidden();
   // 선택은 그대로라 카드에 셀 중심에서의 거리가 나온다
-  await expect(page.getByTestId('selected-cell')).toHaveText(hall);
+  await expectSelectionStays(page, hall);
   await expect(card.getByTestId('poi-distance')).toBeVisible();
 
   await card.getByRole('button', { name: '닫기' }).click();
