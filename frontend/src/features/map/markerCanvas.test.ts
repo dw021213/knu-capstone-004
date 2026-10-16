@@ -1,8 +1,9 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   MARKER_HIT_RADIUS,
   PILL_H,
+  drawMarkers,
   hitTest,
   pillText,
   placeMarkers,
@@ -82,5 +83,65 @@ describe('hitTest', () => {
     const p = hits[2];
     expect(hitTest(hits, p.box[2] - 1, 300 + 21)?.kind).toBe('cluster');
     expect(hitTest(hits, p.box[2] + 30, 300)).toBeNull();
+  });
+});
+
+describe('drawMarkers', () => {
+  /** setTransform·fill·fillText 호출을 기록하는 가짜 2D 컨텍스트 */
+  function recorder() {
+    const ops: { op: string; args: unknown[]; fillStyle?: unknown }[] = [];
+    const ctx = {
+      font: '',
+      fillStyle: '' as unknown,
+      strokeStyle: '' as unknown,
+      lineWidth: 1,
+      lineJoin: '',
+      textBaseline: '',
+      measureText: (t: string) => ({ width: t.length * 7 }),
+      setTransform: (...args: unknown[]) => ops.push({ op: 'setTransform', args }),
+      clearRect: (...args: unknown[]) => ops.push({ op: 'clearRect', args }),
+      beginPath: () => {},
+      moveTo: () => {},
+      arcTo: () => {},
+      closePath: () => {},
+      fill: (...args: unknown[]) => ops.push({ op: 'fill', args, fillStyle: ctx.fillStyle }),
+      stroke: () => {},
+      fillText: (...args: unknown[]) =>
+        ops.push({ op: 'fillText', args, fillStyle: ctx.fillStyle }),
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, ops };
+  }
+  vi.stubGlobal(
+    'Path2D',
+    class {
+      d: string;
+      constructor(d: string) {
+        this.d = d;
+      }
+    },
+  );
+  const opts = { width: 400, height: 800, dpr: 2, ink: 'INK', white: 'WHITE', font: 'F' };
+
+  it('화면을 지우고 마커는 검정 채움, 알약은 흰 글자로 그린다', () => {
+    const { ctx, ops } = recorder();
+    const hits = drawMarkers(ctx, [marker(10, 20, 'a'), pill(200, 300, 128)], opts);
+    expect(ops[1]).toEqual({ op: 'clearRect', args: [0, 0, 400, 800] });
+    expect(ops.filter((o) => o.op === 'fill').map((o) => o.fillStyle)).toContain('INK');
+    const text = ops.find((o) => o.op === 'fillText')!;
+    expect(text.args[0]).toBe('CCTV 128');
+    expect(text.fillStyle).toBe('WHITE');
+    expect(hits).toHaveLength(2);
+  });
+
+  it('카드를 연 마커(highlight)는 1.5배로 그린다', () => {
+    const { ctx, ops } = recorder();
+    drawMarkers(ctx, [marker(10, 20, 'a'), marker(50, 60, 'b')], { ...opts, highlight: 'b' });
+    const scales = ops
+      .filter((o) => o.op === 'setTransform' && o.args[4] !== 0)
+      .map((o) => [o.args[0], o.args[4]]);
+    expect(scales).toEqual([
+      [2, 20],
+      [3, 100],
+    ]);
   });
 });
