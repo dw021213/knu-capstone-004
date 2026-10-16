@@ -200,3 +200,68 @@ test.describe('코스 화면', () => {
     expect(await seriousViolations(page)).toEqual([]);
   });
 });
+
+// 데스크톱 배치(U9)의 가장 좁은 너비. 패널이 지도 영역을 줄이는 화면에서도 위반이 없어야 한다
+test.describe('1024px 데스크톱 배치', () => {
+  test.use({ viewport: { width: 1024, height: 768 } });
+  test.beforeEach(async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-10-17T10:00:00+09:00'));
+  });
+
+  /** 랜드마크 규칙(landmark-*, region)은 영향도와 상관없이 0건 */
+  async function landmarkViolations(page: Page) {
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    return violations
+      .filter((v) => v.id.startsWith('landmark') || v.id === 'region')
+      .map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target.join(' ')) }));
+  }
+
+  test('@desktop 1024 지도 홈: 머리글·지도 랜드마크가 있고 위반이 없다', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => window.__mapReady === true);
+    await expect(page.getByRole('banner')).toHaveCount(1);
+    await expect(page.getByRole('main', { name: '지도' })).toHaveCount(1);
+    expect(await seriousViolations(page)).toEqual([]);
+    expect(await landmarkViolations(page)).toEqual([]);
+  });
+
+  test('@desktop 1024 셀 패널을 연 화면: 보조 영역 이름이 있고 위반이 없으며, 닫으면 포커스가 돌아온다', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page.waitForFunction(() => window.__mapReady === true);
+    const input = page.getByRole('combobox', { name: '읍면동 검색' });
+    await input.fill('연동');
+    await expect(page.getByRole('option')).not.toHaveCount(0);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    const panel = page.getByRole('complementary', { name: '선택한 곳 정보' });
+    await expect(panel).toBeVisible();
+    const sheet = page.getByTestId('cell-sheet');
+    await expect(sheet).toBeFocused();
+    await expect(sheet.getByRole('table')).not.toContainText('…');
+    expect(await seriousViolations(page)).toEqual([]);
+    expect(await landmarkViolations(page)).toEqual([]);
+    await sheet.getByRole('button', { name: '닫기' }).click();
+    await expect(panel).toHaveCount(0);
+    await expect(input).toBeFocused();
+  });
+
+  test('@desktop 1024 코스 목록(왼쪽 지도 + 오른쪽 패널)에 위반이 없다', async ({ page }) => {
+    await page.goto('/courses');
+    await page.waitForFunction(() => window.__mapReady === true);
+    await expect(page.getByRole('list', { name: '코스 목록' }).getByRole('listitem')).toHaveCount(
+      3,
+    );
+    expect(await seriousViolations(page)).toEqual([]);
+    expect(await landmarkViolations(page)).toEqual([]);
+  });
+
+  test('@desktop 1024 코스 상세에 위반이 없다', async ({ page }) => {
+    await page.goto('/courses/olle-1');
+    await page.waitForFunction(() => window.__mapReady === true);
+    await expect(page.getByTestId('course-sheet')).toBeVisible();
+    expect(await seriousViolations(page)).toEqual([]);
+    expect(await landmarkViolations(page)).toEqual([]);
+  });
+});
