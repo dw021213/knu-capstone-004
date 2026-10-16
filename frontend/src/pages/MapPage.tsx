@@ -14,7 +14,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
     <main className={styles.page} aria-label="지도">
       <MapView scores={scores} selected={selected} onCellSelect={(h3) => setSelected(h3)} />
       {/* 지도 위에 얹는 층. MapView 밖(형제)에 두어 여기서 누른 것은 확대·셀 선택으로 가지 않는다 */}
-      <div className={styles.overlay}>
+      <div className={styles.overlay} data-testid="map-overlay">
         <header className={styles.top}>
           {/* 위험 종류 탭 자리. 지금은 '종합' 하나라 선택된 라벨로 둔다 */}
           <div className={styles.tabs} data-testid="risk-tabs" role="group" aria-label="위험 종류">
