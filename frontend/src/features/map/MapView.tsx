@@ -14,6 +14,7 @@ import { BASEMAP } from './basemap';
 import { cellAt } from './hitTest';
 import { TAP_DELAY } from './gesture';
 import { drawMarkers, hitTest, type MarkerHit, type MarkerLayout } from './markerCanvas';
+import { drawRoute, type MapRoute, type RouteMarkHit } from './routeCanvas';
 import { tileUrl, visibleTiles } from './tiles';
 import { JEJU_BOUNDS } from './projection';
 import {
@@ -47,7 +48,13 @@ export interface MapViewProps {
   insets?: Insets | null;
   /** 지도에 찍을 위치 점. me: 내 위치, fallback: 위치를 못 써서 기준으로 삼은 곳(이름을 붙인다) */
   location?: MapLocation | null;
+  /** 코스 경로(구간 등급 색)와 주의 지점 */
+  route?: MapRoute | null;
+  /** 주면 이 셀들만 그대로 칠하고 나머지 셀은 흐리게(코스 화면) */
+  dim?: ReadonlySet<string> | null;
 }
+
+export type { MapRoute };
 
 export type MapLocation =
   | { kind: 'me'; lngLat: [number, number] }
@@ -59,6 +66,10 @@ export interface MapFocus {
   bbox: [number, number, number, number];
   /** 화면 위쪽 가운데에 둘 점 [경도, 위도] */
   point: [number, number];
+  /** 맞출 때 줌 범위(기본 12~14). 코스 전체처럼 넓은 곳은 낮춘다 */
+  zoom?: { min: number; max: number };
+  /** 점을 둘 세로 위치(화면 높이 비율, 기본 0.4) */
+  anchorY?: number;
 }
 
 /** 이 거리(CSS px)보다 덜 움직이고 뗀 포인터만 셀 선택으로 본다 */
@@ -87,6 +98,8 @@ export function MapView({
   focus = null,
   insets = null,
   location = null,
+  route = null,
+  dim = null,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -95,6 +108,12 @@ export function MapView({
   const hitsRef = useRef<{ view: View; hits: MarkerHit[] }>({
     view: { k: 1, x: 0, y: 0 },
     hits: [],
+  });
+  // 마지막으로 그린 코스 주의 지점(그린 변환 기준 화면 좌표)
+  const routeRef = useRef<{ view: View; lines: number; marks: RouteMarkHit[] }>({
+    view: { k: 1, x: 0, y: 0 },
+    lines: 0,
+    marks: [],
   });
   const zoomRef = useRef<{
     behavior: ZoomBehavior<HTMLDivElement, unknown>;
@@ -177,7 +196,11 @@ export function MapView({
     appliedFocus.current = focusKey;
     const { behavior, sel } = zoomRef.current;
     const [west, south, east, north] = f.bbox;
-    const v = focusView(size.w, size.h, { west, south, east, north }, f.point);
+    const v = focusView(size.w, size.h, { west, south, east, north }, f.point, {
+      minZ: f.zoom?.min,
+      maxZ: f.zoom?.max,
+      anchorY: f.anchorY,
+    });
     const extent: [[number, number], [number, number]] = [
       [0, 0],
       [size.w, size.h],
@@ -224,12 +247,20 @@ export function MapView({
             font: cssVar(canvas, '--font'),
           }
         : null,
+      dim,
     });
+    const marks = route
+      ? drawRoute(ctx, route, settled, {
+          white: cssVar(canvas, '--white'),
+          font: cssVar(canvas, '--font'),
+        })
+      : [];
+    routeRef.current = { view: settled, lines: route?.lines.length ?? 0, marks };
     if (cells.length > 0) {
       performance.mark('cells-drawn');
       window.__mapReady = true;
     }
-  }, [cells, settled, size, selected, scores]);
+  }, [cells, settled, size, selected, scores, route, dim]);
 
   // 시설 마커(조작이 끝났을 때, 크기·마커·강조가 바뀔 때). 셀 canvas와 같은 방식
   useLayoutEffect(() => {
@@ -279,6 +310,19 @@ export function MapView({
       },
       zoom() {
         return viewRef.current ? zoomLevel(viewRef.current) : NaN;
+      },
+      route() {
+        const v = viewRef.current;
+        const rect = containerRef.current?.getBoundingClientRect();
+        const { view: drawnAt, lines, marks } = routeRef.current;
+        if (!v || !rect) return { lines, marks: [] };
+        return {
+          lines,
+          marks: marks.map((m) => {
+            const [x, y] = reproject(drawnAt, v, [m.x, m.y]);
+            return { x: rect.left + x, y: rect.top + y, label: m.label };
+          }),
+        };
       },
       markers() {
         const v = viewRef.current;
