@@ -70,7 +70,9 @@ PR 전에 `npm run typecheck && npm run lint && npm run format:check && npm run 
 
 ## 지도 배경
 
-배경 타일은 CARTO Voyager이고 화면에 "© OpenStreetMap contributors © CARTO"를 표기합니다.
+배경 타일은 OSM 표준 타일(`https://tile.openstreetmap.org/{z}/{x}/{y}.png`)이고, 화면 오른쪽 아래에 "© OpenStreetMap contributors"를 저작권 페이지 링크와 함께 표기합니다. 공급자 주소와 출처 문구는 `src/features/map/basemap.ts` 한 곳에 있어 공급자를 바꿀 때 이 파일만 고칩니다(CARTO는 키 없이 워터마크 타일만 줘서 쓰지 않습니다).
+
+OSM 타일 사용 정책상 대량 트래픽 서비스에는 쓰지 않습니다. 배포가 커지면 키가 있는 공급자로 바꿉니다.
 
 ## 지도 모듈
 
