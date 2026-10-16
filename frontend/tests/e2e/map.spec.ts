@@ -15,13 +15,14 @@ async function project(page: import('@playwright/test').Page, lng: number, lat: 
   return page.evaluate(([a, b]) => window.__mapDebug!.project(a, b), [lng, lat] as const);
 }
 
-test('제주공항을 누르면 그 셀이 선택된다', async ({ page }) => {
+test('제주공항 셀을 누르면 그 셀이 선택된다', async ({ page }) => {
   await openMap(page);
-  const [x, y] = await project(page, ...AIRPORT);
+  // 공항 좌표는 셀 경계에서 약 1px(215m)이라, 같은 셀의 중심을 눌러 흔들림에 깨지지 않게 한다
+  const airport = latLngToCell(AIRPORT[1], AIRPORT[0], 8);
+  const [lat, lng] = cellToLatLng(airport);
+  const [x, y] = await project(page, lng, lat);
   await page.mouse.click(x, y);
-  await expect(page.getByTestId('selected-cell')).toHaveText(
-    latLngToCell(AIRPORT[1], AIRPORT[0], 8),
-  );
+  await expect(page.getByTestId('selected-cell')).toHaveText(airport);
 });
 
 test('격자 밖 바다를 누르면 선택이 비워진다', async ({ page }) => {
