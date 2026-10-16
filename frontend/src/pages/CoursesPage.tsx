@@ -71,7 +71,7 @@ function CoursesMap({
   const route = useMemo(() => (summary ? courseRoute(summary) : null), [summary]);
   return (
     <div className={styles.map}>
-      <MapView scores={scores} route={route} focus={focus} />
+      <MapView scores={scores} route={route} focus={focus} panelRight={right ?? 0} />
     </div>
   );
 }

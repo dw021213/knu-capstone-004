@@ -329,3 +329,59 @@ for (const [w, h] of [
     });
   });
 }
+
+// 코스 목록 지도는 오른쪽 패널 너비만큼 비운 왼쪽 영역에 맞춘다: 미리 보는 경로와 시작·끝·주의 지점 표지가 패널에 걸리지 않는다
+for (const [w, h] of [
+  [1440, 900],
+  [1024, 768],
+  [820, 1180],
+  [769, 1024],
+] as const) {
+  test.describe(`${w}×${h} 코스 목록 지도 맞춤`, () => {
+    test.use({ viewport: { width: w, height: h } });
+
+    test(`@desktop ${w}px: 어느 코스를 미리 봐도 경로 전체와 표지가 목록 패널 왼쪽 지도 영역 안에 있다`, async ({
+      page,
+    }) => {
+      const courses = (
+        (await (await page.request.get('/data/courses.json')).json()) as {
+          items: { id: string; name: string; coords: [number, number][] }[];
+        }
+      ).items;
+      await page.clock.setFixedTime(FIXED_NOW);
+      await page.goto('/courses');
+      await page.waitForFunction(() => window.__mapReady === true);
+      const list = page.getByRole('list', { name: '코스 목록' });
+      await expect(list.getByRole('listitem')).toHaveCount(3);
+      const panelX = (await list.boundingBox())!.x;
+      const bar = (await page.getByRole('button', { name: '뒤로' }).boundingBox())!;
+      const top = bar.y + bar.height;
+      // 표지(시작·끝 알약 반폭 18px, 주의 지점 반지름)가 패널 경계에 걸리지 않을 여유
+      const MARGIN = 20;
+      for (const c of courses) {
+        const link = page.getByRole('link', { name: new RegExp(`${c.name}(?!\\d)`) });
+        if ((await link.count()) === 0) continue;
+        await link.hover();
+        await expect
+          .poll(async () => (await page.evaluate(() => window.__mapDebug!.route())).ends.length)
+          .toBe(2);
+        await page.waitForTimeout(400);
+        const pts = await page.evaluate(
+          (cs) => cs.map(([a, b]) => window.__mapDebug!.project(a, b)),
+          c.coords,
+        );
+        for (const [x, y] of pts) {
+          expect(x, `${c.name} 경로 x`).toBeGreaterThan(0);
+          expect(x, `${c.name} 경로 x`).toBeLessThan(panelX);
+          expect(y, `${c.name} 경로 y`).toBeGreaterThan(top);
+          expect(y, `${c.name} 경로 y`).toBeLessThan(h);
+        }
+        const r = await page.evaluate(() => window.__mapDebug!.route());
+        for (const m of [...r.ends, ...r.marks]) {
+          expect(m.x - MARGIN, `${c.name} ${m.label}`).toBeGreaterThan(0);
+          expect(m.x + MARGIN, `${c.name} ${m.label}`).toBeLessThanOrEqual(panelX);
+        }
+      }
+    });
+  });
+}
