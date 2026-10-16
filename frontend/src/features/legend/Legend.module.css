@@ -9,6 +9,7 @@
   border: var(--border-strong) solid var(--ink);
   border-radius: var(--radius-s);
   color: var(--ink);
+  pointer-events: auto;
 }
 
 /* 데스크톱: 우하단 카드. 배경 지도 출처 위로 띄운다 */

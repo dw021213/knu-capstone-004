@@ -4,15 +4,11 @@
   min-height: 0;
 }
 
-/* 지도 위 층: 빈 곳은 지도로 통과시키고, 패널만 누를 수 있다 */
+/* 지도 위 층: 빈 곳은 지도로 통과시킨다(상속). 보이는 패널만 pointer-events: auto */
 .overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
-}
-
-.overlay > * {
-  pointer-events: auto;
 }
 
 .top {
@@ -22,6 +18,7 @@
   right: 0;
   background: var(--white);
   border-bottom: 1px solid var(--line);
+  pointer-events: auto;
 }
 
 .tabs {

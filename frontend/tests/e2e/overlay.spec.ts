@@ -112,3 +112,16 @@ for (const tag of ['', '@desktop ']) {
       .click({ trial: true, timeout: 2000 });
   });
 }
+
+test('날짜 칩 영역의 빈 곳(안내 옆)은 지도로 통과한다', async ({ page }) => {
+  await zoomIntoLand(page);
+  const n = (await page.getByText('날씨 미반영 · 공간 점수는 날짜와 무관').boundingBox())!;
+  const vp = page.viewportSize()!;
+  const x = n.x + n.width + 40;
+  expect(x).toBeLessThan(vp.width - 20);
+  // 확대하며 두 번 누른 곳의 셀이 골라져 있으므로 다른 셀로 바뀌는지 본다
+  const base = (await selected(page).textContent()) ?? '';
+  await page.mouse.click(x, n.y + n.height / 2);
+  await expect(selected(page)).not.toHaveText('');
+  await expect(selected(page)).not.toHaveText(base);
+});

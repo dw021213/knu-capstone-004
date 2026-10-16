@@ -29,6 +29,7 @@
   background: var(--white);
   border: var(--border-strong) solid var(--ink);
   border-radius: var(--radius-full);
+  pointer-events: auto;
 }
 
 .chip {
@@ -86,6 +87,7 @@
   border-radius: var(--radius-full);
   font-size: var(--text-xs);
   color: var(--ink2);
+  pointer-events: auto;
 }
 
 @media (min-width: 768px) {
