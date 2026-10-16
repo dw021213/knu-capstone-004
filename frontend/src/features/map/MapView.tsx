@@ -187,6 +187,8 @@ export function MapView({
   const focusKey = focus?.key;
   const focusRef = useRef(focus);
   const appliedFocus = useRef<number | null>(null);
+  // 옮기기를 끝낸 맞춤 key(e2e가 첫 맞춤이 끝났는지 본다)
+  const doneFocus = useRef<number | null>(null);
   useLayoutEffect(() => {
     focusRef.current = focus;
   });
@@ -217,7 +219,10 @@ export function MapView({
     sel
       .transition()
       .duration(reduce ? 0 : 300)
-      .call(behavior.transform, t);
+      .call(behavior.transform, t)
+      .on('end', () => {
+        doneFocus.current = focusKey;
+      });
   }, [focusKey, size]);
 
   // 셀 그리기(조작이 끝났을 때, 크기·데이터·선택이 바뀔 때)
@@ -313,6 +318,9 @@ export function MapView({
       },
       zoom() {
         return viewRef.current ? zoomLevel(viewRef.current) : NaN;
+      },
+      focusDone() {
+        return doneFocus.current;
       },
       route() {
         const v = viewRef.current;

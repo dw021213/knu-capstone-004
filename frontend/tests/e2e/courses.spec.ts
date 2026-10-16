@@ -231,6 +231,8 @@ test.describe('U8-4 코스 상세', () => {
   test('주의 구간을 누르면 지도가 그 구간으로 옮겨 확대한다(키보드로도)', async ({ page }) => {
     await openDetail(page);
     await expect.poll(async () => (await marks(page)).length).toBe(6);
+    // 처음 코스 전체 맞춤(key 0) 옮기기가 끝난 뒤의 줌을 기준으로 삼는다
+    await expect.poll(() => page.evaluate(() => window.__mapDebug!.focusDone())).toBe(0);
     const before = await page.evaluate(() => window.__mapDebug!.zoom());
     const items = cautionList(page).getByRole('button');
     await items.nth(2).click();
