@@ -1,4 +1,6 @@
 /// <reference path="../../src/types/global.d.ts" />
+import { cellToLatLng, latLngToCell } from 'h3-js';
+import { distanceMeters, formatDistance } from '../../src/shared/geo/distance';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 
@@ -303,4 +305,122 @@ test('클러스터를 누르면 그 위치로 2배 확대되고 셀 선택은 �
   const after = await drawn(page);
   const near = after.filter((i) => Math.hypot(i.x - c.x, i.y - c.y) < 80);
   expect(near.length).toBeGreaterThan(0);
+});
+
+// ── 시설 카드 ──
+
+type Item = {
+  id: string;
+  name: string;
+  lng: number;
+  lat: number;
+  detail?: Record<string, unknown>;
+};
+const card = (page: Page) => page.getByTestId('poi-card');
+
+async function items(page: Page, type: string) {
+  return (await (await page.request.get(`/data/poi/${type}.json`)).json()).items as Item[];
+}
+
+/** 이웃과 떨어져 있어 눌러도 헷갈리지 않는 마커 */
+function lonelyMarker(list: Drawn[], vp: { width: number; height: number }, group: string) {
+  return list.find(
+    (m) =>
+      m.kind === 'marker' &&
+      m.group === group &&
+      m.x > 40 &&
+      m.x < vp.width - 40 &&
+      m.y > 160 &&
+      m.y < vp.height - 200 &&
+      list.every((o) => o === m || Math.hypot(o.x - m.x, o.y - m.y) > 30),
+  );
+}
+
+test('셀을 고르지 않고 119 마커를 누르면 카드에 이름·종류·출처가 있고 거리는 없다', async ({
+  page,
+}) => {
+  const fire = await items(page, 'fire');
+  await openMap(page);
+  await turnOn(page, '119안전센터');
+  await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+  const vp = page.viewportSize()!;
+  const m = lonelyMarker(await drawn(page), vp, 'fire');
+  expect(m).toBeDefined();
+  await page.mouse.click(m!.x, m!.y);
+  const c = card(page);
+  await expect(c).toBeVisible();
+  await expect(c).toHaveRole('dialog');
+  const poi = fire.find((f) => f.id === m!.id)!;
+  await expect(c.getByRole('heading', { name: poi.name })).toBeVisible();
+  await expect(c).toContainText('119안전센터');
+  await expect(c).toContainText('소방청 119안전센터 목록');
+  // 좌표를 OpenStreetMap Nominatim에서 얻은 종류는 OSM 표기를 함께 한다
+  await expect(c).toContainText('© OpenStreetMap contributors');
+  await expect(c.getByText('거리')).toHaveCount(0);
+  // 마커 누르기는 셀 선택이 아니다
+  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  // 닫기
+  await c.getByRole('button', { name: '닫기' }).click();
+  await expect(c).toBeHidden();
+});
+
+for (const tag of ['', '@desktop ']) {
+  test(`${tag}셀을 고른 뒤 CCTV 마커를 누르면 목적·대수와 셀 중심에서의 거리가 보인다`, async ({
+    page,
+  }) => {
+    const cctv = await items(page, 'cctv');
+    await openMap(page);
+    await zoomInAt(page, CITY_HALL, 13);
+    // 시청 셀을 고른다(셀 중심을 눌러 경계 흔들림을 피한다)
+    const hall = latLngToCell(CITY_HALL[1], CITY_HALL[0], 8);
+    const [clat, clng] = cellToLatLng(hall);
+    const [hx, hy] = await project(page, clng, clat);
+    await page.mouse.click(hx, hy);
+    await expect(page.getByTestId('selected-cell')).toHaveText(hall);
+
+    await turnOn(page, 'CCTV');
+    await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+    const vp = page.viewportSize()!;
+    const m = lonelyMarker(await drawn(page), vp, 'cctv');
+    expect(m).toBeDefined();
+    await page.mouse.click(m!.x, m!.y);
+    const c = card(page);
+    await expect(c).toBeVisible();
+    const poi = cctv.find((i) => i.id === m!.id)!;
+    await expect(c.getByRole('heading', { name: poi.name })).toBeVisible();
+    await expect(c).toContainText('CCTV');
+    await expect(c).toContainText(`목적${poi.detail!.purpose}`);
+    await expect(c).toContainText(`카메라${poi.detail!.cameras}대`);
+    await expect(c).toContainText('행정안전부 전국CCTV표준데이터');
+    const want = formatDistance(distanceMeters([clng, clat], [poi.lng, poi.lat]));
+    await expect(c.getByTestId('poi-distance')).toHaveText(`선택한 셀 중심에서 ${want}`);
+    // 셀 선택은 그대로, 누른 마커는 크게 그린다
+    await expect(page.getByTestId('selected-cell')).toHaveText(hall);
+    // Esc로 닫는다
+    await c.focus();
+    await page.keyboard.press('Escape');
+    await expect(c).toBeHidden();
+  });
+}
+
+test('카드를 연 채 레이어를 끄거나 지도를 누르면 카드가 닫힌다', async ({ page }) => {
+  await openMap(page);
+  await turnOn(page, '119안전센터');
+  await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+  const vp = page.viewportSize()!;
+  const m = lonelyMarker(await drawn(page), vp, 'fire')!;
+  await page.mouse.click(m.x, m.y);
+  await expect(card(page)).toBeVisible();
+  await layerButton(page).click();
+  await sw(page, '119안전센터').click();
+  await expect(card(page)).toBeHidden();
+  // 다시 켜고 열어 둔 뒤 지도 빈 곳(바다)을 누르면 닫힌다
+  await sw(page, '119안전센터').click();
+  await layerButton(page).click();
+  await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
+  await page.mouse.click(m.x, m.y);
+  await expect(card(page)).toBeVisible();
+  const [sx, sy] = await project(page, 126.3, 33.7);
+  await page.mouse.click(sx, sy);
+  await expect(card(page)).toBeHidden();
 });

@@ -3,16 +3,21 @@ import { dataSource, type DataSource } from '../data';
 import { DateChips } from '../features/date/DateChips';
 import { LayerPanel } from '../features/layers/LayerPanel';
 import { buildMarkerLayout } from '../features/layers/markerLayout';
+import { PoiCard } from '../features/layers/PoiCard';
 import { LAYER_TYPES, useLayers } from '../features/layers/useLayers';
 import { usePoiLayers } from '../features/layers/usePoiLayers';
 import { Legend } from '../features/legend/Legend';
 import { MapView } from '../features/map/MapView';
+import { cellCenter } from '../shared/geo/h3';
+import type { PoiType } from '../data/types';
 import { useScores } from './useScores';
 import styles from './MapPage.module.css';
 
 export function MapPage({ source = dataSource }: { source?: DataSource }) {
   const { data: scores } = useScores(source);
   const [selected, setSelected] = useState<string | null>(null);
+  // 마커를 눌러 연 시설 카드
+  const [picked, setPicked] = useState<{ type: PoiType; id: string } | null>(null);
   const layers = useLayers();
   const states = usePoiLayers(source, layers.on);
   const { toggle, off } = layers;
@@ -30,6 +35,10 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
     () => buildMarkerLayout([l0, l1, l2, l3, l4].filter((l) => l !== null)),
     [l0, l1, l2, l3, l4],
   );
+  // 카드: 그 종류를 끄면 닫힌다
+  const pickedState = picked && layers.on.has(picked.type) ? states[picked.type] : null;
+  const pickedLayer = pickedState?.status === 'ready' ? pickedState.layer : null;
+  const pickedPoi = pickedLayer?.items.find((p) => p.id === picked?.id) ?? null;
   const count = LAYER_TYPES.filter(
     (t) => layers.on.has(t) && states[t].status !== 'pending',
   ).length;
@@ -39,8 +48,13 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
       <MapView
         scores={scores}
         selected={selected}
-        onCellSelect={(h3) => setSelected(h3)}
+        onCellSelect={(h3) => {
+          setSelected(h3);
+          setPicked(null);
+        }}
         markers={markerLayout}
+        onMarkerSelect={(type, id) => setPicked({ type: type as PoiType, id })}
+        highlight={pickedPoi?.id ?? null}
       />
       {/* 지도 위에 얹는 층. MapView 밖(형제)에 두어 여기서 누른 것은 확대·셀 선택으로 가지 않는다 */}
       <div className={styles.overlay} data-testid="map-overlay">
@@ -55,6 +69,14 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
         <LayerPanel on={layers.on} toggle={toggle} count={count} states={states} />
         <Legend mode={source.mode} generatedAt={scores?.generatedAt} />
         <DateChips mode={source.mode} />
+        {pickedPoi && pickedLayer && (
+          <PoiCard
+            poi={pickedPoi}
+            layer={pickedLayer}
+            from={selected ? cellCenter(selected) : null}
+            onClose={() => setPicked(null)}
+          />
+        )}
       </div>
       {/* 셀 시트(U6) 전까지 선택 결과를 e2e와 보조기기에 알린다 */}
       <output className="sr-only" data-testid="selected-cell">
