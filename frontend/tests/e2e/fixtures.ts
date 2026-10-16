@@ -6,7 +6,7 @@ const PNG = Buffer.from(
 );
 export const test = base.extend({
   page: async ({ page }, use) => {
-    await page.route('**/*.basemaps.cartocdn.com/**', (r) =>
+    await page.route('**/tile.openstreetmap.org/**', (r) =>
       r.fulfill({ status: 200, contentType: 'image/png', body: PNG }),
     );
     await use(page);

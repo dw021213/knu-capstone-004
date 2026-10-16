@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { visibleTiles, tileUrl } from './tiles';
+import { visibleTiles } from './tiles';
 import { lngLatToScreen, worldExtent, type View } from './view';
 import { TILE, tilePixel } from './projection';
 
@@ -42,13 +42,5 @@ describe('visibleTiles', () => {
     const [sx, sy] = lngLatToScreen(v, 126.493, 33.5113);
     expect(Math.abs(t!.left + ((px - tx * TILE) / TILE) * t!.size - sx)).toBeLessThan(0.5);
     expect(Math.abs(t!.top + ((py - ty * TILE) / TILE) * t!.size - sy)).toBeLessThan(0.5);
-  });
-});
-
-describe('tileUrl', () => {
-  it('CARTO Voyager @2x, 하위 도메인 a~d', () => {
-    expect(tileUrl({ x: 437, y: 203, z: 9 })).toMatch(
-      /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/rastertiles\/voyager\/9\/437\/203@2x\.png$/,
-    );
   });
 });

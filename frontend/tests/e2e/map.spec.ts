@@ -227,8 +227,9 @@ test('@desktop 데이터 부족 셀은 회색 빗금, 등급 셀은 램프 색 0
 
 test('지도 오른쪽 아래에 배경 지도 출처를 표기한다', async ({ page }) => {
   await openMap(page);
-  const credit = page.getByText('© OpenStreetMap contributors © CARTO');
+  const credit = page.getByRole('link', { name: '© OpenStreetMap contributors' });
   await expect(credit).toBeVisible();
+  await expect(credit).toHaveAttribute('href', 'https://www.openstreetmap.org/copyright');
   const box = (await credit.boundingBox())!;
   const map = (await page.getByTestId('map').boundingBox())!;
   expect(box.x + box.width).toBeGreaterThan(map.x + map.width - 24);

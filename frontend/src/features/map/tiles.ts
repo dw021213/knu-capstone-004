@@ -1,4 +1,5 @@
 import { tile } from 'd3-tile';
+import { BASEMAP } from './basemap';
 import { TILE, worldSize } from './projection';
 import { BASE_Z, type View } from './view';
 
@@ -27,10 +28,7 @@ export function visibleTiles(v: View, width: number, height: number): ScreenTile
   return tiles.map(([x, y, z]) => ({ x, y, z, left: (x + tx) * k, top: (y + ty) * k, size: k }));
 }
 
-const SUBDOMAINS = 'abcd';
-
-/** CARTO Voyager 래스터 타일(레티나 @2x) */
+/** 배경 타일 주소(공급자는 basemap.ts) */
 export function tileUrl({ x, y, z }: { x: number; y: number; z: number }): string {
-  const s = SUBDOMAINS[(x + y) % SUBDOMAINS.length];
-  return `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}@2x.png`;
+  return BASEMAP.url(z, x, y);
 }

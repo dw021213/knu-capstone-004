@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { select, zoom, zoomIdentity, type D3ZoomEvent, type ZoomTransform } from 'd3';
 import type { Scores } from '../../data/types';
 import { drawCells, makeHatchPattern, prepareCells } from './cellCanvas';
+import { BASEMAP } from './basemap';
 import { cellAt } from './hitTest';
 import { tileUrl, visibleTiles } from './tiles';
 import { JEJU_BOUNDS } from './projection';
@@ -177,24 +178,31 @@ export function MapView({ scores, selected = null, onCellSelect, overlays }: Map
   }
 
   return (
-    <div ref={containerRef} className={styles.map} data-testid="map">
-      {tiles.map((t) => (
-        <img
-          key={`${t.z}/${t.x}/${t.y}`}
-          className={styles.tile}
-          src={tileUrl(t)}
-          alt=""
-          draggable={false}
-          style={{ left: t.left, top: t.top, width: t.size, height: t.size }}
+    <div className={styles.map} data-testid="map">
+      {/* 확대·이동과 셀 선택은 이 안에서만. 출처 링크는 밖에 두어 누를 수 있게 한다 */}
+      <div ref={containerRef} className={styles.viewport}>
+        {tiles.map((t) => (
+          <img
+            key={`${t.z}/${t.x}/${t.y}`}
+            className={styles.tile}
+            src={tileUrl(t)}
+            alt=""
+            draggable={false}
+            style={{ left: t.left, top: t.top, width: t.size, height: t.size }}
+          />
+        ))}
+        <canvas
+          ref={canvasRef}
+          className={styles.cells}
+          style={canvasTransform ? { transform: canvasTransform } : undefined}
         />
-      ))}
-      <canvas
-        ref={canvasRef}
-        className={styles.cells}
-        style={canvasTransform ? { transform: canvasTransform } : undefined}
-      />
-      {overlays}
-      <p className={styles.attribution}>© OpenStreetMap contributors © CARTO</p>
+        {overlays}
+      </div>
+      <p className={styles.attribution}>
+        <a href={BASEMAP.attributionUrl} target="_blank" rel="noreferrer">
+          {BASEMAP.attribution}
+        </a>
+      </p>
     </div>
   );
 }
