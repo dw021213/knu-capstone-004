@@ -208,6 +208,20 @@ describe('api 구현', () => {
     ]);
   });
 
+  it('스냅숏 파일을 못 받아도 격자는 그리고, 도로 있는 셀은 표준노드링크로 둔다', async () => {
+    server.use(
+      http.get(`${SNAPSHOT_BASE}/data/scores.json`, () => new HttpResponse(null, { status: 500 })),
+    );
+    const scores = await makeApi().getScores();
+    expect(scores.datasetId).toBe('');
+    expect(scores.cells.size).toBe(FIXTURE_CELLS.length);
+    expect(scores.cells.get('8830d10c49fffff')).toMatchObject({
+      roadSource: 'standard_link',
+      level: 5,
+    });
+    expect(scores.cells.get(TRAP_SCORE_ONE)?.roadSource).toBe('none');
+  });
+
   it('격자 요청이 실패하면 실패한다', async () => {
     server.use(http.get(`${API_BASE}/api/grid`, () => new HttpResponse(null, { status: 500 })));
     await expect(makeApi().getScores()).rejects.toThrow();

@@ -9,7 +9,6 @@ interface GridProperties {
 }
 
 interface GridResponse {
-  risk?: { version?: string };
   weather?: { status?: 'ok' | 'no_data' | 'off' };
   features: { properties: GridProperties }[];
 }
@@ -56,7 +55,8 @@ export function createApiSource(apiBase = '', snapshotBase = ''): DataSource {
         cells.set(p.h3, toCellScore(p.h3, percentile, roadSource));
       }
       return {
-        datasetId: file?.datasetId ?? grid.risk?.version ?? '',
+        // 백엔드 risk.version(combined_v2)은 데이터 버전이 아니라서 쓰지 않는다
+        datasetId: file?.datasetId ?? '',
         cells,
         weather: WEATHER[grid.weather?.status ?? 'no_data'] ?? 'no_data',
       };
