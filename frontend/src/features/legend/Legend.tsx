@@ -2,13 +2,11 @@ import { useId, useState } from 'react';
 import { LEVEL_NAME, type Level } from '../../entities/risk/level';
 import type { DataSource, Scores } from '../../data/types';
 import { dotDate, kstNow } from '../date/kst';
+import { isWide } from '../../app/useBreakpoint';
 import styles from './Legend.module.css';
 
 const LEVELS_UP: Level[] = [1, 2, 3, 4, 5];
 const LEVELS_DOWN: Level[] = [5, 4, 3, 2, 1];
-
-/** 데스크톱 배치 기준(이 너비 이상이면 처음부터 펼침) */
-export const DESKTOP_QUERY = '(min-width: 768px)';
 
 // snapshot 값은 기상 미반영 공간 점수, api 값은 백엔드 기상 가산이 들어간 값(docs/DATA_SOURCES.md)
 const BASIS: Record<DataSource['mode'], string> = {
@@ -22,10 +20,6 @@ function weatherNotice(mode: DataSource['mode'], weather: Scores['weather'] | un
   if (weather === 'no_data') return '날씨 미반영 · 이 시각 관측 없음';
   if (weather === 'off') return '날씨 미반영';
   return null;
-}
-
-function isDesktop(): boolean {
-  return typeof window.matchMedia === 'function' && window.matchMedia(DESKTOP_QUERY).matches;
 }
 
 /** 점수 파일 생성 시각 → '점수 기준 2026.10.12 생성'(서울 날짜). 읽을 수 없으면 null */
@@ -47,7 +41,7 @@ interface LegendProps {
 }
 
 export function Legend({ mode, generatedAt, disabled = false, weather }: LegendProps) {
-  const [open, setOpen] = useState(isDesktop);
+  const [open, setOpen] = useState(isWide);
   const time = mode === 'snapshot' ? basisTime(generatedAt) : null;
   const notice = weatherNotice(mode, weather);
   // 가산이 빠졌으면 '기상 가산 반영'이라고 적지 않는다

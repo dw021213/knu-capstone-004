@@ -37,7 +37,7 @@
 }
 
 /* 데스크톱: 오른쪽 패널 */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .sheet {
     top: calc(var(--touch) + var(--space-2) + var(--space-3));
     left: auto;

@@ -51,7 +51,7 @@ describe('점수 기준 시각', () => {
 });
 
 describe('처음 펼침 여부', () => {
-  it('768px 미만이면 접혀 있다', () => {
+  it('768px 이하(모바일 배치)면 접혀 있다', () => {
     stubWidth(false);
     render(<Legend mode="snapshot" />);
     expect(screen.getByRole('button', { name: /위험도 범례/ })).toHaveAttribute(
@@ -60,7 +60,7 @@ describe('처음 펼침 여부', () => {
     );
   });
 
-  it('768px 이상이면 펼쳐 있다', () => {
+  it('769px 이상(데스크톱 배치)이면 펼쳐 있다', () => {
     stubWidth(true);
     render(<Legend mode="snapshot" />);
     expect(screen.getByRole('button', { name: /위험도 범례/ })).toHaveAttribute(

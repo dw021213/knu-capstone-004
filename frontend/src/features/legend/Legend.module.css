@@ -13,7 +13,7 @@
 }
 
 /* 데스크톱: 우하단 카드. 배경 지도 출처 위로 띄운다 */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .legend {
     top: auto;
     right: var(--space-4);

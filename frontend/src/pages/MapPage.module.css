@@ -74,7 +74,7 @@
 }
 
 /* 데스크톱: 내 위치는 오른쪽 아래 범례 카드 왼쪽, 코스는 좌상단 레이어 버튼 옆 */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .actions {
     padding: 0;
   }
@@ -97,7 +97,7 @@
 }
 
 /* 데스크톱: 셀 패널은 오른쪽, 날짜 칩은 아래 가운데에 따로 놓는다 */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .dock {
     top: 0;
   }

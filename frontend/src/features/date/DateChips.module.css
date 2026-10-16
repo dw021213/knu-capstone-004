@@ -9,7 +9,7 @@
 }
 
 /* 데스크톱: 가운데, 내용만큼 */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .bar {
     position: absolute;
     margin: 0;
@@ -94,7 +94,7 @@
   pointer-events: auto;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .notice {
     align-self: center;
   }

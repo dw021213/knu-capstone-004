@@ -23,7 +23,7 @@
   color: var(--ink);
 }
 
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .sheet {
     left: 50%;
     right: auto;

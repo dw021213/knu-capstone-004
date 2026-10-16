@@ -13,7 +13,7 @@
 }
 
 /* 데스크톱: 오른쪽 패널. 아래 범례 카드(--legend-h)를 가리지 않는다 */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .sheet {
     position: absolute;
     top: var(--overlay-top);
