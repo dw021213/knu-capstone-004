@@ -282,3 +282,50 @@ test.describe('U9-2 데스크톱 코스 화면', () => {
     await credit.click({ trial: true, timeout: 2000 });
   });
 });
+
+// 배경 지도 출처(OSM 타일 이용 조건)는 지도를 그리는 모든 화면에서 보이고 눌러야 한다
+for (const [w, h] of [
+  [1440, 900],
+  [1024, 768],
+  [820, 1180],
+  [769, 1024],
+  [390, 844],
+] as const) {
+  test.describe(`${w}×${h} 배경 지도 출처`, () => {
+    test.use({ viewport: { width: w, height: h } });
+
+    test(`@desktop ${w}px: 지도 홈(패널 닫힘·열림), 코스 목록, 코스 상세에서 배경 지도 출처가 보이고 눌린다`, async ({
+      page,
+    }) => {
+      const credit = page.getByRole('link', { name: '© OpenStreetMap contributors', exact: true });
+      const expectUsable = async (where: string) => {
+        await expect(credit, where).toBeVisible();
+        // 다른 요소(패널·카드)가 가로채면 trial 누르기가 실패한다
+        await credit.click({ trial: true, timeout: 2000 });
+      };
+      await openMap(page);
+      await expectUsable('지도 홈');
+      await pickLandCell(page);
+      await expect(page.getByTestId('cell-sheet')).toBeVisible();
+      await expectUsable('셀을 고른 지도 홈');
+
+      await page.goto('/courses');
+      await expect(page.getByRole('list', { name: '코스 목록' }).getByRole('listitem')).toHaveCount(
+        3,
+      );
+      if (w > 768) {
+        await page.waitForFunction(() => window.__mapReady === true);
+        await expectUsable('코스 목록');
+      } else {
+        // 모바일 목록은 지도를 그리지 않는다(출처를 표기할 배경 지도가 없다)
+        await expect(page.getByTestId('map')).toHaveCount(0);
+        await expect(credit).toHaveCount(0);
+      }
+
+      await page.goto('/courses/olle-1');
+      await page.waitForFunction(() => window.__mapReady === true);
+      await expect(page.getByTestId('course-sheet')).toBeVisible();
+      await expectUsable('코스 상세');
+    });
+  });
+}

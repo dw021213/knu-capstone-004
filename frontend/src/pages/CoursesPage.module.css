@@ -19,7 +19,9 @@
 }
 
 @media (min-width: 769px) {
+  /* 지도 출처(MapView)를 오른쪽 목록 패널 왼쪽으로 옮긴다 */
   .page {
+    --panel-offset: var(--panel-size);
     position: relative;
   }
 
