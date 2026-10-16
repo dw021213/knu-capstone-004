@@ -385,3 +385,22 @@ for (const [w, h] of [
     });
   });
 }
+
+test('@desktop U9-1 1440: 패널이 닫힌 지도 홈에서 범례 카드는 펼친 채 화면 오른쪽 아래에 있다', async ({
+  page,
+}) => {
+  await openMap(page);
+  const legend = page.getByTestId('legend');
+  await expect(legend.getByRole('button', { name: '위험도 범례' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  const vp = page.viewportSize()!;
+  const b = await box(page, 'legend');
+  // 오른쪽 끝·아래 끝에서 32px 안(배경 지도 출처 한 줄 위), 화면 오른쪽 아래 사분면
+  expect(vp.width - (b.x + b.width)).toBeLessThanOrEqual(32);
+  expect(vp.height - (b.y + b.height)).toBeLessThanOrEqual(40);
+  expect(b.x).toBeGreaterThan(vp.width / 2);
+  expect(b.y).toBeGreaterThan(vp.height / 2);
+  await expect(page.getByRole('complementary', { name: '선택한 곳 정보' })).toHaveCount(0);
+});
