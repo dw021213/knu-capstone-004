@@ -100,6 +100,35 @@ test('코스 파일을 받지 못하면 다시 시도할 수 있는 안내', asy
   await expect(courseList(page).getByRole('listitem')).toHaveCount(3);
 });
 
+test('코스를 받는 동안 불러오는 중, 코스 자료가 없으면 준비 중이라고 한다', async ({ page }) => {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  await page.route('**/data/courses.json', async (r) => {
+    await gate;
+    await r.fulfill({ json: { status: 'pending', source: '', items: [] } });
+  });
+  await page.goto('/courses');
+  await expect(page.getByRole('status')).toHaveText('코스를 불러오는 중이에요');
+  release();
+  await expect(page.getByText('코스 자료를 준비 중이에요')).toBeVisible();
+  await expect(courseList(page)).toHaveCount(0);
+});
+
+test('문서 제목은 화면마다 바뀌고 지도 홈으로 돌아오면 서비스 이름', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__mapReady === true);
+  await expect(page).toHaveTitle('제주 안전지도');
+  await page.getByRole('link', { name: '오늘 안전한 코스' }).click();
+  await expect(page).toHaveTitle('오늘 안전한 코스 · 제주 안전지도');
+  await courseList(page)
+    .getByRole('link', { name: /제주올레 10코스/ })
+    .click();
+  await expect(page).toHaveTitle('제주올레 10코스 · 제주 안전지도');
+  await page.goBack();
+  await page.goBack();
+  await expect(page).toHaveTitle('제주 안전지도');
+});
+
 test('목록에서 뒤로 가기(화면 버튼, 브라우저)로 지도 홈에 돌아온다', async ({ page }) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__mapReady === true);
