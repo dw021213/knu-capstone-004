@@ -98,8 +98,8 @@
       "limits": "119안전센터만 있고 소방서 본서·119지역대는 없다"
     },
     "er": {
-      "status": "pending",
-      "label": "아직 내려받지 않음",
+      "status": "ready",
+      "label": "제주특별자치도 응급의료기관 현황 2025-12-31(좌표: OpenStreetMap Nominatim)",
       "provider": "제주특별자치도",
       "publicDataPk": "15056000",
       "page": "https://www.data.go.kr/data/15056000/fileData.do",
