@@ -79,10 +79,14 @@ export function buildReason({
       sources: [MODEL_SOURCE, ...poiSources],
     };
   }
-  const top = Math.max(1, Math.round(100 - percentile));
+  // 위쪽 절반은 상위 비율, 아래쪽 절반은 낮은 쪽 비율로 말한다('상위 96%'처럼 어색하게 읽히지 않게)
+  const rank =
+    percentile >= 50
+      ? `상위 ${Math.max(1, Math.round(100 - percentile))}%`
+      : `위험도가 낮은 쪽 ${Math.max(1, Math.round(percentile))}%`;
   const island = roadSource === 'ngii_map';
   const parts = [
-    `도로가 있는 제주 격자 중 상위 ${top}% 안에 드는 곳이에요.`,
+    `도로가 있는 제주 격자 중 ${rank} 안에 드는 곳이에요.`,
     island
       ? `도로 길이와 밀도로 본 교통사고 위험이 ${ADVERB[level]} 나왔어요.`
       : `도로 구조(차로 수, 제한속도, 교차로)로 본 교통사고 위험이 ${ADVERB[level]} 나왔어요.`,
