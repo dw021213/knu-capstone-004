@@ -212,6 +212,10 @@ test.describe('U7-2 내 위치', () => {
         .filter({ hasText: '위치 권한을 켜면 내 주변 위험도를 볼 수 있어요' });
       await expect(banner).toBeVisible();
       await expect(banner).toContainText('제주시청');
+      // 기준으로 삼은 곳을 지도에 이름과 함께 찍는다(위치 점은 찍지 않는다)
+      const ref = page.getByTestId('fallback-location').getByText('제주시청');
+      await expect(ref).toBeVisible();
+      await expect(page.getByTestId('my-location')).toHaveCount(0);
       const vp = page.viewportSize()!;
       await expect.poll(() => zoomNow(page)).toBeGreaterThanOrEqual(12);
       await expect
