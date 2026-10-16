@@ -1,16 +1,11 @@
 import { useRef, useState } from 'react';
 import type { DataSource, Scores } from '../../data/types';
 import { DatePickerSheet } from './DatePickerSheet';
+import { DATE_NOTICE } from './notice';
 import { CalendarIcon } from './CalendarIcon';
 import { chipLabel, kstNow } from './kst';
 import { useSelectedDate } from './useSelectedDate';
 import styles from './DateChips.module.css';
-
-// 배포본은 날씨를 반영하지 않는다. api 모드의 기상 가산은 AWS 관측 기반이라 미래 날짜에는 들어가지 않는다
-const NOTICE: Record<DataSource['mode'], string> = {
-  snapshot: '날씨 미반영 · 공간 점수는 날짜와 무관',
-  api: '날씨는 오늘 관측값만 반영',
-};
 
 /** 지도 아래 '오늘 / 날짜 선택' 칩. 날짜 선택은 달력 시트로 연다 */
 export function DateChips({
@@ -25,7 +20,7 @@ export function DateChips({
   weather?: Scores['weather'];
 }) {
   const notice =
-    mode === 'api' && (weather === 'no_data' || weather === 'off') ? null : NOTICE[mode];
+    mode === 'api' && (weather === 'no_data' || weather === 'off') ? null : DATE_NOTICE[mode];
   const { date, isToday, setDate } = useSelectedDate();
   const [open, setOpen] = useState(false);
   const pickRef = useRef<HTMLButtonElement>(null);
