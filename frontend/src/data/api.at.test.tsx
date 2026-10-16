@@ -100,8 +100,14 @@ describe('날씨 미반영 안내', () => {
     expect(screen.getByText('날씨 미반영 · 공간 점수는 날짜와 무관')).toBeInTheDocument();
   });
 
-  it('api 모드는 안내를 보이지 않는다', () => {
+  it('snapshot 모드는 관측 안내를 보이지 않는다', () => {
+    renderWith(createSnapshotSource(SNAPSHOT_BASE));
+    expect(screen.queryByText('날씨는 오늘 관측값만 반영')).toBeNull();
+  });
+
+  it('api 모드는 기상이 관측 기반이라 오늘 관측값만 반영한다고 알린다', () => {
     renderWith(createApiSource(API_BASE, SNAPSHOT_BASE));
+    expect(screen.getByText('날씨는 오늘 관측값만 반영')).toBeInTheDocument();
     expect(screen.queryByText('날씨 미반영 · 공간 점수는 날짜와 무관')).toBeNull();
   });
 });

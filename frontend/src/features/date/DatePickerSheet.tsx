@@ -1,14 +1,10 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import type { DataSource } from '../../data/types';
-import { WEEKDAY_NAMES, addDays, chipLabel, dayLabel, kstNow, monthCells, shortLabel } from './kst';
+import { WEEKDAY_NAMES, chipLabel, dayLabel, kstNow, monthCells } from './kst';
 import styles from './DatePickerSheet.module.css';
 
-/** 오늘부터 며칠 뒤까지 날씨 반영 점을 찍는지(api 모드만) */
-export const WEATHER_DAYS = 5;
-
+// 백엔드 기상은 AWS 관측 기반이라 미래 날짜에 날씨가 반영되지 않는다. 그래서 날씨 반영 점은 찍지 않는다.
 interface Props {
-  mode: DataSource['mode'];
   /** 처음 고른 상태로 둘 날짜 */
   initial: string;
   onClose(): void;
@@ -23,7 +19,7 @@ function shiftMonth(y: number, m: number, n: number): [number, number] {
 }
 
 /** 하단 시트 달력. 오늘부터 앞으로 고를 수 있고 지난 날짜는 비활성 */
-export function DatePickerSheet({ mode, initial, onClose, onConfirm }: Props) {
+export function DatePickerSheet({ initial, onClose, onConfirm }: Props) {
   const today = kstNow().date;
   const [pending, setPending] = useState(initial);
   const [[year, month], setMonth] = useState<[number, number]>(() => [
@@ -32,8 +28,6 @@ export function DatePickerSheet({ mode, initial, onClose, onConfirm }: Props) {
   ]);
   const titleId = useId();
   const sheetRef = useRef<HTMLDivElement>(null);
-  const weatherEnd = addDays(today, WEATHER_DAYS);
-  const showDots = mode === 'api';
   const atFirstMonth = `${year}-${String(month).padStart(2, '0')}` <= ym(today);
 
   // 열리면 고른 날짜(없으면 오늘) 칸으로 포커스
@@ -131,19 +125,10 @@ export function DatePickerSheet({ mode, initial, onClose, onConfirm }: Props) {
                 onClick={() => setPending(d)}
               >
                 <span className={styles.dayNum}>{Number(d.slice(8))}</span>
-                {showDots && d >= today && d <= weatherEnd && (
-                  <span className={styles.dot} data-testid="weather-dot" aria-hidden="true" />
-                )}
               </button>
             ),
           )}
         </div>
-        {showDots && (
-          <p className={styles.note}>
-            <span className={styles.dot} aria-hidden="true" />점 = 날씨 반영 기간 (오늘 ~{' '}
-            {shortLabel(weatherEnd)})
-          </p>
-        )}
         <button type="button" className={styles.confirm} onClick={() => onConfirm(pending)}>
           {chipLabel(pending)} 보기
         </button>

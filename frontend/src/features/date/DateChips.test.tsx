@@ -23,25 +23,10 @@ async function openSheet(mode: 'snapshot' | 'api') {
   return screen.getByRole('dialog', { name: '날짜 선택' });
 }
 
-describe('달력의 날씨 반영 점', () => {
-  it('api 모드는 오늘부터 5일 뒤까지 6칸에 점을 찍는다', async () => {
-    const sheet = await openSheet('api');
-    const dotted = within(sheet)
-      .getAllByTestId('weather-dot')
-      .map((d) => d.closest('button')!.getAttribute('aria-label'));
-    expect(dotted).toEqual([
-      '17, 10월 17일 (토)',
-      '18, 10월 18일 (일)',
-      '19, 10월 19일 (월)',
-      '20, 10월 20일 (화)',
-      '21, 10월 21일 (수)',
-      '22, 10월 22일 (목)',
-    ]);
-    expect(within(sheet).getByText('점 = 날씨 반영 기간 (오늘 ~ 10월 22일)')).toBeInTheDocument();
-  });
-
-  it('snapshot 모드는 점을 찍지 않는다', async () => {
-    const sheet = await openSheet('snapshot');
+// 백엔드 기상은 AWS 관측 기반이라 미래 날짜의 날씨를 반영하지 않는다. 그래서 두 모드 모두 점을 찍지 않는다.
+describe('달력의 날씨 점', () => {
+  it.each(['api', 'snapshot'] as const)('%s 모드는 점을 찍지 않는다', async (mode) => {
+    const sheet = await openSheet(mode);
     expect(within(sheet).queryAllByTestId('weather-dot')).toHaveLength(0);
     expect(within(sheet).queryByText(/점 =/)).toBeNull();
   });

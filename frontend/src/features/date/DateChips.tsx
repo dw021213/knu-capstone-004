@@ -6,6 +6,12 @@ import { chipLabel, kstNow } from './kst';
 import { useSelectedDate } from './useSelectedDate';
 import styles from './DateChips.module.css';
 
+// 배포본은 날씨를 반영하지 않는다. api 모드의 기상 가산은 AWS 관측 기반이라 미래 날짜에는 들어가지 않는다
+const NOTICE: Record<DataSource['mode'], string> = {
+  snapshot: '날씨 미반영 · 공간 점수는 날짜와 무관',
+  api: '날씨는 오늘 관측값만 반영',
+};
+
 /** 지도 아래 '오늘 / 날짜 선택' 칩. 날짜 선택은 달력 시트로 연다 */
 export function DateChips({ mode }: { mode: DataSource['mode'] }) {
   const { date, isToday, setDate } = useSelectedDate();
@@ -20,10 +26,7 @@ export function DateChips({ mode }: { mode: DataSource['mode'] }) {
 
   return (
     <div className={styles.bar} data-testid="date-bar">
-      {/* 배포본은 날씨를 반영하지 않는다(api 모드는 백엔드 기상 가산이 들어간 값) */}
-      {mode === 'snapshot' && (
-        <p className={styles.notice}>날씨 미반영 · 공간 점수는 날짜와 무관</p>
-      )}
+      <p className={styles.notice}>{NOTICE[mode]}</p>
       <div className={styles.chips} role="group" aria-label="날짜">
         <button
           type="button"
@@ -48,7 +51,6 @@ export function DateChips({ mode }: { mode: DataSource['mode'] }) {
       </div>
       {open && (
         <DatePickerSheet
-          mode={mode}
           initial={date}
           onClose={close}
           onConfirm={(d) => {

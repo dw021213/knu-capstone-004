@@ -103,7 +103,6 @@
 }
 
 .day {
-  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -147,32 +146,6 @@
 
 .dayNum {
   line-height: 1;
-}
-
-.dot {
-  display: inline-block;
-  width: var(--space-1);
-  height: var(--space-1);
-  border-radius: var(--radius-full);
-  background: currentColor;
-}
-
-.day .dot {
-  position: absolute;
-  bottom: var(--space-1);
-}
-
-.note {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: var(--space-3) 0 0;
-  font-size: var(--text-xs);
-  color: var(--ink2);
-}
-
-.note .dot {
-  background: var(--ink);
 }
 
 .confirm {
