@@ -240,3 +240,44 @@ test('셀을 고르기 전에는 시설 파일을 받지 않고, 시트를 열�
     .poll(() => [...poi].sort())
     .toEqual(['cctv', 'convenience', 'er', 'fire', 'lodging', 'police']);
 });
+
+test('시설 카드와 셀 시트는 함께 보이지 않는다: 카드가 뜨면 시트를 숨기고 카드를 닫으면 같은 셀 시트가 다시 보인다', async ({
+  page,
+}) => {
+  const hall = latLngToCell(CITY_HALL[1], CITY_HALL[0], 8);
+  await openMap(page);
+  await clickCell(page, hall);
+  await expect(sheet(page)).toBeVisible();
+  const sheetBox = (await sheet(page).boundingBox())!;
+
+  await page.getByRole('button', { name: /^레이어/ }).click();
+  await page.getByRole('switch', { name: '119안전센터' }).click();
+  await page.getByRole('button', { name: /^레이어/ }).click();
+  await expect
+    .poll(async () => (await page.evaluate(() => window.__mapDebug!.markers())).length)
+    .toBeGreaterThan(0);
+  const list = await page.evaluate(() => window.__mapDebug!.markers());
+  const vp = page.viewportSize()!;
+  const m = list.find(
+    (i) =>
+      i.kind === 'marker' &&
+      i.x > 40 &&
+      i.x < vp.width - 40 &&
+      i.y > 160 &&
+      i.y < sheetBox.y - 20 &&
+      list.every((o) => o === i || Math.hypot(o.x - i.x, o.y - i.y) > 30),
+  )!;
+  expect(m).toBeDefined();
+  await page.mouse.click(m.x, m.y);
+  const card = page.getByTestId('poi-card');
+  await expect(card).toBeVisible();
+  await expect(sheet(page)).toBeHidden();
+  // 선택은 그대로라 카드에 셀 중심에서의 거리가 나온다
+  await expect(page.getByTestId('selected-cell')).toHaveText(hall);
+  await expect(card.getByTestId('poi-distance')).toBeVisible();
+
+  await card.getByRole('button', { name: '닫기' }).click();
+  await expect(card).toBeHidden();
+  await expect(sheet(page)).toBeVisible();
+  await expect(sheet(page).getByTestId('sheet-badge')).toHaveText('5 · 매우 높음');
+});
