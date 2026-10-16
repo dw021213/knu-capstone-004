@@ -24,7 +24,7 @@ export function courseReason(s: CourseSummary): string {
   ];
   if (s.noDataRatio > 0) {
     parts.push(
-      `도로 자료가 확인되지 않은 구간(${pct(s.noDataRatio)}%)은 등급 계산에서 빠졌어요. ${missing}`,
+      `도로 자료가 확인되지 않은 구간(${pct(s.noDataRatio) < 1 ? '1% 미만' : `${pct(s.noDataRatio)}%`})은 등급 계산에서 빠졌어요. ${missing}`,
     );
   }
   return parts.join(' ');

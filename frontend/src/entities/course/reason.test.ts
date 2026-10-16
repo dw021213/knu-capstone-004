@@ -52,6 +52,12 @@ describe('courseReason', () => {
     );
   });
 
+  it('데이터 부족 구간이 아주 짧으면 0%가 아니라 1% 미만이라고 한다', () => {
+    const text = courseReason(summary({ noDataRatio: 0.004 }));
+    expect(text).toContain('도로 자료가 확인되지 않은 구간(1% 미만)은 등급 계산에서 빠졌어요.');
+    expect(text).not.toContain('(0%)');
+  });
+
   it('모든 구간이 데이터 부족이면 등급을 정하지 못했다고 한다', () => {
     expect(courseReason(summary({ level: null, caution: [], cautionKm: 0, noDataRatio: 1 }))).toBe(
       '이 코스가 지나는 구간 모두 도로 자료가 확인되지 않아 코스 등급을 정하지 못했어요. 위험하지 않다는 뜻은 아니에요.',
