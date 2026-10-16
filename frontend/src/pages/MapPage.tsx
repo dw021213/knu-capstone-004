@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dataSource } from '../data';
+import { Legend } from '../features/legend/Legend';
 import { MapView } from '../features/map/MapView';
 import styles from './MapPage.module.css';
 
@@ -24,6 +25,7 @@ export function MapPage() {
             </span>
           </div>
         </header>
+        <Legend mode={dataSource.mode} />
       </div>
       {/* 셀 시트(U6) 전까지 선택 결과를 e2e와 보조기기에 알린다 */}
       <output className="sr-only" data-testid="selected-cell">
