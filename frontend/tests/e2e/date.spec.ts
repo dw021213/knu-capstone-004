@@ -137,7 +137,7 @@ test('@desktop 데스크톱에서도 날짜 칩이 지도 아래쪽 가운데에
 
 for (const tag of ['', '@desktop ']) {
   test(`${tag}배포본(snapshot)은 칩 바로 위에 날씨 미반영 안내를 보인다`, async ({ page }) => {
-    const notice = page.getByText('날씨 미반영 · 공간 점수는 날짜와 무관');
+    const notice = page.getByText('날씨 미반영 · 공간 점수는 날짜와 무관', { exact: true });
     await expect(notice).toBeVisible();
     const n = (await notice.boundingBox())!;
     const chips = (await bar(page).getByRole('group', { name: '날짜' }).boundingBox())!;

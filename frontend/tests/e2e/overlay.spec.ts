@@ -80,7 +80,7 @@ for (const tag of ['', '@desktop ']) {
     await expectBlocks(page, [
       legend.getByText('보통', { exact: true }),
       bar.getByRole('button', { name: '오늘' }),
-      page.getByText('날씨 미반영 · 공간 점수는 날짜와 무관'),
+      page.getByText('날씨 미반영 · 공간 점수는 날짜와 무관', { exact: true }),
       page.getByTestId('risk-tabs'),
     ]);
   });
@@ -119,7 +119,9 @@ for (const tag of ['', '@desktop ']) {
 
 test('날짜 칩 영역의 빈 곳(안내 옆)은 지도로 통과한다', async ({ page }) => {
   await zoomIntoLand(page);
-  const n = (await page.getByText('날씨 미반영 · 공간 점수는 날짜와 무관').boundingBox())!;
+  const n = (await page
+    .getByText('날씨 미반영 · 공간 점수는 날짜와 무관', { exact: true })
+    .boundingBox())!;
   const vp = page.viewportSize()!;
   const x = n.x + n.width + 40;
   expect(x).toBeLessThan(vp.width - 20);
