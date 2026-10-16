@@ -58,6 +58,12 @@ describe('buildMarkerLayout', () => {
     expect(items[0]).toMatchObject({ id: 'cctv-0', x: 10, y: 25 });
   });
 
+  it('줌 경계: 12.9는 클러스터, 13은 개별 마커', () => {
+    const kinds = (z: number) => new Set(buildMarkerLayout([cctv])(ctx(z)).map((i) => i.kind));
+    expect(kinds(12.9).has('cluster')).toBe(true);
+    expect([...kinds(13)]).toEqual(['marker']);
+  });
+
   it('끌어도(x, y만 바뀜) 묶음 구성이 같다', () => {
     const pts = Array.from({ length: 80 }, (_, i): [number, number] => [
       100 + ((i * 37) % 200),
