@@ -45,7 +45,13 @@ export interface MapViewProps {
   focus?: MapFocus | null;
   /** 지도 위 검색·날짜 칩이 가리는 위·아래 높이. 첫 화면은 그 사이 가운데에 본섬을 둔다 */
   insets?: Insets | null;
+  /** 지도에 찍을 위치 점. me: 내 위치, fallback: 위치를 못 써서 기준으로 삼은 곳(이름을 붙인다) */
+  location?: MapLocation | null;
 }
+
+export type MapLocation =
+  | { kind: 'me'; lngLat: [number, number] }
+  | { kind: 'fallback'; lngLat: [number, number]; label: string };
 
 export interface MapFocus {
   key: number;
@@ -80,6 +86,7 @@ export function MapView({
   highlight = null,
   focus = null,
   insets = null,
+  location = null,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -411,6 +418,7 @@ export function MapView({
           data-testid="marker-canvas"
           style={canvasTransform ? { transform: canvasTransform } : undefined}
         />
+        {location && view && <LocationMark location={location} view={view} />}
         {overlays}
       </div>
       <p className={styles.attribution}>
@@ -418,6 +426,27 @@ export function MapView({
           {BASEMAP.attribution}
         </a>
       </p>
+    </div>
+  );
+}
+
+/** 위치 점(누르기를 가로채지 않는다). 지금 변환으로 놓아 끄는 동안에도 따라간다 */
+function LocationMark({ location, view }: { location: MapLocation; view: View }) {
+  const [x, y] = lngLatToScreen(view, ...location.lngLat);
+  if (location.kind === 'me') {
+    return (
+      <div
+        className={styles.me}
+        style={{ left: x, top: y }}
+        data-testid="my-location"
+        aria-hidden="true"
+      />
+    );
+  }
+  return (
+    <div className={styles.fallback} style={{ left: x, top: y }} data-testid="fallback-location">
+      <span className={styles.diamond} aria-hidden="true" />
+      <span className={styles.placeLabel}>{location.label}</span>
     </div>
   );
 }

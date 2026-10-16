@@ -100,3 +100,148 @@ test.describe('U7-3 불러오기 실패', () => {
     await expect(page.getByTestId('sheet-badge')).toBeVisible();
   });
 });
+
+const CITY_HALL: [number, number] = [126.5312, 33.4996];
+const SEOGWIPO: [number, number] = [126.56, 33.2539];
+const SEOUL: [number, number] = [126.978, 37.5665];
+
+const project = (page: Page, [lng, lat]: [number, number]) =>
+  page.evaluate(([a, b]) => window.__mapDebug!.project(a, b), [lng, lat] as const);
+const zoomNow = (page: Page) => page.evaluate(() => window.__mapDebug!.zoom());
+
+/** 위치 요청 횟수를 센다(처음 열 때 묻지 않는지 보려고) */
+async function countGeoCalls(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __geoCalls: number };
+    w.__geoCalls = 0;
+    const g = navigator.geolocation;
+    const get = g.getCurrentPosition.bind(g);
+    const watch = g.watchPosition.bind(g);
+    g.getCurrentPosition = (...a: Parameters<Geolocation['getCurrentPosition']>) => {
+      w.__geoCalls++;
+      return get(...a);
+    };
+    g.watchPosition = (...a: Parameters<Geolocation['watchPosition']>) => {
+      w.__geoCalls++;
+      return watch(...a);
+    };
+  });
+}
+const geoCalls = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __geoCalls: number }).__geoCalls);
+
+async function openReady(page: Page) {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__mapReady === true);
+}
+
+const locateButton = (page: Page) => page.getByRole('button', { name: '내 위치' });
+
+test.describe('U7-2 내 위치', () => {
+  test('처음 열 때는 위치를 묻지 않고, 내 위치 버튼은 오른쪽 아래(날짜 칩 위)에 있다', async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ longitude: SEOGWIPO[0], latitude: SEOGWIPO[1] });
+    await countGeoCalls(page);
+    await openReady(page);
+    await page.waitForTimeout(500);
+    expect(await geoCalls(page)).toBe(0);
+    const vp = page.viewportSize()!;
+    const b = (await locateButton(page).boundingBox())!;
+    const bar = (await page.getByTestId('date-bar').boundingBox())!;
+    expect(b.x + b.width).toBeGreaterThan(vp.width - 24);
+    expect(b.y).toBeGreaterThan(vp.height / 2);
+    expect(b.y + b.height).toBeLessThanOrEqual(bar.y);
+    expect(b.height).toBeGreaterThanOrEqual(44);
+    expect(b.width).toBeGreaterThanOrEqual(44);
+  });
+
+  test('허용하면 내 위치로 옮겨 확대하고 위치 점을 그린다', async ({ page, context }) => {
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ longitude: SEOGWIPO[0], latitude: SEOGWIPO[1] });
+    await countGeoCalls(page);
+    await openReady(page);
+    const z0 = await zoomNow(page);
+    await locateButton(page).click();
+    const vp = page.viewportSize()!;
+    await expect.poll(() => zoomNow(page)).toBeGreaterThan(Math.max(12, z0 + 2));
+    await expect
+      .poll(async () => {
+        const [x, y] = await project(page, SEOGWIPO);
+        return Math.hypot(x - vp.width / 2, y - vp.height * 0.4);
+      })
+      .toBeLessThan(2);
+    const dot = page.getByTestId('my-location');
+    await expect(dot).toBeVisible();
+    const d = (await dot.boundingBox())!;
+    const [px, py] = await project(page, SEOGWIPO);
+    expect(Math.abs(d.x + d.width / 2 - px)).toBeLessThan(3);
+    expect(Math.abs(d.y + d.height / 2 - py)).toBeLessThan(3);
+    expect(await geoCalls(page)).toBe(1);
+    // 위치 점은 누르기를 가로채지 않는다(그 자리 셀이 골라진다)
+    await page.mouse.click(px, py);
+    await expect(page.getByTestId('selected-cell')).not.toHaveText('');
+  });
+
+  test('제주 밖이면 안내만 하고 지도를 옮기지 않는다', async ({ page, context }) => {
+    await context.grantPermissions(['geolocation']);
+    await context.setGeolocation({ longitude: SEOUL[0], latitude: SEOUL[1] });
+    await openReady(page);
+    const z0 = await zoomNow(page);
+    const p0 = await project(page, CITY_HALL);
+    await locateButton(page).click();
+    await expect(page.getByRole('status').filter({ hasText: '제주 밖에 있어요' })).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(await zoomNow(page)).toBe(z0);
+    expect(await project(page, CITY_HALL)).toEqual(p0);
+    await expect(page.getByTestId('my-location')).toHaveCount(0);
+  });
+
+  for (const tag of ['', '@desktop ']) {
+    test(`${tag}거부하면 제주시청으로 옮기고 위치 권한 안내 배너를 띄우며, 배너는 닫을 수 있다`, async ({
+      page,
+      context,
+    }) => {
+      await context.grantPermissions([]);
+      await openReady(page);
+      await locateButton(page).click();
+      const banner = page
+        .getByRole('status')
+        .filter({ hasText: '위치 권한을 켜면 내 주변 위험도를 볼 수 있어요' });
+      await expect(banner).toBeVisible();
+      await expect(banner).toContainText('제주시청');
+      const vp = page.viewportSize()!;
+      await expect.poll(() => zoomNow(page)).toBeGreaterThanOrEqual(12);
+      await expect
+        .poll(async () => {
+          const [x, y] = await project(page, CITY_HALL);
+          return Math.hypot(x - vp.width / 2, y - vp.height * 0.4);
+        })
+        .toBeLessThan(2);
+      // 배너가 레이어 버튼·범례를 가리지 않는다(아래로 밀린다)
+      const bb = (await banner.boundingBox())!;
+      const layer = (await page.getByRole('button', { name: /^레이어/ }).boundingBox())!;
+      expect(layer.y).toBeGreaterThanOrEqual(bb.y + bb.height);
+      await page.getByRole('button', { name: /^레이어/ }).click();
+      await expect(page.getByRole('region', { name: '시설 레이어' })).toBeVisible();
+      await page.getByRole('button', { name: /^레이어/ }).click();
+
+      await banner.getByRole('button', { name: '위치 안내 닫기' }).click();
+      await expect(banner).toHaveCount(0);
+    });
+  }
+
+  test('@desktop 내 위치 버튼은 오른쪽 아래에 있고 범례 카드와 겹치지 않는다', async ({ page }) => {
+    await openReady(page);
+    const vp = page.viewportSize()!;
+    const b = (await locateButton(page).boundingBox())!;
+    const l = (await page.getByTestId('legend').boundingBox())!;
+    expect(b.x + b.width).toBeGreaterThan(vp.width * 0.75);
+    expect(b.y).toBeGreaterThan(vp.height / 2);
+    const overlap =
+      b.x < l.x + l.width && l.x < b.x + b.width && b.y < l.y + l.height && l.y < b.y + b.height;
+    expect(overlap).toBe(false);
+  });
+});

@@ -24,6 +24,23 @@
   gap: var(--space-2);
 }
 
+/* 모바일: 날짜 칩(과 셀 시트) 위 오른쪽 끝. 빈 곳은 지도로 통과한다 */
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--space-3);
+}
+
+/* 데스크톱: 오른쪽 아래 범례 카드 왼쪽 */
+@media (min-width: 768px) {
+  .actions {
+    position: absolute;
+    right: calc(var(--space-4) + var(--legend-w, 0px) + var(--space-2));
+    bottom: var(--space-8);
+    padding: 0;
+  }
+}
+
 /* 데스크톱: 셀 패널은 오른쪽, 날짜 칩은 아래 가운데에 따로 놓는다 */
 @media (min-width: 768px) {
   .dock {

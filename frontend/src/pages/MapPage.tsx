@@ -12,7 +12,10 @@ import { LAYER_TYPES, useLayers } from '../features/layers/useLayers';
 import { usePoiLayers } from '../features/layers/usePoiLayers';
 import { Legend } from '../features/legend/Legend';
 import { cellAt } from '../features/map/hitTest';
-import { MapView, type MapFocus } from '../features/map/MapView';
+import { LocateButton } from '../features/locate/LocateButton';
+import { LocationBanner } from '../features/locate/LocationBanner';
+import { CITY_HALL, useMyLocation } from '../features/locate/useMyLocation';
+import { MapView, type MapFocus, type MapLocation } from '../features/map/MapView';
 import type { Insets } from '../features/map/view';
 import { PlaceSearch } from '../features/search/PlaceSearch';
 import { ErrorState } from '../features/status/ErrorState';
@@ -21,6 +24,9 @@ import { cellCenter } from '../shared/geo/h3';
 import type { PoiType } from '../data/types';
 import { useScores } from './useScores';
 import styles from './MapPage.module.css';
+
+/** 내 위치로 옮길 때 맞출 둘레(도). 셀 몇 개가 보이는 줌(14)이 된다 */
+const AROUND = 0.004;
 
 export function MapPage({ source = dataSource }: { source?: DataSource }) {
   const { data: scores, isError, isFetching, refetch } = useScores(source);
@@ -36,6 +42,20 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
   // 검색으로 고른 곳(지도가 옮겨 가 확대한다)
   const [focus, setFocus] = useState<MapFocus | null>(null);
   const { date } = useSelectedDate();
+  // 내 위치: 찾은 곳(또는 제주시청)으로 옮겨 확대한다. 검색과 같은 이동을 쓴다
+  const my = useMyLocation(([lng, lat]) =>
+    setFocus((f) => ({
+      key: (f?.key ?? 0) + 1,
+      bbox: [lng - AROUND, lat - AROUND, lng + AROUND, lat + AROUND],
+      point: [lng, lat],
+    })),
+  );
+  const mapLocation: MapLocation | null =
+    my.state.status === 'me'
+      ? { kind: 'me', lngLat: my.state.lngLat }
+      : my.state.status === 'denied' || my.state.status === 'unavailable'
+        ? { kind: 'fallback', lngLat: CITY_HALL, label: '제주시청' }
+        : null;
   const sheetData = useSheetData(source, target !== null);
   // 마커를 눌러 연 시설 카드
   const [picked, setPicked] = useState<{ type: PoiType; id: string } | null>(null);
@@ -90,15 +110,24 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
     });
   }, []);
 
-  // 데스크톱 오른쪽 패널이 범례 카드를 가리지 않게 범례 높이를 CSS 변수로 넘긴다
+  // 데스크톱 오른쪽 패널·내 위치 버튼이 범례 카드를 가리지 않게 범례 크기를 CSS 변수로 넘긴다.
+  // 상단에 위치 안내 띠가 붙으면 그만큼 레이어 버튼·범례 줄(--overlay-top)을 아래로 민다
   useLayoutEffect(() => {
     const overlay = overlayRef.current;
     const legend = overlay?.querySelector('[data-testid="legend"]');
-    if (!overlay || !legend) return;
+    const header = overlay?.querySelector('header');
+    if (!overlay || !legend || !header) return;
     const ro = new ResizeObserver(() => {
-      overlay.style.setProperty('--legend-h', `${legend.getBoundingClientRect().height}px`);
+      const box = legend.getBoundingClientRect();
+      overlay.style.setProperty('--legend-h', `${box.height}px`);
+      overlay.style.setProperty('--legend-w', `${box.width}px`);
+      overlay.style.setProperty(
+        '--overlay-top',
+        `calc(${header.getBoundingClientRect().height}px + var(--space-3))`,
+      );
     });
     ro.observe(legend);
+    ro.observe(header);
     return () => ro.disconnect();
   }, []);
 
@@ -122,6 +151,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
         highlight={pickedPoi?.id ?? null}
         focus={focus}
         insets={insets}
+        location={mapLocation}
       />
       {/* 지도 위에 얹는 층. MapView 밖(형제)에 두어 여기서 누른 것은 확대·셀 선택으로 가지 않는다 */}
       <div ref={overlayRef} className={styles.overlay} data-testid="map-overlay">
@@ -144,6 +174,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
               종합
             </span>
           </div>
+          {my.noticeOpen && <LocationBanner state={my.state} onClose={my.dismiss} />}
         </header>
         <LayerPanel on={layers.on} toggle={toggle} count={count} states={states} />
         <Legend mode={source.mode} generatedAt={scores?.generatedAt} disabled={loading} />
@@ -151,6 +182,9 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
         {failed && <ErrorState onRetry={() => void refetch()} />}
         {/* 아래 묶음: 셀 시트를 날짜 칩 위에 쌓아 시트를 연 채로도 날짜를 바꿀 수 있다 */}
         <div className={styles.dock}>
+          <div className={styles.actions}>
+            <LocateButton busy={my.state.status === 'locating'} onClick={my.locate} />
+          </div>
           {target && (
             <CellSheet
               target={target}

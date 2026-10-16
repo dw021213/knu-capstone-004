@@ -24,5 +24,5 @@ for (const tag of ['', '@desktop ']) {
 test('동작하지 않는 자리 채우기 컨트롤은 두지 않는다', async ({ page }) => {
   await openMap(page);
   await expect(page.getByRole('textbox')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /내 위치|코스/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /코스/ })).toHaveCount(0);
 });
