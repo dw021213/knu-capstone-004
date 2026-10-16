@@ -263,4 +263,22 @@ test.describe('U9-2 데스크톱 코스 화면', () => {
     await link('제주올레 1코스').focus();
     await expect.poll(marks).toBe(6);
   });
+
+  test('@desktop 1440 상세: 오른쪽 400px 패널이 뒤로 막대 아래부터 바닥까지 붙고 지도 출처는 패널 왼쪽에 보인다', async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(FIXED_NOW);
+    await page.goto('/courses/olle-1');
+    await page.waitForFunction(() => window.__mapReady === true);
+    const sheet = (await page.getByTestId('course-sheet').boundingBox())!;
+    const bar = (await page.getByRole('button', { name: '뒤로' }).boundingBox())!;
+    expect(Math.abs(sheet.width - 400)).toBeLessThan(2);
+    expect(Math.abs(sheet.x + sheet.width - 1440)).toBeLessThan(1);
+    expect(sheet.y).toBeGreaterThanOrEqual(bar.y + bar.height);
+    expect(Math.abs(sheet.y + sheet.height - 900)).toBeLessThan(1);
+    const credit = page.getByRole('link', { name: '© OpenStreetMap contributors' });
+    const c = (await credit.boundingBox())!;
+    expect(c.x + c.width).toBeLessThanOrEqual(sheet.x);
+    await credit.click({ trial: true, timeout: 2000 });
+  });
 });
