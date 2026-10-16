@@ -93,12 +93,30 @@ export const snapshotFireJson = {
   items: [{ id: 'fire-1', type: 'fire', name: '구좌119안전센터', lat: 33.52037, lng: 126.86019 }],
 };
 
+export const snapshotErJson = {
+  type: 'er',
+  status: 'ready',
+  source: '테스트 응급의료기관',
+  fetchedAt: '2026-10-17',
+  items: [
+    {
+      id: 'er-1',
+      type: 'er',
+      name: '제주한라병원',
+      lat: 33.490209,
+      lng: 126.485005,
+      detail: { kind: '권역응급의료센터' },
+    },
+  ],
+};
+
 /** 마지막으로 받은 /api/grid 요청 URL(쿼리 단언용) */
 export const seen: { gridUrl: URL | null } = { gridUrl: null };
 
 export const handlers = [
   http.get(`${SNAPSHOT_BASE}/data/scores.json`, () => HttpResponse.json(snapshotScoresJson)),
   http.get(`${SNAPSHOT_BASE}/data/poi/fire.json`, () => HttpResponse.json(snapshotFireJson)),
+  http.get(`${SNAPSHOT_BASE}/data/poi/er.json`, () => HttpResponse.json(snapshotErJson)),
   // 아직 만들지 않은 시설·코스 파일: Vercel처럼 404
   http.get(`${SNAPSHOT_BASE}/data/poi/:type`, () => new HttpResponse(null, { status: 404 })),
   http.get(`${SNAPSHOT_BASE}/data/courses.json`, () => new HttpResponse(null, { status: 404 })),

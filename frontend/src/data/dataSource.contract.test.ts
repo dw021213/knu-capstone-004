@@ -17,6 +17,7 @@ import {
   gridJson,
   handlers,
   seen,
+  snapshotErJson,
   snapshotScoresJson,
 } from './mocks/backend';
 
@@ -94,6 +95,20 @@ describe.each([
   it('아직 없는 코스 파일은 pending과 빈 목록', async () => {
     const courses = await make().getCourses();
     expect(courses).toMatchObject({ status: 'pending', items: [] });
+  });
+
+  it('응급실은 스냅숏 er.json에서 받는다(백엔드에 응급실이 없음)', async () => {
+    const er = await make().getEmergency();
+    expect(er.status).toBe('ready');
+    expect(er.source).toBe(snapshotErJson.source);
+    expect(er.items).toEqual(snapshotErJson.items);
+  });
+
+  it('응급실 파일이 없으면 pending과 빈 목록', async () => {
+    server.use(
+      http.get(`${SNAPSHOT_BASE}/data/poi/er.json`, () => new HttpResponse(null, { status: 404 })),
+    );
+    expect(await make().getEmergency()).toEqual({ status: 'pending', source: '', items: [] });
   });
 });
 

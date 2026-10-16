@@ -4,6 +4,8 @@ import type {
   CourseFile,
   CourseList,
   DataSource,
+  EmergencyFile,
+  EmergencyList,
   PoiFile,
   PoiLayer,
   PoiType,
@@ -58,6 +60,11 @@ export function createSnapshotSource(base = ''): DataSource {
       const file = await fetchOptionalJson<PoiFile>(`${base}/data/poi/${type}.json`);
       if (!file) return { type, status: 'pending', source: '', items: [] };
       return { type, status: file.status ?? 'ready', source: file.source, items: file.items };
+    },
+    async getEmergency(): Promise<EmergencyList> {
+      const file = await fetchOptionalJson<EmergencyFile>(`${base}/data/poi/er.json`);
+      if (!file) return { status: 'pending', source: '', items: [] };
+      return { status: file.status ?? 'ready', source: file.source, items: file.items };
     },
     async getCourses(): Promise<CourseList> {
       const file = await fetchOptionalJson<CourseFile>(`${base}/data/courses.json`);

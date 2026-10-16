@@ -34,7 +34,7 @@ async function getJson<T>(url: string): Promise<T> {
 /**
  * 백엔드(VITE_API_BASE)를 부른다. 격자 응답에는 도로 출처가 has_road뿐이라
  * 표준노드링크·수치지도 구분은 같은 데이터 버전의 스냅숏 파일에서 붙인다.
- * 백엔드에 없는 시설(119 외)과 코스는 스냅숏 파일을 쓴다.
+ * 백엔드에 없는 시설(119 외), 응급실, 코스는 스냅숏 파일을 쓴다.
  */
 export function createApiSource(apiBase = '', snapshotBase = ''): DataSource {
   const snapshot = createSnapshotSource(snapshotBase);
@@ -77,6 +77,8 @@ export function createApiSource(apiBase = '', snapshotBase = ''): DataSource {
       }));
       return { type, status: 'ready', source: '백엔드 /api/facilities', items };
     },
+    // 백엔드에는 응급실 자료가 없어 같은 스냅숏 파일을 쓴다
+    getEmergency: () => snapshot.getEmergency(),
     getCourses: () => snapshot.getCourses(),
   };
 }
