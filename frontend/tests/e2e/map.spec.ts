@@ -224,3 +224,13 @@ test('@desktop 데이터 부족 셀은 회색 빗금, 등급 셀은 램프 색 0
   const mixed = [r, g, b].map((c) => (c * a) / 255 + 255 * (1 - a / 255));
   mixed.forEach((c, i) => expect(Math.abs(c - (want[i] * 0.5 + 127.5))).toBeLessThanOrEqual(4));
 });
+
+test('지도 오른쪽 아래에 배경 지도 출처를 표기한다', async ({ page }) => {
+  await openMap(page);
+  const credit = page.getByText('© OpenStreetMap contributors © CARTO');
+  await expect(credit).toBeVisible();
+  const box = (await credit.boundingBox())!;
+  const map = (await page.getByTestId('map').boundingBox())!;
+  expect(box.x + box.width).toBeGreaterThan(map.x + map.width - 24);
+  expect(box.y + box.height).toBeGreaterThan(map.y + map.height - 24);
+});

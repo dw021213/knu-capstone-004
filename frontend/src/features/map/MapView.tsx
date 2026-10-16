@@ -194,6 +194,7 @@ export function MapView({ scores, selected = null, onCellSelect, overlays }: Map
         style={canvasTransform ? { transform: canvasTransform } : undefined}
       />
       {overlays}
+      <p className={styles.attribution}>© OpenStreetMap contributors © CARTO</p>
     </div>
   );
 }
