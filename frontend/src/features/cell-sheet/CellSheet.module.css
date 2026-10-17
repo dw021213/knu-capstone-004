@@ -3,16 +3,10 @@
 .sheet {
   --sheet-pad-x: var(--space-4);
   --sheet-pad-bottom: var(--space-4);
+  composes: surface from '../../shared/ui/sheet.module.css';
   max-height: 45dvh;
   margin: 0 var(--space-3);
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: var(--space-1) var(--sheet-pad-x) var(--sheet-pad-bottom);
-  background: var(--white);
-  border: var(--border-strong) solid var(--ink);
-  border-radius: var(--radius-m);
-  color: var(--ink);
-  pointer-events: auto;
 }
 
 /* 데스크톱: 오른쪽 패널(MapPage의 보조 영역)을 가득 채운다 */
@@ -24,8 +18,6 @@
     max-height: none;
     margin: 0;
     padding: var(--space-4) var(--sheet-pad-x) var(--sheet-pad-bottom);
-    border: 0;
-    border-radius: 0;
   }
 }
 
@@ -159,12 +151,8 @@
 
 /* 출처 칩: 줄바꿈 */
 .chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
+  composes: chips from '../../shared/ui/sheet.module.css';
   margin: 0 0 var(--space-3);
-  padding: 0;
-  list-style: none;
 }
 
 /* 모바일: 출처 칩은 한 줄로 두고 옆으로 굴려 주변 시설 표가 시트를 처음 열 때 보이게 한다 */
@@ -188,13 +176,7 @@
 }
 
 .chip {
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-full);
-  background: var(--surf);
-  font-size: var(--text-xs);
-  color: var(--ink2);
-  word-break: keep-all;
+  composes: chip from '../../shared/ui/sheet.module.css';
 }
 
 .table {
