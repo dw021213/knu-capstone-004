@@ -1,0 +1,55 @@
+/* 셀 시트 배지와 같은 모양: 색 칩 + 1.5px 검정 테두리 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: var(--space-8);
+  padding: 0 var(--space-3);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  font-size: var(--text-m);
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.badge[data-size='s'] {
+  min-height: var(--space-6);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.badge[data-level='1'] {
+  background: var(--risk-1);
+}
+.badge[data-level='2'] {
+  background: var(--risk-2);
+}
+.badge[data-level='3'] {
+  background: var(--risk-3);
+}
+.badge[data-level='4'] {
+  background: var(--risk-4);
+}
+.badge[data-level='5'] {
+  background: var(--risk-5);
+  color: var(--white);
+}
+
+.badge[data-level='none'] {
+  gap: var(--space-2);
+  padding-left: var(--space-2);
+  background: var(--white);
+}
+
+.badge[data-level='none']::before {
+  content: '';
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--space-1);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--risk-none) 0 3px,
+    var(--risk-none-hatch) 3px 4px
+  );
+}

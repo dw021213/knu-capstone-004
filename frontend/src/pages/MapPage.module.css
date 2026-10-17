@@ -1,0 +1,231 @@
+.page {
+  /* 상단 영역(검색창 줄 + '종합' 탭 줄 + 아래 선) 높이. MapPage가 잰 값으로 바꾼다 */
+  --header-h: calc(var(--touch) * 2 + var(--space-2) * 2 + 1px);
+  /* 머리글 바로 아래 첫 줄(레이어 버튼, 모바일 범례) */
+  --overlay-top: calc(var(--header-h) + var(--space-3));
+  /* 오른쪽 패널이 가리는 너비. 지도 위 조작과 지도 출처를 그만큼 왼쪽으로 옮긴다 */
+  --panel-offset: 0px;
+  /* 데스크톱 범례 카드 아래 끝. 지도 영역이 좁으면(data-stack) 날짜 칩 묶음 위로 올린다 */
+  --legend-bottom: var(--space-8);
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 지도와 지도 위 조작. 머리글은 이 위에 얹는다(지도는 화면 전체) */
+.main {
+  position: absolute;
+  inset: 0;
+}
+
+/* 지도 위 층: 빈 곳은 지도로 통과시킨다(상속). 보이는 패널만 pointer-events: auto.
+   데스크톱 패널이 열리면 패널 왼쪽 지도 영역만 쓴다 */
+.overlay {
+  position: absolute;
+  inset: 0 var(--panel-offset) 0 0;
+  pointer-events: none;
+}
+
+.page[data-stack='true'] {
+  --legend-bottom: calc(var(--space-8) + var(--date-h, 0px) + var(--space-3));
+}
+
+.page[data-panel='open'] {
+  --panel-offset: var(--panel-size);
+}
+
+/* 데스크톱 셀 패널: 머리글 아래부터 바닥까지 오른쪽에 붙는다. 넘치면 안에서 굴린다 */
+.panel {
+  position: absolute;
+  top: var(--header-h);
+  right: 0;
+  bottom: 0;
+  display: flex;
+  width: var(--panel-size);
+  background: var(--white);
+  border-left: 1px solid var(--line);
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+/* 모바일: 아래쪽에 셀 시트와 날짜 칩을 차례로 쌓는다 */
+.dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 모바일: 날짜 칩(과 셀 시트) 바로 위 한 줄. 왼쪽 '오늘 안전한 코스', 오른쪽 내 위치. 빈 곳은 지도로 통과한다 */
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+}
+
+.underSheet {
+  display: none;
+}
+
+/* 주 버튼: 검정 채움 */
+.courseLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  padding: 0 var(--space-3);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--ink);
+  color: var(--white);
+  font-size: var(--text-s);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.courseLink:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.courseIcon {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.locate {
+  margin-left: auto;
+}
+
+/* 데스크톱: 내 위치는 오른쪽 아래 범례 카드 왼쪽, 코스는 좌상단 레이어 버튼 옆 */
+@media (min-width: 769px) {
+  .actions {
+    padding: 0;
+  }
+
+  /* Figma: 내 위치는 범례 카드 바로 위, 오른쪽 맞춤 */
+  .locate {
+    position: absolute;
+    right: var(--space-4);
+    bottom: calc(var(--legend-bottom) + var(--legend-h, 0px) + var(--space-2));
+  }
+
+  .courseLink {
+    position: absolute;
+    top: var(--overlay-top);
+    left: calc(var(--space-3) + var(--layer-w, 0px) + var(--space-2));
+  }
+
+  .underSheet {
+    display: flex;
+  }
+}
+
+/* 데스크톱: 셀 패널은 오른쪽, 날짜 칩은 아래 가운데에 따로 놓는다 */
+@media (min-width: 769px) {
+  .dock {
+    top: 0;
+  }
+}
+
+.top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* 검색 목록이 레이어 버튼·범례 위에 뜬다 */
+  z-index: 4;
+  background: var(--white);
+  border-bottom: 1px solid var(--line);
+}
+
+/* 모바일: 서비스 이름은 화면 읽기 프로그램에만(맨 위는 검색창) */
+.brand {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.logo {
+  display: none;
+}
+
+/* 데스크톱: 첫 줄에 로고 자리와 서비스 이름, 그 오른쪽에 검색창(400px) */
+@media (min-width: 769px) {
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding-left: var(--space-6);
+  }
+
+  .brand {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    font-size: var(--text-l);
+    font-weight: 700;
+  }
+
+  .logo {
+    display: block;
+    width: calc(var(--space-6) + var(--space-1));
+    height: calc(var(--space-6) + var(--space-1));
+    border-radius: var(--radius-s);
+    background: var(--ink);
+  }
+
+  .search {
+    flex: 0 1 calc(var(--search-w) + var(--space-3) * 2);
+    min-width: 0;
+  }
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-4);
+  padding: 0 var(--space-4);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  font-size: var(--text-s);
+  font-weight: 700;
+  color: var(--ink2);
+}
+
+.tab[aria-current='true'] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+
+@media (min-width: 769px) {
+  .tabs {
+    padding: 0 var(--space-6);
+  }
+}

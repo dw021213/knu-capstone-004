@@ -1,0 +1,119 @@
+/* 지도 아래 하단 시트 모양(날짜 칩 위를 덮는다). 데스크톱은 가운데 카드 */
+.card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: var(--space-2) var(--space-4) var(--space-6);
+  background: var(--white);
+  border-top: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-m) var(--radius-m) 0 0;
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+@media (min-width: 769px) {
+  .card {
+    left: 50%;
+    right: auto;
+    bottom: var(--space-8);
+    width: calc(var(--touch) * 10);
+    translate: -50% 0;
+    border: var(--border-strong) solid var(--ink);
+    border-radius: var(--radius-m);
+  }
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -4px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+.shape {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: var(--ink);
+  stroke: var(--white);
+  stroke-width: 1.5;
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch);
+  height: var(--touch);
+  margin-right: calc(var(--space-2) * -1);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--ink);
+}
+
+.close svg {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-l);
+  font-weight: 700;
+  word-break: keep-all;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-3);
+}
+
+.row {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--text-s);
+}
+
+.row dt {
+  flex-shrink: 0;
+  width: calc(var(--space-8) + var(--space-4));
+  color: var(--ink2);
+}
+
+.row dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.source {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink2);
+  word-break: keep-all;
+}

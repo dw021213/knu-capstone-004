@@ -1,0 +1,49 @@
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+:root {
+  /* 데스크톱 오른쪽 패널 너비: 1024px부터 넓게, 그보다 좁은 태블릿은 좁게 */
+  --panel-size: var(--panel-w-narrow);
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --panel-size: var(--panel-w);
+  }
+}
+
+/* 마우스·손가락으로 열려 스스로 포커스를 받은 시트·카드는 테두리를 그리지 않는다(shared/a11y/inputModality) */
+[data-focus-ring='off'][data-focus-ring]:focus-visible {
+  outline: none;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--white);
+  -webkit-font-smoothing: antialiased;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

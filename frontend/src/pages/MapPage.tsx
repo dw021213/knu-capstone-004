@@ -1,0 +1,315 @@
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { isWide, useWide } from '../app/useBreakpoint';
+import { dataSource, type DataSource } from '../data';
+import { CellSheet, type SheetTarget } from '../features/cell-sheet/CellSheet';
+import { useSheetData } from '../features/cell-sheet/useSheetData';
+import { chipLabel } from '../features/date/kst';
+import { useSelectedDate } from '../features/date/useSelectedDate';
+import { DateChips } from '../features/date/DateChips';
+import { LayerPanel } from '../features/layers/LayerPanel';
+import { buildMarkerLayout } from '../features/layers/markerLayout';
+import { PoiCard } from '../features/layers/PoiCard';
+import { LAYER_TYPES, useLayers } from '../features/layers/useLayers';
+import { usePoiLayers } from '../features/layers/usePoiLayers';
+import { Legend } from '../features/legend/Legend';
+import { cellAt } from '../features/map/hitTest';
+import { LocateButton } from '../features/locate/LocateButton';
+import { LocationBanner } from '../features/locate/LocationBanner';
+import { CITY_HALL, useMyLocation } from '../features/locate/useMyLocation';
+import {
+  MapView,
+  type Cover,
+  type MapFocus,
+  type MapLocation,
+  type MapReveal,
+} from '../features/map/MapView';
+import type { Insets } from '../features/map/view';
+import { PlaceSearch } from '../features/search/PlaceSearch';
+import { ErrorState } from '../features/status/ErrorState';
+import { LoadingBanner } from '../features/status/LoadingBanner';
+import { cellCenter } from '../shared/geo/h3';
+import { SITE_NAME } from '../shared/page/usePageTitle';
+import type { PoiType } from '../data/types';
+import { useScores } from './useScores';
+import styles from './MapPage.module.css';
+
+/** 내 위치로 옮길 때 맞출 둘레(도). 셀 몇 개가 보이는 줌(14)이 된다 */
+const AROUND = 0.004;
+
+export function MapPage({ source = dataSource }: { source?: DataSource }) {
+  const { data: scores, isError, isFetching, refetch } = useScores(source);
+  // 실패: 다시 시도 중이 아닐 때만. 점수가 없는 나머지 동안은 받는 중으로 본다
+  const failed = isError && !isFetching;
+  const loading = !scores && !failed;
+  // 셀 시트 대상: 격자 셀 또는 격자 밖(바다)을 누른 곳
+  const [target, setTarget] = useState<SheetTarget | null>(null);
+  const selected = target?.kind === 'cell' ? target.h3 : null;
+  // 시트를 닫으면 열기 전 포커스로 돌아간다(검색창 등)
+  const returnFocus = useRef<Element | null>(null);
+  // 검색으로 고른 곳(지도가 옮겨 가 확대한다)
+  const [focus, setFocus] = useState<MapFocus | null>(null);
+  const { date } = useSelectedDate();
+  // 내 위치: 찾은 곳(또는 제주시청)으로 옮겨 확대한다. 검색과 같은 이동을 쓴다
+  const my = useMyLocation(([lng, lat]) =>
+    setFocus((f) => ({
+      key: (f?.key ?? 0) + 1,
+      bbox: [lng - AROUND, lat - AROUND, lng + AROUND, lat + AROUND],
+      point: [lng, lat],
+    })),
+  );
+  const mapLocation: MapLocation | null =
+    my.state.status === 'me'
+      ? { kind: 'me', lngLat: my.state.lngLat }
+      : my.state.status === 'denied' || my.state.status === 'unavailable'
+        ? { kind: 'fallback', lngLat: CITY_HALL, label: '제주시청' }
+        : null;
+  const sheetData = useSheetData(source, target !== null);
+  // 마커를 눌러 연 시설 카드
+  const [picked, setPicked] = useState<{ type: PoiType; id: string } | null>(null);
+  const layers = useLayers();
+  const states = usePoiLayers(source, layers.on);
+  const { toggle, off } = layers;
+  // 켜서 받아 보니 아직 자료가 없는 종류는 끈다(패널에는 '준비 중'으로 남는다)
+  const pendingOn = LAYER_TYPES.filter((t) => layers.on.has(t) && states[t].status === 'pending');
+  useEffect(() => {
+    pendingOn.forEach(off);
+  });
+  // 켜고 받은 레이어만 지도에 그린다. 받아 둔 레이어 객체가 같으면 배치 함수도 같다
+  const [l0, l1, l2, l3, l4] = LAYER_TYPES.map((t) => {
+    const st = states[t];
+    return layers.on.has(t) && st.status === 'ready' ? st.layer : null;
+  });
+  const markerLayout = useMemo(
+    () => buildMarkerLayout([l0, l1, l2, l3, l4].filter((l) => l !== null)),
+    [l0, l1, l2, l3, l4],
+  );
+  // 카드: 그 종류를 끄면 닫힌다
+  const pickedState = picked && layers.on.has(picked.type) ? states[picked.type] : null;
+  const pickedLayer = pickedState?.status === 'ready' ? pickedState.layer : null;
+  const pickedPoi = pickedLayer?.items.find((p) => p.id === picked?.id) ?? null;
+
+  const openSheet = (t: SheetTarget) => {
+    if (!target) returnFocus.current = document.activeElement;
+    setTarget(t);
+  };
+  const closeSheet = () => {
+    setTarget(null);
+    const el = returnFocus.current;
+    returnFocus.current = null;
+    if (el instanceof HTMLElement && el !== document.body) {
+      requestAnimationFrame(() => {
+        if (el.isConnected) el.focus();
+      });
+    }
+  };
+
+  // 첫 화면 맞춤: 상단(검색·탭)과 날짜 칩 묶음이 가리는 높이. 지도를 처음 맞추기 전에 잰다
+  const rootRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const [insets, setInsets] = useState<Insets | null>(null);
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const header = headerRef.current;
+    const bar = root?.querySelector('[data-testid="date-bar"]');
+    if (!root || !header || !bar) return;
+    const box = root.getBoundingClientRect();
+    setInsets({
+      top: header.getBoundingClientRect().bottom - box.top,
+      bottom: box.bottom - bar.getBoundingClientRect().top,
+    });
+  }, []);
+
+  // 데스크톱 내 위치 버튼을 범례 카드 바로 위에 두도록 범례 높이를 CSS 변수로 넘긴다.
+  // 상단에 위치 안내 띠가 붙으면 그만큼 레이어 버튼·범례 줄(--overlay-top)을 아래로 민다
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const header = headerRef.current;
+    const legend = root?.querySelector('[data-testid="legend"]');
+    const layer = root?.querySelector('[data-testid="layer-button"]');
+    const area = root?.querySelector('[data-testid="map-overlay"]');
+    const bar = root?.querySelector('[data-testid="date-bar"]');
+    if (!root || !legend || !header || !layer || !area || !bar) return;
+    const ro = new ResizeObserver(() => {
+      const box = legend.getBoundingClientRect();
+      root.style.setProperty('--legend-h', `${box.height}px`);
+      // 데스크톱: 지도 영역(패널 왼쪽)이 좁아 가운데 날짜 칩과 오른쪽 아래 범례가 한 줄에 들지 않으면
+      // 범례(와 그 위 내 위치)를 날짜 칩 묶음 위로 올린다(태블릿, 패널을 연 1024px 등)
+      const chips = bar.getBoundingClientRect();
+      const width = area.getBoundingClientRect().width;
+      const gap = parseFloat(getComputedStyle(root).getPropertyValue('--space-4')) || 0;
+      const fits = width / 2 + chips.width / 2 + gap <= width - gap - box.width;
+      root.style.setProperty('--date-h', `${chips.height}px`);
+      if (isWide() && !fits) root.dataset.stack = 'true';
+      else delete root.dataset.stack;
+      // 데스크톱 '오늘 안전한 코스'를 레이어 버튼 바로 옆에 둔다(켠 개수 배지로 너비가 바뀐다)
+      root.style.setProperty('--layer-w', `${layer.getBoundingClientRect().width}px`);
+      root.style.setProperty('--header-h', `${header.getBoundingClientRect().height}px`);
+    });
+    ro.observe(legend);
+    ro.observe(header);
+    ro.observe(layer);
+    ro.observe(area);
+    ro.observe(bar);
+    return () => ro.disconnect();
+  }, []);
+
+  // 데스크톱: 셀 정보는 머리글 아래 오른쪽 패널(지도 main 밖 보조 영역). 모바일: 날짜 칩 위 카드
+  const wide = useWide();
+
+  // 시트·패널이 가리는 곳과, 새로 고른 곳을 그 밖(보이는 지도 영역)으로 옮기기.
+  // 모바일 시트는 내용이 다 들어오면 커지므로 최대 높이(max-height)로 잰다
+  const [shown, setShown] = useState<{ cover: Cover; reveal: MapReveal | null } | null>(null);
+  const revealedFor = useRef<SheetTarget | null>(null);
+  const revealSeq = useRef(0);
+  const sheetShown = target !== null && pickedPoi === null;
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const header = headerRef.current;
+    const sheetEl = root?.querySelector<HTMLElement>('[data-testid="cell-sheet"]');
+    if (!root || !header || !target || !sheetShown || !sheetEl) {
+      setShown(null);
+      return;
+    }
+    const box = root.getBoundingClientRect();
+    const top = header.getBoundingClientRect().bottom - box.top;
+    const sheet = sheetEl.getBoundingClientRect();
+    let cover: Cover;
+    if (wide) {
+      cover = { top, right: Math.max(0, box.right - sheet.left), bottom: 0 };
+    } else {
+      const maxH = parseFloat(getComputedStyle(sheetEl).maxHeight);
+      const sheetTop = sheet.bottom - Math.max(sheet.height, Number.isFinite(maxH) ? maxH : 0);
+      cover = { top, right: 0, bottom: Math.max(0, box.bottom - sheetTop) };
+    }
+    // 같은 곳 시트를 시설 카드 뒤에서 다시 보일 때는 옮기지 않는다
+    const fresh = revealedFor.current !== target;
+    revealedFor.current = target;
+    if (fresh) revealSeq.current += 1;
+    const point = target.kind === 'cell' ? cellCenter(target.h3) : target.lngLat;
+    setShown({ cover, reveal: { key: revealSeq.current, point } });
+  }, [target, sheetShown, wide]);
+  const sheet = target && (
+    <CellSheet
+      target={target}
+      cell={target.kind === 'cell' ? scores?.cells.get(target.h3) : undefined}
+      mode={source.mode}
+      weather={scores?.weather ?? 'off'}
+      dateLabel={chipLabel(date)}
+      data={sheetData}
+      // 시설 카드와 함께 보이지 않는다: 카드가 떠 있는 동안 숨기고 닫으면 다시 보인다
+      hidden={pickedPoi !== null}
+      onClose={closeSheet}
+    />
+  );
+  // 패널이 열리면 지도 위 조작(범례·날짜 칩·내 위치)과 지도 출처를 패널 왼쪽 영역으로 옮긴다
+  const panelOpen = wide && target !== null && pickedPoi === null;
+
+  const count = LAYER_TYPES.filter(
+    (t) => layers.on.has(t) && states[t].status !== 'pending',
+  ).length;
+
+  return (
+    <div ref={rootRef} className={styles.page} data-panel={panelOpen ? 'open' : undefined}>
+      <header ref={headerRef} className={styles.top}>
+        <div className={styles.bar}>
+          {/* 모바일은 화면 맨 위가 검색창이라 이름을 숨기고, 데스크톱은 로고 자리와 함께 보인다 */}
+          <h1 className={styles.brand}>
+            <span className={styles.logo} aria-hidden="true" />
+            {SITE_NAME}
+          </h1>
+          <div className={styles.search}>
+            <PlaceSearch
+              onPick={(item, input) => {
+                setFocus((f) => ({ key: (f?.key ?? 0) + 1, bbox: item.bbox, point: item.center }));
+                setPicked(null);
+                // 고른 곳의 셀 시트를 연다. 시트를 닫으면 검색창으로 돌아온다
+                const [lng, lat] = item.center;
+                if (!scores) return;
+                const h3 = cellAt(lng, lat, scores.cells);
+                returnFocus.current = input;
+                setTarget(h3 ? { kind: 'cell', h3 } : { kind: 'sea', lngLat: item.center });
+              }}
+            />
+          </div>
+        </div>
+        {/* 위험 종류 탭 자리. 지금은 '종합' 하나라 선택된 라벨로 둔다 */}
+        <div className={styles.tabs} data-testid="risk-tabs" role="group" aria-label="위험 종류">
+          <span className={styles.tab} aria-current="true">
+            종합
+          </span>
+        </div>
+        {my.noticeOpen && <LocationBanner state={my.state} onClose={my.dismiss} />}
+      </header>
+      <main className={styles.main} aria-label="지도">
+        <MapView
+          scores={scores}
+          selected={selected}
+          onCellSelect={(h3, lngLat) => {
+            // 점수가 없으면(받는 중·실패) 셀인지 바다인지 모르므로 시트를 열지 않는다
+            if (!scores) return;
+            setPicked(null);
+            openSheet(h3 ? { kind: 'cell', h3 } : { kind: 'sea', lngLat });
+          }}
+          markers={markerLayout}
+          onMarkerSelect={(type, id) => setPicked({ type: type as PoiType, id })}
+          highlight={pickedPoi?.id ?? null}
+          focus={focus}
+          insets={insets}
+          cover={shown?.cover ?? null}
+          reveal={shown?.reveal ?? null}
+          location={mapLocation}
+        />
+        {/* 지도 위에 얹는 층. MapView 밖(형제)에 두어 여기서 누른 것은 확대·셀 선택으로 가지 않는다 */}
+        <div className={styles.overlay} data-testid="map-overlay">
+          <LayerPanel on={layers.on} toggle={toggle} count={count} states={states} />
+          <Legend
+            mode={source.mode}
+            generatedAt={scores?.generatedAt}
+            disabled={loading}
+            weather={scores?.weather}
+          />
+          {loading && <LoadingBanner />}
+          {failed && <ErrorState onRetry={() => void refetch()} />}
+          {/* 아래 묶음: 셀 시트를 날짜 칩 위에 쌓아 시트를 연 채로도 날짜를 바꿀 수 있다 */}
+          <div className={styles.dock}>
+            {/* 모바일에서 셀 시트를 열면 지도를 덜 가리도록 숨긴다(데스크톱은 시트가 오른쪽 패널이라 그대로) */}
+            <div className={target ? `${styles.actions} ${styles.underSheet}` : styles.actions}>
+              {/* 모바일은 날짜 칩 위 왼쪽, 데스크톱은 좌상단 레이어 버튼 옆 */}
+              <Link to="/courses" className={styles.courseLink}>
+                <svg className={styles.courseIcon} viewBox="0 0 16 16" aria-hidden="true">
+                  <circle cx="3.5" cy="12.5" r="1.75" />
+                  <circle cx="12.5" cy="3.5" r="1.75" />
+                  <path d="M5.25 12.5h4a2.25 2.25 0 0 0 0-4.5h-2.5a2.25 2.25 0 0 1 0-4.5h4" />
+                </svg>
+                오늘 안전한 코스
+              </Link>
+              <div className={styles.locate}>
+                <LocateButton busy={my.state.status === 'locating'} onClick={my.locate} />
+              </div>
+            </div>
+            {!wide && sheet}
+            <DateChips mode={source.mode} disabled={loading} weather={scores?.weather} />
+          </div>
+          {pickedPoi && pickedLayer && (
+            <PoiCard
+              poi={pickedPoi}
+              layer={pickedLayer}
+              from={selected ? cellCenter(selected) : null}
+              onClose={() => setPicked(null)}
+            />
+          )}
+        </div>
+        {/* 선택한 셀 id(e2e·디버그용). 바다를 누르면 비운다 */}
+        <output className="sr-only" data-testid="selected-cell">
+          {selected ?? ''}
+        </output>
+      </main>
+      {wide && sheet && (
+        <aside className={styles.panel} aria-label="선택한 곳 정보" hidden={!panelOpen}>
+          {sheet}
+        </aside>
+      )}
+    </div>
+  );
+}

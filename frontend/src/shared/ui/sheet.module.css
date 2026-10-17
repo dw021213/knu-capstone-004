@@ -1,0 +1,38 @@
+/* 지도 위 시트(모바일 카드, 데스크톱 오른쪽 패널) 공용 겉모습. 셀 시트와 코스 상세가 composes로 쓴다 */
+.surface {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--white);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-m);
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+/* 데스크톱: 화면 높이를 다 쓰는 패널. 높이 제한(max-height)과 왼쪽 선은 쓰는 쪽이 정한다 */
+@media (min-width: 769px) {
+  .surface {
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+/* 출처 칩 목록 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surf);
+  font-size: var(--text-xs);
+  color: var(--ink2);
+  word-break: keep-all;
+}

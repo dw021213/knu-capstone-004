@@ -1,0 +1,60 @@
+.row {
+  border-bottom: 1px solid var(--line);
+}
+
+.link {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--touch);
+  padding: var(--space-4) var(--space-4);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-m);
+  font-weight: 700;
+}
+
+.meta {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-s);
+  color: var(--ink2);
+  font-variant-numeric: tabular-nums;
+}
+
+.line {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-s);
+  word-break: keep-all;
+}
+
+.noData {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}
+
+.chevron {
+  flex-shrink: 0;
+  align-self: center;
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

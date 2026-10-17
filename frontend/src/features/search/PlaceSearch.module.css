@@ -1,0 +1,109 @@
+/* 상단 첫 줄 검색창. 보조 입력: 흰 바탕 + 1.5px 검정 테두리 */
+.root {
+  position: relative;
+  padding: var(--space-2) var(--space-3);
+}
+
+.icon {
+  position: absolute;
+  left: calc(var(--space-3) + var(--space-3));
+  top: 50%;
+  width: var(--space-4);
+  height: var(--space-4);
+  translate: 0 -50%;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.input {
+  display: block;
+  width: 100%;
+  height: var(--touch);
+  padding: 0 var(--space-3) 0 calc(var(--space-3) + var(--space-4) + var(--space-2));
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-m);
+}
+
+.input::placeholder {
+  color: var(--ink2);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* 결과 목록: 입력창 바로 아래, 범례·레이어 버튼 위에 뜬다 */
+.list {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  top: calc(100% - var(--space-1));
+  z-index: 5;
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+  background: var(--white);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--touch);
+  padding: 0 var(--space-3);
+  font-size: var(--text-m);
+  cursor: pointer;
+}
+
+/* 고른 줄: 검정 채움 */
+.option[aria-selected='true'] {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.option:hover:not([aria-selected='true']) {
+  background: var(--surf);
+}
+
+.name {
+  font-weight: 700;
+}
+
+.sgg {
+  font-size: var(--text-s);
+  color: inherit;
+}
+
+.empty {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  top: calc(100% - var(--space-1));
+  z-index: 5;
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--white);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  font-size: var(--text-s);
+  color: var(--ink);
+}
+
+/* 모바일: 안내는 검색창 아래 제자리에 두어 바로 아래 '종합' 탭 라벨을 덮지 않는다(탭 줄이 잠시 내려간다) */
+@media (max-width: 768px) {
+  .empty {
+    position: static;
+    margin-top: var(--space-2);
+  }
+}

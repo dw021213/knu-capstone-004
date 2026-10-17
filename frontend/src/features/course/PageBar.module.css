@@ -1,0 +1,48 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: calc(var(--touch) + var(--space-2));
+  padding: 0 var(--space-3) 0 var(--space-1);
+  background: var(--white);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.back:focus-visible {
+  outline: 2px solid var(--ink);
+}
+
+.back svg {
+  width: var(--space-6);
+  height: var(--space-6);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.title {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-l);
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
