@@ -2,7 +2,7 @@
 
 Go(Gin) + PostGIS + Uber H3(res 8, 3,651셀). 셀별 위험도를 계산해 API와 지도(`web/index.html`)로 제공한다.
 
-- 위험도 = 0.8 × 위해도(교통사고 도로 모델 백분위) + 0.2 × 고립도(시간대별 유동인구가 적을수록 높음) + 기상 가산(최대 0.3)
+- 위험도 = 교통사고 도로 모델 위험점수 + 기상 가산(호우 경보급일 때 +0.15). 유동인구는 2026-10-17 제외
 - 프론트 연동 API: [`docs/FRONTEND_API.md`](docs/FRONTEND_API.md)
 - 결정 사항·진행 기록: [`ROADMAP.md`](ROADMAP.md)
 

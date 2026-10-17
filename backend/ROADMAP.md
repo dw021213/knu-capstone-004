@@ -332,6 +332,9 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 2026-10-17: 시설 POI 5종(CCTV 1,291·편의점 1,300·숙박 1,153·경찰 25·응급실 6)을 프론트 POI 파일에서 facility 로 적재(`etl poi`, migration 012: ext_id·detail·source, (type, ext_id) 고유) → 셀별 통계 6종.
   `/api/grid` 에 base_hazard_percentile·base_hazard_level·road_source·facility_counts 추가, `/api/facilities` 에 detail·source·ext_id.
   서버 기동 시 최근 24시간 기상 백필. `db-dump.sh --deploy`(weather_obs 내용 제외, 19MB). 운영은 실시간 기상만 쓰기로.
+- 2026-10-17: **유동인구 완전 제외 (`traffic_weather_v1`)**. 최종 = min(1, 모델 위험점수(hazard_score 백분위 평균/100) + 기상 가산).
+  API: risk_* = 가산 반영, base_* = 가산 전 (짝), hazard_* 는 risk_* 와 같은 값으로 호환용 유지. isolation·population·hourly·condition·hour 삭제.
+  risk_combined·유동인구 표는 DB 에 남아 있지만 API 가 안 씀(배포 덤프에서 내용 제외). 확인용 지도에서 유동인구 UI 삭제. frontend/ 는 건드리지 않음.
 
 ## ▶ 현재 상태 요약 (2026-10-13, 이어서 작업할 때 여기부터)
 - **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (push 완료, main 미병합). 옛 `종프/back` 은 백업

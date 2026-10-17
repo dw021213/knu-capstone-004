@@ -38,36 +38,12 @@ func (h *Handler) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-const riskLegend = "제주 상대 위험 순위 (모든 시간대 공통 기준)"
+const riskLegend = "제주 상대 위험 순위 (도로 격자 기준)"
 
-// slotOf 는 ?condition=&hour= 를 읽는다. 없으면 at(기본 지금) 시각 기준(요일 구분, 그 시간대).
-// 잘못된 값이면 400 을 쓰고 ok=false.
-func slotOf(c *gin.Context, at time.Time) (condition string, hour int, auto bool, ok bool) {
-	condition, hour = risk.DefaultSlot(at)
-	auto = true
-	if v := c.Query("condition"); v != "" {
-		if _, found := risk.ConditionByKey(v); !found {
-			keys := make([]string, 0, len(risk.Conditions))
-			for _, k := range risk.Conditions {
-				keys = append(keys, k.Key)
-			}
-			c.JSON(http.StatusBadRequest, gin.H{"error": "condition 은 " + strings.Join(keys, "|")})
-			return "", 0, false, false
-		}
-		condition, auto = v, false
-	}
-	if v := c.Query("hour"); v != "" {
-		h, err := strconv.Atoi(v)
-		if err != nil || h < 0 || h > 23 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "hour 는 0~23"})
-			return "", 0, false, false
-		}
-		hour, auto = h, false
-	}
-	return condition, hour, auto, true
-}
+// Version 은 응답의 위험도 산출 방식. 2026-10-17 유동인구(고립도)를 빼고 모델 위험점수 + 기상 가산만 쓴다.
+const Version = "traffic_weather_v1"
 
-// GET /api/risk/meta — 최종 위험도 계산 방식, 들어간 위험 모델, 유동인구 출처, 등급 구간, 제한사항
+// GET /api/risk/meta — 최종 위험도 계산 방식, 들어간 위험 모델, 등급 구간, 기상 기준, 제한사항
 func (h *Handler) riskMeta(c *gin.Context) {
 	type hazardInfo struct {
 		Hazard       string          `json:"hazard"`
@@ -94,14 +70,8 @@ func (h *Handler) riskMeta(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	var popStdYM *string
-	if err := h.DB.QueryRow(c, `SELECT min(std_ym) FROM population_source`).Scan(&popStdYM); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defCond, defHour := risk.DefaultSlot(time.Now())
 	var computedAt *time.Time
-	if err := h.DB.QueryRow(c, `SELECT max(computed_at) FROM risk_combined`).Scan(&computedAt); err != nil {
+	if err := h.DB.QueryRow(c, `SELECT max(loaded_at) FROM hazard_meta`).Scan(&computedAt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -110,41 +80,32 @@ func (h *Handler) riskMeta(c *gin.Context) {
 		levels = append(levels, gin.H{"level": b.Level, "label": b.Label, "min_percentile": b.MinPercentile})
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"version":         risk.Version,
+		"version":         Version,
 		"computed_at":     computedAt,
 		"legend":          riskLegend,
-		"formula":         "최종 = 0.8 × 위해도(가용 위험 모델 백분위 평균) + 0.2 × 고립도(1 − 유동인구 백분위). 고립도·최종 순위는 모든 조건·시간대·셀을 한 줄로 세운 공통 기준",
-		"weights":         gin.H{"hazard": risk.WeightHazard, "isolation": risk.WeightIsolation},
+		"formula":         "최종 = min(1, 모델 위험점수 + 기상 가산). 모델 위험점수 = 위험 모델 백분위/100 (현재 교통사고 도로 모델 하나). 순위는 가산 전 모델 점수 분포에 대어 다시 매김",
+		"fields":          "risk_* = 기상 가산 반영(지도 색), base_* = 가산 전 모델 점수, weather_bonus = 가산점",
 		"hazards":         hazards,
 		"hazards_planned": risk.Hazards,
-		"population": gin.H{
-			"source":     "제주도민 250m 격자 시간대별 유동인구",
-			"std_ym":     popStdYM,
-			"assumption": "2015년 1월 제주도민 시간대별 유동인구(하루 평균으로 환산)를 현재 패턴으로 가정 (관광객 미포함)",
-			"per_day":    "원본은 조건별 월 합계라 2015-01 달력 일수(전체 31·평일 16·휴일 10·휴일전날 5)로 나눔. 날씨 조건은 일수 자료가 없어 섬 전체 하루 인구를 '전체'와 같게 맞춤",
-		},
-		"conditions": risk.Conditions,
-		"hours":      gin.H{"min": 0, "max": 23},
-		"default_slot": gin.H{
-			"condition": defCond, "hour": defHour,
-			"rule": "condition·hour 를 안 주면 at(기본 지금) 한국 시각: 토·일=holiday, 금=preholiday, 그 외=weekday (공휴일 미반영)",
-		},
-		"levels":             levels,
-		"weather":            h.weatherMeta(c),
-		"no_data":            "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_* 가 null. 안전으로 표시하지 않는다",
-		"isolation_toggle":   "유동인구(고립도) 반영: risk_percentile·risk_level / 끔(위해도만): hazard_percentile·hazard_level",
-		"default_population": false, // 2026-10-15 기본 표시는 유동인구 끔(hazard_*). 사고 빈도와 고립도 방향이 반대라 근거가 약함
+		"levels":          levels,
+		"weather":         h.weatherMeta(c),
+		"no_data":         "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_*·base_* 가 null. 안전으로 표시하지 않는다",
 		"notes": []string{
-			"risk_percentile 은 모든 조건·시간대·셀을 통틀어 매긴 상대 순위이며 사고 확률이 아니다. 시간대끼리 비교 가능(새벽이 낮보다 높게 나옴)",
-			"위해도(도로 모델)는 고정, 고립도만 유동인구 조건·시간대에 따라 바뀐다. 실시간 관측이 아니라 2015-01 패턴이다",
-			"hazard_percentile·hazard_level(유동인구 끔)은 도로 셀끼리의 순위로 시간대와 무관",
+			"risk_percentile 은 도로 격자끼리의 상대 순위이며 사고 확률이 아니다",
+			"모델 위험점수는 날짜와 무관한 고정값이고, 시간에 따라 바뀌는 것은 at 시각의 기상 관측 기반 가산뿐이다 (예측 아님)",
+			"유동인구(고립도)는 2026-10-17 제외 (2021 사고 자료에서 '한산할수록 위험' 효과 없음)",
+			"hazard_percentile·hazard_level 은 risk_percentile·risk_level 과 같은 값 (예전 프론트 호환용, 새 코드는 risk_* 사용)",
 		},
 	})
 }
 
-// 셀별 최종 위험도·구성요소 + 119 정보 (+ 백엔드 테스트용 더미 값). $1~$4 가 NULL 이면 전체.
+// 셀별 최종 위험도(모델 위험점수 + 기상 가산) + 시설·119 정보 (+ 백엔드 테스트용 더미 값). $1~$4 가 NULL 이면 전체.
 const gridSQL = `
-WITH dummy AS (
+WITH hz AS (
+  -- 모델 위험점수: 입력자료가 있는 위험 모델 백분위의 평균 (현재 교통사고 하나)
+  SELECT h3_index, avg(percentile) / 100 AS score, array_agg(hazard ORDER BY hazard) AS used
+  FROM hazard_score WHERE available AND percentile IS NOT NULL GROUP BY h3_index
+), dummy AS (
   SELECT DISTINCT ON (h3_index) h3_index, score, level
   FROM risk_score
   ORDER BY h3_index, ts DESC
@@ -161,9 +122,8 @@ WITH dummy AS (
 )
 SELECT json_build_object(
   'type', 'FeatureCollection',
-  'risk', json_build_object('version', $5::text, 'legend', $6::text,
-                            'condition', $7::text, 'hour', $8::int, 'auto_slot', $9::boolean),
-  'weather', $11::jsonb,
+  'risk', json_build_object('version', $5::text, 'legend', $6::text),
+  'weather', $8::jsonb,
   'features', COALESCE(json_agg(json_build_object(
     'type', 'Feature',
     -- D3(d3-geo)는 바깥 고리가 시계 방향이어야 해서 CW 로 내보낸다. Leaflet 은 방향과 무관.
@@ -173,22 +133,18 @@ SELECT json_build_object(
       'risk_score', round(adj.s::numeric, 4),
       'risk_percentile', round(adj.pct::numeric, 2),
       'risk_level', adj.lvl,
-      'hazard', round(rc.hazard::numeric, 4),
-      'hazard_percentile', round(adj.hpct::numeric, 2),
-      'hazard_level', adj.hlvl,
-      'base_percentile', round(rc.percentile::numeric, 2),
-      'base_level', rc.level,
-      'base_hazard_percentile', round(rc.hazard_percentile::numeric, 2),
-      'base_hazard_level', rc.hazard_level,
-      'weather_bonus', CASE WHEN rc.score IS NULL THEN NULL ELSE round(w.bonus::numeric, 3) END,
+      'base_score', round(hz.score::numeric, 4),
+      'base_percentile', round(base.pct::numeric, 2),
+      'base_level', risk_level(base.pct),
+      'hazard_percentile', round(adj.pct::numeric, 2),
+      'hazard_level', adj.lvl,
+      'weather_bonus', CASE WHEN hz.score IS NULL THEN NULL ELSE round(w.bonus::numeric, 3) END,
       'weather_alerts', COALESCE(w.alerts, '[]'::jsonb),
       'weather_stn', cw.stn,
-      'isolation', round(rc.isolation::numeric, 4),
       'traffic_percentile', round(ht.percentile::numeric, 2),
       'has_road', ht.available,
       'road_source', ht.detail->>'road_source',
       'facility_counts', COALESCE(fc.counts, '{}'::json),
-      'population', round(p.population::numeric, 1),
       'fire_station_dist_m', round(s.nearest_dist_m::numeric),
       'fire_station_drive_min', round(s.nearest_drive_min::numeric, 1),
       'fire_station_k1', s.count_k1,
@@ -200,36 +156,30 @@ SELECT json_build_object(
   )), '[]'::json)
 )
 FROM h3_cell c
-LEFT JOIN risk_combined rc ON rc.h3_index = c.h3_index AND rc.condition = $7 AND rc.hour = $8
+LEFT JOIN hz ON hz.h3_index = c.h3_index
 LEFT JOIN hazard_score ht ON ht.h3_index = c.h3_index AND ht.hazard = 'traffic'
-LEFT JOIN cell_population_hourly p ON p.h3_index = c.h3_index AND p.condition = $7 AND p.hour = $8
 LEFT JOIN dummy d ON d.h3_index = c.h3_index
 LEFT JOIN crowd g ON g.h3_index = c.h3_index
 LEFT JOIN ems e ON e.h3_index = c.h3_index
 LEFT JOIN cell_facility_stat s ON s.h3_index = c.h3_index AND s.type = 'fire_station'
 LEFT JOIN fac fc ON fc.h3_index = c.h3_index
 LEFT JOIN cell_weather_station cw ON cw.h3_index = c.h3_index
--- 기상 가산: 셀의 지점 판별 결과($10: 지점번호 → {bonus, alerts, …})
+-- 기상 가산: 셀의 지점 판별 결과($7: 지점번호 → {bonus, alerts, …})
 CROSS JOIN LATERAL (
-  SELECT COALESCE(($10::jsonb -> cw.stn::text ->> 'bonus')::float8, 0) AS bonus,
-         $10::jsonb -> cw.stn::text -> 'alerts' AS alerts
+  SELECT COALESCE(($7::jsonb -> cw.stn::text ->> 'bonus')::float8, 0) AS bonus,
+         $7::jsonb -> cw.stn::text -> 'alerts' AS alerts
 ) w
+CROSS JOIN LATERAL (SELECT 100 * hz.score AS pct) base
 CROSS JOIN LATERAL (
-  SELECT LEAST(1, rc.score + w.bonus) AS s,
-         CASE WHEN rc.score IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_pct('combined', LEAST(1, rc.score + w.bonus)) ELSE rc.percentile END AS pct,
-         CASE WHEN rc.score IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_level(risk_pct('combined', LEAST(1, rc.score + w.bonus))) ELSE rc.level END AS lvl,
-         CASE WHEN rc.hazard IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_pct('hazard', LEAST(1, rc.hazard + w.bonus)) ELSE rc.hazard_percentile END AS hpct,
-         CASE WHEN rc.hazard IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_level(risk_pct('hazard', LEAST(1, rc.hazard + w.bonus))) ELSE rc.hazard_level END AS hlvl
+  SELECT LEAST(1, hz.score + w.bonus) AS s,
+         CASE WHEN hz.score IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_pct('hazard', LEAST(1, hz.score + w.bonus)) ELSE base.pct END AS pct,
+         CASE WHEN hz.score IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_level(risk_pct('hazard', LEAST(1, hz.score + w.bonus))) ELSE risk_level(base.pct) END AS lvl
 ) adj
 WHERE $1::float8 IS NULL OR c.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)`
 
-// GET /api/grid?at=2021-08-23T14:00&condition=weekday&hour=21&weather=on&bbox=minLng,minLat,maxLng,maxLat
+// GET /api/grid?at=2026-10-17T14:00&weather=on&bbox=minLng,minLat,maxLng,maxLat
 func (h *Handler) grid(c *gin.Context) {
 	at, _, ok := atOf(c)
-	if !ok {
-		return
-	}
-	cond, hour, auto, ok := slotOf(c, at)
 	if !ok {
 		return
 	}
@@ -239,7 +189,7 @@ func (h *Handler) grid(c *gin.Context) {
 		return
 	}
 	info, _ := json.Marshal(wxInfo)
-	args := []any{nil, nil, nil, nil, risk.Version, riskLegend, cond, hour, auto, string(wx), string(info)}
+	args := []any{nil, nil, nil, nil, Version, riskLegend, string(wx), string(info)}
 	if s := c.Query("bbox"); s != "" {
 		parts := strings.Split(s, ",")
 		if len(parts) != 4 {
@@ -282,40 +232,25 @@ SELECT json_build_object(
   'h3', c.h3_index,
   'center', json_build_array(ST_X(c.center), ST_Y(c.center)),
   'risk', (SELECT json_build_object(
-             'condition', condition, 'hour', hour, 'auto_slot', $5::boolean,
-             'score', LEAST(1, score + w.bonus),
-             'percentile', CASE WHEN score IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_pct('combined', LEAST(1, score + w.bonus)) ELSE percentile END,
-             'level', CASE WHEN score IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_level(risk_pct('combined', LEAST(1, score + w.bonus))) ELSE level END,
-             'hazard', hazard, 'isolation', isolation, 'hazards_used', hazards_used,
-             'hazard_percentile', CASE WHEN hazard IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_pct('hazard', LEAST(1, hazard + w.bonus)) ELSE hazard_percentile END,
-             'hazard_level', CASE WHEN hazard IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_level(risk_pct('hazard', LEAST(1, hazard + w.bonus))) ELSE hazard_level END,
-             'base_score', score, 'base_percentile', percentile, 'base_level', level,
-             'base_hazard_percentile', hazard_percentile, 'base_hazard_level', hazard_level,
-             'weather_bonus', CASE WHEN score IS NULL THEN NULL ELSE w.bonus END,
-             'version', $2::text, 'computed_at', computed_at)
-           FROM risk_combined,
-                LATERAL (SELECT COALESCE(($6::jsonb -> (SELECT stn::text FROM cell_weather_station WHERE h3_index = $1) ->> 'bonus')::float8, 0) AS bonus) w
-           WHERE h3_index = c.h3_index AND condition = $3 AND hour = $4),
+             'score', LEAST(1, hz.score + w.bonus),
+             'percentile', CASE WHEN w.bonus > 0 THEN risk_pct('hazard', LEAST(1, hz.score + w.bonus)) ELSE 100 * hz.score END,
+             'level', risk_level(CASE WHEN w.bonus > 0 THEN risk_pct('hazard', LEAST(1, hz.score + w.bonus)) ELSE 100 * hz.score END),
+             'base_score', hz.score, 'base_percentile', 100 * hz.score, 'base_level', risk_level(100 * hz.score),
+             'weather_bonus', w.bonus, 'hazards_used', hz.used,
+             'version', $2::text)
+           FROM (SELECT avg(percentile) / 100 AS score, array_agg(hazard ORDER BY hazard) AS used
+                 FROM hazard_score WHERE h3_index = c.h3_index AND available AND percentile IS NOT NULL
+                 HAVING count(*) > 0) hz,
+                LATERAL (SELECT COALESCE(($3::jsonb -> (SELECT stn::text FROM cell_weather_station WHERE h3_index = $1) ->> 'bonus')::float8, 0) AS bonus) w),
   -- 그 시각 셀의 기상 판별 (가장 가까운 AWS 지점)
-  'weather', (SELECT jsonb_build_object('stn', cw.stn, 'dist_m', round(cw.dist_m::numeric)) || $7::jsonb
-                     || COALESCE($6::jsonb -> cw.stn::text, '{}'::jsonb)
+  'weather', (SELECT jsonb_build_object('stn', cw.stn, 'dist_m', round(cw.dist_m::numeric)) || $4::jsonb
+                     || COALESCE($3::jsonb -> cw.stn::text, '{}'::jsonb)
               FROM cell_weather_station cw WHERE cw.h3_index = c.h3_index),
-  -- 같은 조건의 0~23시 순위 (시간대별 그래프용)
-  'hourly', (SELECT COALESCE(json_agg(json_build_object(
-               'hour', rc.hour, 'percentile', round(rc.percentile::numeric, 2), 'level', rc.level,
-               'isolation', round(rc.isolation::numeric, 4), 'population', round(p.population::numeric, 1)) ORDER BY rc.hour), '[]'::json)
-             FROM risk_combined rc
-             LEFT JOIN cell_population_hourly p USING (h3_index, condition, hour)
-             WHERE rc.h3_index = c.h3_index AND rc.condition = $3),
   'hazards', (SELECT COALESCE(json_object_agg(hs.hazard, json_build_object(
                 'label', hm.label, 'percentile', hs.percentile, 'score', hs.score,
                 'available', hs.available, 'dataset_id', hm.dataset_id, 'snapshot_date', hm.snapshot_date,
                 'detail', hs.detail)), '{}'::json)
               FROM hazard_score hs JOIN hazard_meta hm USING (hazard) WHERE hs.h3_index = c.h3_index),
-  'population', (SELECT json_build_object('value', round(p.population::numeric, 1), 'condition', p.condition, 'hour', p.hour,
-                                         'std_ym', ps.std_ym, 'file', ps.file)
-                 FROM cell_population_hourly p JOIN population_source ps USING (condition)
-                 WHERE p.h3_index = c.h3_index AND p.condition = $3 AND p.hour = $4),
   'facilities', (SELECT COALESCE(json_object_agg(type, json_build_object(
                    'count_in_cell', count_in_cell, 'count_k1', count_k1,
                    'nearest_dist_m', round(nearest_dist_m::numeric),
@@ -330,13 +265,9 @@ SELECT json_build_object(
 )
 FROM h3_cell c WHERE c.h3_index = $1`
 
-// GET /api/cells/:h3?at=&condition=&hour=&weather=
+// GET /api/cells/:h3?at=&weather=
 func (h *Handler) cell(c *gin.Context) {
 	at, _, ok := atOf(c)
-	if !ok {
-		return
-	}
-	cond, hour, auto, ok := slotOf(c, at)
 	if !ok {
 		return
 	}
@@ -347,7 +278,7 @@ func (h *Handler) cell(c *gin.Context) {
 	}
 	info, _ := json.Marshal(wxInfo)
 	var raw []byte
-	err = h.DB.QueryRow(c, cellSQL, c.Param("h3"), risk.Version, cond, hour, auto, string(wx), string(info)).Scan(&raw)
+	err = h.DB.QueryRow(c, cellSQL, c.Param("h3"), Version, string(wx), string(info)).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "격자에 없는 셀"})
 		return
