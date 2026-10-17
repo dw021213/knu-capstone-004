@@ -1,0 +1,41 @@
+# feat/backend 에 백엔드 변경이 push 되면 운영 서버(https://jeju-risk.duckdns.org)를 갱신한다.
+# 서버 authorized_keys 에서 이 키는 /root/deploy-backend.sh 만 실행하도록 묶여 있다 (다른 명령 불가).
+# 필요한 시크릿: DEPLOY_SSH_KEY (배포 전용 개인키). 자세한 내용은 backend/deploy/DEPLOY.md "자동 배포".
+name: backend-deploy
+
+on:
+  push:
+    branches: [feat/backend]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 배포 키 준비
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          test -n "$DEPLOY_SSH_KEY" || { echo "::error::DEPLOY_SSH_KEY 시크릿이 없습니다"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # 서버 호스트 키 (중간자 공격 방지)
+          echo '158.247.200.215 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKan58i/dodS/oFhMJOfL0U+BcKj9lQ5mHjZD8i3W2pv' > ~/.ssh/known_hosts
+
+      - name: 서버 갱신
+        run: ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o ConnectTimeout=20 root@158.247.200.215 deploy
+
+      - name: 외부 확인
+        run: curl -sf --retry 5 --retry-delay 3 https://jeju-risk.duckdns.org/api/health

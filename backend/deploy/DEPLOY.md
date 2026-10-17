@@ -102,3 +102,15 @@ Vercel 프로젝트 → Settings → Environment Variables:
 - `.env` 와 덤프 파일은 git 에 올리지 않는다.
 - DB 포트(5432)는 열지 않는다. DB 를 직접 보려면 서버에서 `docker compose -f docker-compose.prod.yml exec db psql -U jeju -d jeju`.
 - 서버를 멈춰도(Stop) Vultr 는 요금을 계속 받는다. 안 쓸 땐 Destroy.
+
+## 자동 배포 (GitHub Actions)
+
+`feat/backend` 에 `backend/` 변경이 push 되면 `.github/workflows/backend-deploy.yml` 이 서버를 갱신한다
+(서버 `/root/deploy-backend.sh`: `git reset --hard origin/feat/backend` → `server` 재빌드 → health 확인, 기록은 `/root/deploy.log`).
+Actions 탭에서 **Run workflow** 로 수동 실행도 된다.
+
+- 배포 전용 키(로컬 `~/.ssh/jeju_deploy_actions`, 암호 없음)는 서버 `authorized_keys` 에서
+  `command="/root/deploy-backend.sh",no-pty,…` 로 묶여 있어 **배포 스크립트만** 실행된다.
+- 레포 시크릿 `DEPLOY_SSH_KEY` = 그 개인키 내용 (Settings → Secrets and variables → Actions, 레포 관리자 권한 필요).
+- 코드만 갱신된다. **DB 데이터(모델 점수 등)는 git 으로 옮겨지지 않으므로** 바뀌면 6번(덤프 넣기)을 다시 한다.
+- 키를 바꾸려면: 서버 `~/.ssh/authorized_keys` 에서 `github-actions-deploy` 줄을 지우고 새 공개키를 같은 형식으로 넣은 뒤 시크릿을 갱신.
