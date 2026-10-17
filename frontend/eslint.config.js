@@ -20,6 +20,14 @@ export default defineConfig([
     extends: [reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
   },
   {
+    // 데이터 생성 스크립트와 그 테스트는 node에서 돈다
+    files: ['scripts/**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
     // e2e는 브라우저 전역 타입(src/types/global.d.ts)을 path 참조로 가져온다
     files: ['tests/e2e/**/*.ts'],
     languageOptions: {

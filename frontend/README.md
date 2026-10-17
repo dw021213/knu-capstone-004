@@ -4,7 +4,7 @@
 
 ## 실행법
 
-Node 22 이상이 필요합니다(`.nvmrc`는 `22`).
+Node 22.13 이상이 필요합니다(`.nvmrc`는 `22`, 잠긴 vite 8·eslint 10·jsdom 29가 22.13 이상을 요구).
 
 ```bash
 cd frontend
@@ -51,6 +51,7 @@ VITE_DATA_MODE=api VITE_API_BASE=http://localhost:8000 npm run dev
 | `npm run format:check` | Prettier 검사만                                                                                      |
 | `npm run test`         | Vitest 단위 테스트                                                                                   |
 | `npm run test:e2e`     | Playwright e2e(모바일 390×844, 데스크톱 1440×900). `PLAYWRIGHT_BASE_URL`을 주면 그 주소를 검사합니다 |
+| `npm run data:scores`  | `data-src/risk_scores.csv`(교통 모델 전달본)로 `public/data/scores.json`을 다시 만듦                 |
 
 PR 전에 `npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build`와 `CI=1 npm run test:e2e`가 통과해야 합니다.
 
