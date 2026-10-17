@@ -1,0 +1,53 @@
+# 운영 서버용: DB(PostGIS) + 백엔드 + Caddy(HTTPS 자동 인증서). deploy/DEPLOY.md 참고.
+#   cd backend/deploy && docker compose -f docker-compose.prod.yml up -d --build
+name: jeju-risk-prod
+
+services:
+  db:
+    image: imresamu/postgis:17-3.5
+    environment:
+      POSTGRES_USER: jeju
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?deploy/.env 에 POSTGRES_PASSWORD 필요}
+      POSTGRES_DB: jeju
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jeju -d jeju"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    # 포트를 밖으로 열지 않는다 (서버 컨테이너만 접근)
+
+  server:
+    build: ..
+    environment:
+      DATABASE_URL: postgres://jeju:${POSTGRES_PASSWORD}@db:5432/jeju?sslmode=disable
+      SERVER_ADDR: ":8080"
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      KMA_APIHUB_KEY: ${KMA_APIHUB_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?deploy/.env 에 DOMAIN 필요}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

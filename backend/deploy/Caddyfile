@@ -1,0 +1,5 @@
+# DOMAIN(예: jeju-risk.duckdns.org)으로 들어온 요청을 백엔드로 넘기고, HTTPS 인증서는 Caddy 가 자동으로 받는다.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy server:8080
+}

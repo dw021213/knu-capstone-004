@@ -327,6 +327,8 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   기상 규칙 v3: **호우 경보급 +0.18만** 가산(위해도 점수 기준 RR 2.44 → ln/4.835 = 0.185), 나머지 0(기준 초과는 표시만).
 - 2026-10-17: 기상 규칙 v4 — 호우 경보급 가산을 **단순 비교**로 다시 산정: 사고율 10.77 ÷ 5.12 = ×2.11 (1.31~3.40) → ln/4.835 = 0.154 → **+0.15**.
   (셀 위험도·월 보정 시 ×2.44 → +0.18 이었으나 설명을 단순하게 하기로 결정)
+- 2026-10-17: main(프론트·시설 POI) 병합. 배포 준비: `Dockerfile`(server+etl, cgo), `deploy/`(docker-compose.prod.yml: db+server+caddy, Caddyfile, .env.example, DEPLOY.md).
+  로컬에서 운영 구성 전체(HTTPS 포함) 기동·덤프 복원·API 확인. 호스팅은 Vultr 서울 2GB 로 결정, 주소는 DuckDNS 무료 서브도메인.
 
 ## ▶ 현재 상태 요약 (2026-10-13, 이어서 작업할 때 여기부터)
 - **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (push 완료, main 미병합). 옛 `종프/back` 은 백업
