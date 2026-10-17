@@ -14,11 +14,16 @@ export interface MarkerItem {
   /** cluster: 알약 글자와 개수 */
   label?: string;
   count?: number;
+  /** cluster: 묶인 시설 id */
+  ids?: string[];
+  /** 실제 위치(묶음 무게중심) 화면 좌표. 알약을 비켜 놓았으면 x, y와 다르다. 없으면 x, y */
+  anchor?: [number, number];
 }
 
 /** 그린 상자 [x0, y0, x1, y1](화면 좌표)를 붙인 항목. 누르기 판정과 e2e에 쓴다 */
 export interface MarkerHit extends MarkerItem {
   box: [number, number, number, number];
+  anchor: [number, number];
 }
 
 /** 마커 배치에 넘기는 지도 상태. project는 경도·위도 → 화면 좌표(view 기준) */
@@ -28,6 +33,8 @@ export interface MarkerContext {
   zoom: number;
   view: View;
   project(lng: number, lat: number): [number, number];
+  /** 알약 글자 폭(px). 없으면 어림값 */
+  measure?: (text: string) => number;
 }
 
 export type MarkerLayout = (ctx: MarkerContext) => MarkerItem[];
@@ -45,6 +52,8 @@ const PILL_GAP = 4;
 const PILL_FONT_PX = 12;
 
 export const pillText = (i: MarkerItem) => `${i.label} ${i.count}`;
+/** 알약 글자 글꼴(canvas font). font는 tokens.css의 --font */
+export const pillFont = (font: string) => `700 ${PILL_FONT_PX}px ${font}`;
 
 const overlaps = (a: number[], b: number[]) =>
   a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
@@ -52,6 +61,8 @@ const overlaps = (a: number[], b: number[]) =>
 /** 알약을 비켜 놓을 후보 자리: 가로 16px, 세로 한 줄 간격 격자를 가까운 순서로 */
 const PILL_STEP_X = 16;
 const PILL_STEP_Y = PILL_H + 2;
+/** 알약을 실제 위치(묶음 무게중심)에서 비켜 놓을 수 있는 최대 거리: 알약 한 줄(높이 + 틈) */
+export const PILL_MAX_SHIFT = PILL_STEP_Y;
 const PILL_RINGS = 24;
 const PILL_OFFSETS: [number, number][] = (() => {
   const out: [number, number][] = [];
@@ -63,16 +74,42 @@ const PILL_OFFSETS: [number, number][] = (() => {
   );
 })();
 
+/** 겹침 검사용 칸 나누기(px). 알약이 많아도 가까운 칸의 상자만 본다 */
+const BUCKET = 128;
+
+class BoxIndex {
+  private cells = new Map<string, MarkerHit['box'][]>();
+  private keys([x0, y0, x1, y1]: MarkerHit['box']): string[] {
+    const out: string[] = [];
+    for (let i = Math.floor(x0 / BUCKET); i <= Math.floor(x1 / BUCKET); i++)
+      for (let j = Math.floor(y0 / BUCKET); j <= Math.floor(y1 / BUCKET); j++)
+        out.push(`${i},${j}`);
+    return out;
+  }
+  hits(b: MarkerHit['box']): boolean {
+    return this.keys(b).some((k) => this.cells.get(k)?.some((p) => overlaps(p, b)) ?? false);
+  }
+  add(b: MarkerHit['box']) {
+    for (const k of this.keys(b)) {
+      const list = this.cells.get(k);
+      if (list) list.push(b);
+      else this.cells.set(k, [b]);
+    }
+  }
+}
+
 /**
  * 항목마다 그릴 상자를 정한다. 알약은 글자 폭으로 넓이를 재고, 종류와 상관없이 앞서 놓은
  * 알약과 겹치면 가장 가까운 빈자리로 비켜 놓는다. 마커는 제자리.
+ * 배치(buildMarkerLayout)가 이미 겹치지 않게 놓은 알약은 그대로 둔다.
  */
 export function placeMarkers(items: MarkerItem[], measure: (text: string) => number): MarkerHit[] {
-  const placed: MarkerHit['box'][] = [];
+  const placed = new BoxIndex();
   return items.map((item) => {
+    const anchor = item.anchor ?? [item.x, item.y];
     if (item.kind === 'marker') {
       const r = MARKER_R;
-      return { ...item, box: [item.x - r, item.y - r, item.x + r, item.y + r] };
+      return { ...item, anchor, box: [item.x - r, item.y - r, item.x + r, item.y + r] };
     }
     const w = PILL_PAD * 2 + PILL_ICON + PILL_GAP + measure(pillText(item));
     const at = ([dx, dy]: [number, number]): MarkerHit['box'] => [
@@ -84,13 +121,13 @@ export function placeMarkers(items: MarkerItem[], measure: (text: string) => num
     let box = at([0, 0]);
     for (const off of PILL_OFFSETS) {
       const b = at(off);
-      if (!placed.some((p) => overlaps(p, b))) {
+      if (!placed.hits(b)) {
         box = b;
         break;
       }
     }
-    placed.push(box);
-    return { ...item, x: (box[0] + box[2]) / 2, y: (box[1] + box[3]) / 2, box };
+    placed.add(box);
+    return { ...item, anchor, x: (box[0] + box[2]) / 2, y: (box[1] + box[3]) / 2, box };
   });
 }
 
@@ -153,7 +190,7 @@ export function drawMarkers(
 ): MarkerHit[] {
   ctx.setTransform(o.dpr, 0, 0, o.dpr, 0, 0);
   ctx.clearRect(0, 0, o.width, o.height);
-  ctx.font = `700 ${PILL_FONT_PX}px ${o.font}`;
+  ctx.font = pillFont(o.font);
   const hits = placeMarkers(items, (t) => ctx.measureText(t).width);
   ctx.lineJoin = 'round';
   // 개별 마커: 검정 채움, 흰 테두리

@@ -8,6 +8,7 @@
 .overlay {
   position: absolute;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
 }
 
@@ -21,19 +22,13 @@
 
 /* 모바일: 아래 카드(배경 지도 출처 위). 넘치면 안에서 굴린다 */
 .sheet {
+  composes: surface from '../shared/ui/sheet.module.css';
   position: absolute;
   left: var(--space-3);
   right: var(--space-3);
   bottom: var(--space-6);
   max-height: 45dvh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: var(--space-3) var(--space-4) var(--space-4);
-  background: var(--white);
-  border: var(--border-strong) solid var(--ink);
-  border-radius: var(--radius-m);
-  color: var(--ink);
-  pointer-events: auto;
 }
 
 /* 데스크톱: 뒤로 막대 아래부터 바닥까지 오른쪽에 붙는 패널(지도 화면의 셀 패널과 같은 너비).
@@ -51,9 +46,7 @@
     width: var(--panel-size);
     max-height: none;
     padding: var(--space-4) var(--space-6) var(--space-6);
-    border: 0;
     border-left: 1px solid var(--line);
-    border-radius: 0;
   }
 }
 
@@ -109,20 +102,9 @@
 }
 
 .chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  composes: chips from '../shared/ui/sheet.module.css';
 }
 
 .chip {
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-full);
-  background: var(--surf);
-  font-size: var(--text-xs);
-  color: var(--ink2);
-  word-break: keep-all;
+  composes: chip from '../shared/ui/sheet.module.css';
 }

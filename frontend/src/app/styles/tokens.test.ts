@@ -57,4 +57,8 @@ describe('tokens.css', () => {
   test('시트 뒤 어둡게 하는 색은 ink를 섞어 만든다', () => {
     expect(declared('--scrim')).toBe('color-mix(in srgb, var(--ink) 40%, transparent)');
   });
+
+  test('배경 지도는 채도를 절반쯤만 낮춰 육지와 바다가 구분된다', () => {
+    expect(declared('--basemap-filter')).toBe('grayscale(0.45) brightness(1.02)');
+  });
 });

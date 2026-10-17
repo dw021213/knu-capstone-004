@@ -1,5 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  interpolate,
   select,
   zoom,
   zoomIdentity,
@@ -13,7 +22,7 @@ import { drawCells, makeHatchPattern, prepareCells } from './cellCanvas';
 import { BASEMAP } from './basemap';
 import { cellAt } from './hitTest';
 import { TAP_DELAY } from './gesture';
-import { drawMarkers, hitTest, type MarkerHit, type MarkerLayout } from './markerCanvas';
+import { drawMarkers, hitTest, pillFont, type MarkerHit, type MarkerLayout } from './markerCanvas';
 import { drawRoute, type MapRoute, type RouteHits } from './routeCanvas';
 import { tileUrl, visibleTiles } from './tiles';
 import { JEJU_BOUNDS } from './projection';
@@ -57,6 +66,25 @@ export interface MapViewProps {
    * 맞춰, 경계가 화면보다 좁은 줌에서 맞춘 곳이 패널 쪽으로 밀리지 않게 한다
    */
   panelRight?: number;
+  /**
+   * 지도 위에 열린 시트·패널이 가리는 위·오른쪽·아래 너비(px). 있으면 이동 경계를 그 안쪽 보이는 영역 기준으로
+   * 맞춰, 가린 곳 밑의 셀도 보이는 영역으로 끌어올 수 있다
+   */
+  cover?: Cover | null;
+  /** 이 점이 보이는 영역(cover 안쪽) 밖이면 확대 수준은 그대로 두고 그 가운데로 옮긴다. key가 바뀔 때마다 한 번 */
+  reveal?: MapReveal | null;
+}
+
+export interface Cover {
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export interface MapReveal {
+  key: number;
+  /** [경도, 위도] */
+  point: [number, number];
 }
 
 export type { MapRoute };
@@ -83,6 +111,10 @@ export interface MapFocus {
 const CLICK_SLOP = 6;
 /** 클러스터를 누르면 이만큼 확대 */
 const CLUSTER_ZOOM_BY = 2;
+/** 고른 점을 보이는 영역 가장자리에서 이만큼(px) 안쪽에 있어야 보인다고 본다 */
+const REVEAL_MARGIN = 32;
+
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 /** 그린 시점 변환(from)의 화면 좌표 → 지금 변환(to)의 화면 좌표 */
 function reproject(from: View, to: View, [x, y]: [number, number]): [number, number] {
@@ -108,6 +140,8 @@ export function MapView({
   route = null,
   dim = null,
   panelRight = 0,
+  cover = null,
+  reveal = null,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -160,19 +194,68 @@ export function MapView({
     insetsRef.current = insets;
   });
 
+  // 이동 경계를 맞추는 지도 영역. full: 오른쪽에 늘 붙은 패널만 뺀 부분, area: 열린 시트·패널이 가리는 곳까지 뺀 부분
+  const coverTop = cover?.top ?? 0;
+  const coverRight = Math.max(panelRight, cover?.right ?? 0);
+  const coverBottom = cover?.bottom ?? 0;
+  type Extent = [[number, number], [number, number]];
+  const extentRef = useRef<(w: number, h: number) => { full: Extent; area: Extent }>(() => ({
+    full: [
+      [0, 0],
+      [1, 1],
+    ],
+    area: [
+      [0, 0],
+      [1, 1],
+    ],
+  }));
+  useLayoutEffect(() => {
+    extentRef.current = (w, h) => ({
+      full: [
+        [0, 0],
+        [Math.max(1, w - panelRight), h],
+      ],
+      area: [
+        [0, Math.min(coverTop, h - 1)],
+        [Math.max(1, w - coverRight), Math.max(coverTop + 1, h - coverBottom)],
+      ],
+    });
+  });
+  // 지금 경계(full). constrain이 읽는다
+  const fullRef = useRef<Extent | null>(null);
+  // 시트·패널을 닫았을 때 그 영역 기준으로 옮겨 둔 화면이면, 사용자가 제자리 범위로 끌어올 때까지 그 영역도 허용한다
+  const stickyRef = useRef<Extent | null>(null);
+  /**
+   * 화면이 full 기준으로도, 보이는 영역(area, d3 extent) 기준으로도 경계 안이면 그대로 둔다. 둘 다 벗어나면 덜 옮기는
+   * 쪽으로 들인다. 시트를 열거나 닫아도 지도가 저절로 움직이지 않고, 가린 곳 밑의 셀은 보이는 영역까지 끌어올 수 있다
+   */
+  const constrainBoth = useCallback((t: ZoomTransform, area: Extent, te: Extent): ZoomTransform => {
+    const full = fullRef.current;
+    const moved = (c: ZoomTransform) => Math.hypot(c.x - t.x, c.y - t.y);
+    const options = [area, full, stickyRef.current].filter((e) => e !== null);
+    const out = options
+      .map((e) => constrainView(t, e, te))
+      .reduce((a, b) => (moved(b) < moved(a) ? b : a));
+    if (full && moved(constrainView(t, full, te)) < 0.5) stickyRef.current = null;
+    return out;
+  }, []);
+  // 진행 중인 맞춤(focus) 옮기기. 끝나면 기다리던 reveal을 한다
+  const focusing = useRef(false);
+  const afterFocus = useRef<(() => void) | null>(null);
+
   // 확대·이동: d3-zoom(휠, 핀치, 드래그, 두 번 누르기). 처음에는 제주 본섬에 맞춘다
   useEffect(() => {
     if (!size) return;
     const el = containerRef.current!;
-    const extent: [[number, number], [number, number]] = [
-      [0, 0],
-      [Math.max(1, size.w - panelRight), size.h],
-    ];
+    const { full, area: extent } = extentRef.current(size.w, size.h);
+    fullRef.current = full;
     const toView = ({ k, x, y }: ZoomTransform): View => ({ k, x, y });
     const behavior = zoom<HTMLDivElement, unknown>()
       .scaleExtent(SCALE_EXTENT)
       .translateExtent(worldExtent(JEJU_BOUNDS))
-      .constrain(constrainView)
+      .constrain(constrainBoth)
+      // 옮기기(맞춤·reveal)는 중심과 배율을 곧게 잇는다. 기본(interpolateZoom)은 멀리 옮길 때 잠깐 축소했다 확대한다
+      .interpolate(interpolate)
       .extent(extent)
       .on('zoom', (e: D3ZoomEvent<HTMLDivElement, unknown>) => {
         const v = toView(e.transform);
@@ -190,7 +273,25 @@ export function MapView({
       sel.on('.zoom', null);
       zoomRef.current = null;
     };
-  }, [size, panelRight]);
+  }, [size, constrainBoth]);
+
+  // 가림(패널·시트)이 바뀌면 이동 경계만 바꾼다. 지도는 옮기지 않는다(닫을 때는 앞 영역을 잠시 허용)
+  useEffect(() => {
+    const z = zoomRef.current;
+    if (!z || !size) return;
+    const { full, area: extent } = extentRef.current(size.w, size.h);
+    fullRef.current = full;
+    const same = extent.every((p, i) => p[0] === z.extent[i][0] && p[1] === z.extent[i][1]);
+    if (same) return;
+    const before = z.extent;
+    z.extent = extent;
+    z.behavior.extent(extent);
+    const v = viewRef.current;
+    if (!v) return;
+    const t = zoomIdentity.translate(v.x, v.y).scale(v.k);
+    const c = z.behavior.constrain()(t, extent, worldExtent(JEJU_BOUNDS));
+    if (Math.hypot(c.x - t.x, c.y - t.y) >= 0.5) stickyRef.current = before;
+  }, [size, coverTop, coverRight, coverBottom]);
 
   // 검색으로 고른 곳으로 옮기고 확대한다
   const focusKey = focus?.key;
@@ -220,15 +321,66 @@ export function MapView({
       extent,
       worldExtent(JEJU_BOUNDS),
     );
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    focusing.current = true;
+    const settle = () => {
+      focusing.current = false;
+      const next = afterFocus.current;
+      afterFocus.current = null;
+      next?.();
+    };
     sel
       .transition()
-      .duration(reduce ? 0 : 300)
+      .duration(reducedMotion() ? 0 : 300)
       .call(behavior.transform, t)
       .on('end', () => {
         doneFocus.current = focusKey;
-      });
+        settle();
+      })
+      .on('interrupt', settle);
   }, [focusKey, size]);
+
+  // 고른 곳이 시트·패널에 가려 있으면 보이는 영역 가운데로 옮긴다(확대 수준은 그대로)
+  const revealKey = reveal?.key;
+  const revealRef = useRef(reveal);
+  const appliedReveal = useRef<number | null>(null);
+  const doneReveal = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    revealRef.current = reveal;
+  });
+  useEffect(() => {
+    const r = revealRef.current;
+    if (revealKey === undefined || !r || !zoomRef.current || !size) return;
+    if (appliedReveal.current === revealKey) return;
+    appliedReveal.current = revealKey;
+    const run = () => {
+      const z = zoomRef.current;
+      const v = viewRef.current;
+      if (!z || !v) return;
+      const [[x0, y0], [x1, y1]] = z.extent;
+      const [px, py] = lngLatToScreen(v, ...r.point);
+      const mx = Math.min(REVEAL_MARGIN, (x1 - x0) / 4);
+      const my = Math.min(REVEAL_MARGIN, (y1 - y0) / 4);
+      if (px >= x0 + mx && px <= x1 - mx && py >= y0 + my && py <= y1 - my) {
+        doneReveal.current = revealKey;
+        return;
+      }
+      const t = z.behavior.constrain()(
+        zoomIdentity.translate(v.x + (x0 + x1) / 2 - px, v.y + (y0 + y1) / 2 - py).scale(v.k),
+        z.extent,
+        worldExtent(JEJU_BOUNDS),
+      );
+      z.sel
+        .transition()
+        .duration(reducedMotion() ? 0 : 300)
+        .call(z.behavior.transform, t)
+        .on('end interrupt', () => {
+          doneReveal.current = revealKey;
+        });
+    };
+    // 검색으로 옮기는 중이면 다 옮긴 뒤에 본다
+    if (focusing.current) afterFocus.current = run;
+    else run();
+  }, [revealKey, size]);
 
   // 셀 그리기(조작이 끝났을 때, 크기·데이터·선택이 바뀔 때)
   useLayoutEffect(() => {
@@ -289,6 +441,9 @@ export function MapView({
     }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const font = cssVar(canvas, '--font');
+    // 배치가 알약 폭을 그릴 글꼴로 잰다
+    ctx.font = pillFont(font);
     const items = markers
       ? markers({
           width: size.w,
@@ -296,6 +451,7 @@ export function MapView({
           zoom: zoomLevel(settled),
           view: settled,
           project: (lng, lat) => lngLatToScreen(settled, lng, lat),
+          measure: (t) => ctx.measureText(t).width,
         })
       : [];
     const hits = drawMarkers(ctx, items, {
@@ -304,7 +460,7 @@ export function MapView({
       dpr,
       ink: cssVar(canvas, '--ink'),
       white: cssVar(canvas, '--white'),
-      font: cssVar(canvas, '--font'),
+      font,
       highlight,
     });
     hitsRef.current = { view: settled, hits };
@@ -327,6 +483,12 @@ export function MapView({
       },
       focusDone() {
         return doneFocus.current;
+      },
+      revealDone() {
+        return doneReveal.current;
+      },
+      idle() {
+        return !focusing.current && appliedReveal.current === doneReveal.current;
       },
       route() {
         const v = viewRef.current;
@@ -352,6 +514,7 @@ export function MapView({
           const [x, y] = page([h.x, h.y]);
           const [x0, y0] = page([h.box[0], h.box[1]]);
           const [x1, y1] = page([h.box[2], h.box[3]]);
+          const anchor = page(h.anchor);
           return {
             kind: h.kind,
             group: h.group,
@@ -361,6 +524,7 @@ export function MapView({
             count: h.count,
             label: h.label,
             box: [x0, y0, x1, y1] as [number, number, number, number],
+            anchor,
           };
         });
       },
@@ -414,10 +578,9 @@ export function MapView({
         else if (hit.kind === 'cluster' && zoomRef.current) {
           const { behavior, sel } = zoomRef.current;
           const at = reproject(drawnAt, v, [hit.x, hit.y]);
-          const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
           sel
             .transition()
-            .duration(reduce ? 0 : 250)
+            .duration(reducedMotion() ? 0 : 250)
             .call(behavior.scaleBy, CLUSTER_ZOOM_BY, at);
         }
         return;
@@ -463,7 +626,7 @@ export function MapView({
             src={tileUrl(t)}
             alt=""
             draggable={false}
-            style={{ left: t.left, top: t.top, width: t.size, height: t.size }}
+            style={{ left: t.left, top: t.top, width: t.width, height: t.height }}
           />
         ))}
         <canvas

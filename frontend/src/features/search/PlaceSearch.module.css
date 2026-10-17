@@ -99,3 +99,11 @@
   font-size: var(--text-s);
   color: var(--ink);
 }
+
+/* 모바일: 안내는 검색창 아래 제자리에 두어 바로 아래 '종합' 탭 라벨을 덮지 않는다(탭 줄이 잠시 내려간다) */
+@media (max-width: 768px) {
+  .empty {
+    position: static;
+    margin-top: var(--space-2);
+  }
+}

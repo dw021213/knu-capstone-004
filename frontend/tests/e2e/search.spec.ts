@@ -121,3 +121,25 @@ test('일치하는 읍면동이 없으면 목록 대신 안내를 보인다', as
   await box(page).fill('');
   await expect(page.getByText("'서울'과 일치하는 읍면동이 없어요")).toHaveCount(0);
 });
+
+for (const tag of ['', '@desktop ']) {
+  test(`${tag}일치 없음 안내는 '종합' 탭 라벨을 덮지 않는다`, async ({ page }) => {
+    await openMap(page);
+    await box(page).fill('서울');
+    const msg = page.getByText("'서울'과 일치하는 읍면동이 없어요");
+    await expect(msg).toBeVisible();
+    const m = (await msg.boundingBox())!;
+    const tab = page.getByTestId('risk-tabs').getByText('종합');
+    await expect(tab).toBeVisible();
+    const t = (await tab.boundingBox())!;
+    const overlap =
+      m.x < t.x + t.width && t.x < m.x + m.width && m.y < t.y + t.height && t.y < m.y + m.height;
+    expect(overlap).toBe(false);
+    // 라벨 가운데에 실제로 보이는 것은 라벨 자신이다
+    const top = await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y)?.textContent ?? '',
+      [t.x + t.width / 2, t.y + t.height / 2] as const,
+    );
+    expect(top).toBe('종합');
+  });
+}

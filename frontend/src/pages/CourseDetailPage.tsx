@@ -71,7 +71,7 @@ export function CourseDetailPage({ source = dataSource }: { source?: DataSource 
   const title = summary?.course.name ?? '코스';
   return (
     <main className={styles.page} aria-label="코스 지도">
-      <MapView scores={scores} route={route} dim={dim} focus={focus} />
+      {/* 뒤로 막대·시트를 지도보다 먼저 두어 첫 Tab이 뒤로 버튼으로 간다(지도는 z-index로 아래에 깐다) */}
       <div className={styles.overlay}>
         <div className={styles.top}>
           <PageBar title={title} fallback="/courses" />
@@ -132,6 +132,7 @@ export function CourseDetailPage({ source = dataSource }: { source?: DataSource 
           </section>
         )}
       </div>
+      <MapView scores={scores} route={route} dim={dim} focus={focus} />
     </main>
   );
 }

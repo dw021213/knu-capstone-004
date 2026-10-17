@@ -66,19 +66,6 @@ export function worldExtent(b: Bounds = JEJU_BOUNDS): [[number, number], [number
   ];
 }
 
-/** 경계가 화면에 들어오도록 맞춘 변환. 배율은 SCALE_EXTENT 안으로 자른다 */
-export function fitView(
-  width: number,
-  height: number,
-  b: Bounds = ISLAND_BOUNDS,
-  pad = 0.06,
-): View {
-  const [[x0, y0], [x1, y1]] = worldExtent(b);
-  const k0 = Math.min((width * (1 - 2 * pad)) / (x1 - x0), (height * (1 - 2 * pad)) / (y1 - y0));
-  const k = Math.min(SCALE_EXTENT[1], Math.max(SCALE_EXTENT[0], k0));
-  return { k, x: width / 2 - ((x0 + x1) / 2) * k, y: height / 2 - ((y0 + y1) / 2) * k };
-}
-
 /**
  * 검색으로 고른 곳 보기: 경계 상자가 화면 가로 80%·세로 50% 안에 들도록 맞춘 줌을 minZ~maxZ로 자르고,
  * 점은 가로 가운데·세로 anchorY(모바일 셀 시트 위쪽)에 둔다.

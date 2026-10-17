@@ -43,4 +43,33 @@ describe('visibleTiles', () => {
     expect(Math.abs(t!.left + ((px - tx * TILE) / TILE) * t!.size - sx)).toBeLessThan(0.5);
     expect(Math.abs(t!.top + ((py - ty * TILE) / TILE) * t!.size - sy)).toBeLessThan(0.5);
   });
+
+  it.each([1.37, 2 ** 1.6, 2 ** 4.3])(
+    '타일 위치와 너비·높이는 정수 px이고 이웃 타일 끝과 시작이 딱 맞는다(이음매 없음) (k=%s)',
+    (k) => {
+      const v = { ...centered(k), x: centered(k).x + 0.37, y: centered(k).y + 0.61 };
+      const tiles = visibleTiles(v, W, H);
+      for (const t of tiles) {
+        expect(Number.isInteger(t.left), `left ${t.left}`).toBe(true);
+        expect(Number.isInteger(t.top), `top ${t.top}`).toBe(true);
+        expect(Number.isInteger(t.width), `width ${t.width}`).toBe(true);
+        expect(Number.isInteger(t.height), `height ${t.height}`).toBe(true);
+      }
+      const at = new Map(tiles.map((t) => [`${t.x},${t.y}`, t]));
+      let pairs = 0;
+      for (const t of tiles) {
+        const right = at.get(`${t.x + 1},${t.y}`);
+        const below = at.get(`${t.x},${t.y + 1}`);
+        if (right) {
+          pairs++;
+          expect(right.left).toBe(t.left + t.width);
+        }
+        if (below) {
+          pairs++;
+          expect(below.top).toBe(t.top + t.height);
+        }
+      }
+      expect(pairs).toBeGreaterThan(0);
+    },
+  );
 });

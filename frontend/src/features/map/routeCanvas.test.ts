@@ -9,7 +9,8 @@ import {
   ROUTE_WIDTH,
 } from '../../entities/risk/colors';
 import { drawRoute, type MapRoute } from './routeCanvas';
-import { fitView, lngLatToScreen } from './view';
+import { fitView } from './fitView.fixture';
+import { lngLatToScreen } from './view';
 
 type Op = {
   op: string;

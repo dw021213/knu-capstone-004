@@ -161,6 +161,7 @@ type Drawn = {
   count?: number;
   label?: string;
   box: [number, number, number, number];
+  anchor: [number, number];
 };
 const CITY_HALL: [number, number] = [126.5312, 33.4996];
 const drawn = (page: Page) => page.evaluate(() => window.__mapDebug!.markers() as Drawn[]);
@@ -273,6 +274,39 @@ test('@desktop CCTV·편의점·숙박을 함께 켜도 알약끼리 겹치지 �
   }
   expect(overlaps).toEqual([]);
 });
+
+for (const tag of ['', '@desktop ']) {
+  test(`${tag}첫 화면에서 CCTV·편의점·숙박을 켜면 알약은 종류마다 12개 이하, 실제 위치에서 한 줄 안, 서로 겹치지 않는다`, async ({
+    page,
+  }) => {
+    await openMap(page);
+    expect(await zoomNow(page)).toBeLessThan(11);
+    await turnOn(page, 'CCTV', '편의점', '숙박');
+    await expect.poll(async () => new Set((await drawn(page)).map((i) => i.group)).size).toBe(3);
+    const pills = (await drawn(page)).filter((i) => i.kind === 'cluster');
+    for (const g of ['cctv', 'convenience', 'lodging']) {
+      const n = pills.filter((p) => p.group === g).length;
+      expect(n, g).toBeGreaterThan(0);
+      expect(n, g).toBeLessThanOrEqual(12);
+    }
+    // 알약 중심은 묶음 무게중심에서 알약 한 줄(높이 28 + 틈 2) 안
+    const far = pills
+      .map((p) => ({ p, d: Math.hypot(p.x - p.anchor[0], p.y - p.anchor[1]) }))
+      .filter(({ d }) => d > 30.5)
+      .map(({ p, d }) => `${p.label} ${p.count}: ${d.toFixed(1)}px`);
+    expect(far).toEqual([]);
+    const overlaps: string[] = [];
+    for (let i = 0; i < pills.length; i++)
+      for (let j = i + 1; j < pills.length; j++) {
+        const [a, b] = [pills[i].box, pills[j].box];
+        if (a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3])
+          overlaps.push(
+            `${pills[i].label} ${pills[i].count} / ${pills[j].label} ${pills[j].count}`,
+          );
+      }
+    expect(overlaps).toEqual([]);
+  });
+}
 
 test('두 종류를 켜면 종류별로 따로 묶이고, 하나를 끄면 그 종류만 사라진다', async ({ page }) => {
   await openMap(page);
@@ -430,13 +464,15 @@ for (const tag of ['', '@desktop ']) {
   }) => {
     const cctv = await items(page, 'cctv');
     await openMap(page);
-    await zoomInAt(page, CITY_HALL, 13);
+    // 셀을 고르면 지도가 시청을 시트 위 좁은 영역으로 옮기므로(U10), 그 영역에서도 마커가 떨어져 보이게 14까지 확대한다
+    await zoomInAt(page, CITY_HALL, 14);
     // 시청 셀을 고른다(셀 중심을 눌러 경계 흔들림을 피한다)
     const hall = latLngToCell(CITY_HALL[1], CITY_HALL[0], 8);
     const [clat, clng] = cellToLatLng(hall);
     const [hx, hy] = await project(page, clng, clat);
     await page.mouse.click(hx, hy);
     await expect(page.getByTestId('selected-cell')).toHaveText(hall);
+    await page.waitForFunction(() => window.__mapDebug!.idle());
 
     await turnOn(page, 'CCTV');
     await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
