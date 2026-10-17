@@ -1,0 +1,7 @@
+dist/
+public/data/
+data-src/
+playwright-report/
+test-results/
+coverage/
+package-lock.json

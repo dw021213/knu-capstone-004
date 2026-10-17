@@ -1,0 +1,35 @@
+:root {
+  /* 위험 등급 램프 (1 낮음 ~ 5 매우 높음), 데이터 부족은 회색 빗금 */
+  --risk-1: #9fd39a;
+  --risk-2: #d7e47e;
+  --risk-3: #f5c451;
+  --risk-4: #ec8239;
+  --risk-5: #c0313a;
+  --risk-none: #bdbdbd;
+  --risk-fill-opacity: 0.5;
+
+  /* UI 색 */
+  --ink: #111111;
+  --ink2: #62626b;
+  --line: #d6d6dd;
+  --surf: #f4f4f6;
+  --white: #ffffff;
+
+  /* 글꼴 */
+  --font: 'Noto Sans KR', system-ui, sans-serif;
+
+  /* 간격 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  /* 반경 */
+  --radius-s: 8px;
+  --radius-m: 16px;
+  --radius-full: 999px;
+
+  /* 테두리 */
+  --border-strong: 1.5px;
+}
