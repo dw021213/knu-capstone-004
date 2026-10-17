@@ -81,8 +81,10 @@ test.describe('지도를 그린 뒤', () => {
     await page.mouse.click(x, y);
     const sheet = page.getByTestId('cell-sheet');
     await expect(sheet.getByTestId('sheet-badge')).toHaveText('데이터 부족');
+    // 시트에 가린 셀이면 지도가 시트 위로 옮겨 가므로(U10) 다 옮긴 뒤, 옮긴 화면에 보이는 남서쪽 바다를 누른다
+    await page.waitForFunction(() => window.__mapDebug!.idle());
     expect(await seriousViolations(page)).toEqual([]);
-    [x, y] = await page.evaluate(() => window.__mapDebug!.project(126.3, 33.7));
+    [x, y] = await page.evaluate(() => window.__mapDebug!.project(126.12, 33.22));
     await page.mouse.click(x, y);
     await expect(
       sheet.getByRole('heading', { name: '이 위치는 위험도 정보가 없어요' }),

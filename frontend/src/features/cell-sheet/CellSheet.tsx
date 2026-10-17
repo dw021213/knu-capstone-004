@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { CellScore, DataSource, PoiType, Scores } from '../../data/types';
 import { placeAt, placeLabel } from '../../entities/place/emd';
 import { countNearby, nearest } from '../../entities/poi/nearby';
@@ -54,6 +54,23 @@ export function CellSheet({
   const helpId = useId();
   const ref = useRef<HTMLElement>(null);
   const key = targetKey(target);
+
+  // 내용이 시트보다 길고 끝까지 굴리지 않았으면 아래쪽에 흐려지는 '더 보기' 표시를 둔다
+  const [more, setMore] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setMore(el.scrollHeight - el.clientHeight - el.scrollTop > 1);
+    check();
+    el.addEventListener('scroll', check, { passive: true });
+    // 시험 환경(jsdom)처럼 ResizeObserver가 없으면 굴릴 때와 다시 그릴 때만 본다
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check);
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener('scroll', check);
+      ro?.disconnect();
+    };
+  });
 
   // 새 셀을 열면 시트로 포커스를 옮겨 읽어 준다
   useEffect(() => {
@@ -123,7 +140,8 @@ export function CellSheet({
     </h2>
   );
   const chips = sources.length > 0 && (
-    <ul className={styles.chips} aria-label="출처">
+    // 모바일은 한 줄로 두고 옆으로 굴린다(키보드로도 굴릴 수 있게 포커스를 받는다)
+    <ul className={styles.chips} aria-label="출처" tabIndex={0}>
       {sources.map((s) => (
         <li key={s} className={styles.chip}>
           {s}
@@ -268,6 +286,14 @@ export function CellSheet({
         </p>
       </section>
       {target.kind === 'sea' && chips}
+      <div className={styles.more} data-testid="sheet-more" aria-hidden="true" hidden={!more}>
+        <span className={styles.moreHint}>
+          더 보기
+          <svg viewBox="0 0 16 16">
+            <path d="M4 6l4 4 4-4" />
+          </svg>
+        </span>
+      </div>
     </section>
   );
 }

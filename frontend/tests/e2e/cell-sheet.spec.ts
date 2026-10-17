@@ -41,6 +41,8 @@ async function clickCell(page: Page, h3: string) {
   const [x, y] = await project(page, ...center(h3));
   await page.mouse.click(x, y);
   await expect(page.getByTestId('selected-cell')).toHaveText(h3);
+  // 시트에 가린 셀이면 지도가 옮겨 가므로(U10) 다 옮긴 뒤 다음 조작을 한다
+  await page.waitForFunction(() => window.__mapDebug!.idle());
 }
 
 async function json<T>(page: Page, path: string): Promise<T> {
@@ -258,7 +260,7 @@ test('시설 카드와 셀 시트는 함께 보이지 않는다: 카드가 뜨�
     .toBeGreaterThan(0);
   const list = await page.evaluate(() => window.__mapDebug!.markers());
   const vp = page.viewportSize()!;
-  const m = list.find(
+  const lonely = list.filter(
     (i) =>
       i.kind === 'marker' &&
       i.x > 40 &&
@@ -266,7 +268,14 @@ test('시설 카드와 셀 시트는 함께 보이지 않는다: 카드가 뜨�
       i.y > 160 &&
       i.y < sheetBox.y - 20 &&
       list.every((o) => o === i || Math.hypot(o.x - i.x, o.y - i.y) > 30),
-  )!;
+  );
+  // 범례·레이어 버튼 같은 지도 위 조작에 가린 마커는 고르지 않는다
+  const onMap = await page.evaluate(
+    (pts) =>
+      pts.map(([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('[data-testid="map"]'))),
+    lonely.map((i) => [i.x, i.y] as [number, number]),
+  );
+  const m = lonely.find((_, k) => onMap[k])!;
   expect(m).toBeDefined();
   await page.mouse.click(m.x, m.y);
   const card = page.getByTestId('poi-card');
@@ -317,4 +326,41 @@ test('선택한 셀 위에 등급 숫자 태그(검정 바탕)를 그린다', as
   // 시트를 닫으면 태그도 사라진다
   await sheet(page).getByRole('button', { name: '닫기' }).click();
   await expect.poll(async () => (await pixel())[3]).toBeLessThan(255);
+});
+
+test('모바일 시트는 화면의 45%까지 커져 처음 열 때 주변 시설 표 첫 줄이 보이고, 넘치면 아래에 흐려지는 더 보기 표시가 있다', async ({
+  page,
+}) => {
+  await openMap(page);
+  const hall = latLngToCell(CITY_HALL[1], CITY_HALL[0], 8);
+  await clickCell(page, hall);
+  const sheet = page.getByTestId('cell-sheet');
+  await expect(sheet).toBeVisible();
+  const first = sheet.locator('tbody tr').first();
+  // 주변 시설 수가 다 들어온 뒤(… 아님)
+  await expect(first.locator('td').first()).toHaveText(/^\d+$/);
+  await expect(page.getByTestId('help-er')).not.toContainText('…');
+  const vp = page.viewportSize()!;
+  const s = (await sheet.boundingBox())!;
+  expect(s.height).toBeLessThanOrEqual(vp.height * 0.45 + 1);
+  expect(s.height).toBeGreaterThan(vp.height * 0.4);
+  // 내용이 시트보다 길다(굴려야 보이는 것이 있다)
+  const overflow = await sheet.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(overflow).toBeGreaterThan(0);
+  const more = page.getByTestId('sheet-more');
+  await expect(more).toBeVisible();
+  await expect(more).toContainText('더 보기');
+  const m = (await more.boundingBox())!;
+  // 흐려지는 표시는 시트 아래쪽에 붙어 있고, 표 첫 줄은 그 위에 다 보인다
+  expect(Math.abs(m.y + m.height - (s.y + s.height))).toBeLessThan(4);
+  const r = (await first.boundingBox())!;
+  expect(r.y).toBeGreaterThanOrEqual(s.y);
+  expect(r.y + r.height).toBeLessThanOrEqual(m.y);
+  // 표시는 누르기를 가로채지 않는다
+  await expect(more).toHaveCSS('pointer-events', 'none');
+  // 끝까지 굴리면 표시가 사라진다
+  await sheet.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expect(more).toBeHidden();
+  await sheet.evaluate((el) => el.scrollTo({ top: 0 }));
+  await expect(more).toBeVisible();
 });
