@@ -17,6 +17,7 @@ import {
   gridJson,
   handlers,
   seen,
+  snapshotScoresJson,
 } from './mocks/backend';
 
 const server = setupServer(...handlers);
@@ -97,6 +98,10 @@ describe.each([
 });
 
 describe('snapshot 구현', () => {
+  it('점수 파일의 생성 시각을 싣는다', async () => {
+    expect((await makeSnapshot().getScores()).generatedAt).toBe(snapshotScoresJson.generatedAt);
+  });
+
   it('날씨는 반영하지 않는다(off)', async () => {
     expect((await makeSnapshot().getScores({ at: '2026-10-19T09:00' })).weather).toBe('off');
   });

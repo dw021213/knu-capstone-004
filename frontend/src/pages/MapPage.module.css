@@ -3,3 +3,40 @@
   flex: 1;
   min-height: 0;
 }
+
+/* 지도 위 층: 빈 곳은 지도로 통과시킨다(상속). 보이는 패널만 pointer-events: auto */
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border-bottom: 1px solid var(--line);
+  pointer-events: auto;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-4);
+  padding: 0 var(--space-4);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  font-size: var(--text-s);
+  font-weight: 700;
+  color: var(--ink2);
+}
+
+.tab[aria-current='true'] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--ink);
+}

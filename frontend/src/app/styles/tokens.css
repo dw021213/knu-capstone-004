@@ -6,6 +6,8 @@
   --risk-4: #ec8239;
   --risk-5: #c0313a;
   --risk-none: #bdbdbd;
+  /* 데이터 부족 빗금 선(colors.ts NO_DATA_HATCH_COLOR와 같다) */
+  --risk-none-hatch: #8e8e8e;
   --risk-fill-opacity: 0.5;
 
   /* 배경 지도 타일: 채도를 낮춰 위험 색이 먼저 보이게 */
@@ -17,6 +19,8 @@
   --line: #d6d6dd;
   --surf: #f4f4f6;
   --white: #ffffff;
+  /* 시트 뒤 지도를 어둡게 */
+  --scrim: color-mix(in srgb, var(--ink) 40%, transparent);
 
   /* 글꼴 */
   --font: 'Noto Sans KR', system-ui, sans-serif;
@@ -27,6 +31,16 @@
   --space-3: 12px;
   --space-4: 16px;
   --space-6: 24px;
+  --space-8: 32px;
+
+  /* 누를 수 있는 것의 최소 크기 */
+  --touch: 44px;
+
+  /* 글자 크기 */
+  --text-xs: 12px;
+  --text-s: 14px;
+  --text-m: 16px;
+  --text-l: 18px;
 
   /* 반경 */
   --radius-s: 8px;

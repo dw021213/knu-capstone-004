@@ -52,7 +52,7 @@ export function createSnapshotSource(base = ''): DataSource {
       for (const [h3, [p, code]] of Object.entries(file.cells)) {
         cells.set(h3, toCellScore(h3, p, roadSourceFromCode(code)));
       }
-      return { datasetId: file.datasetId, cells, weather: 'off' };
+      return { datasetId: file.datasetId, generatedAt: file.generatedAt, cells, weather: 'off' };
     },
     async getPoi(type: PoiType): Promise<PoiLayer> {
       const file = await fetchOptionalJson<PoiFile>(`${base}/data/poi/${type}.json`);

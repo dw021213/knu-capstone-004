@@ -32,6 +32,8 @@ CI=1 npm run test:e2e
 | `VITE_DATA_MODE` | `api`                       | `VITE_API_BASE`의 백엔드 API를 부릅니다. 백엔드에 없는 시설·코스는 snapshot 파일을 씁니다                |
 | `VITE_API_BASE`  | 예: `http://localhost:8000` | `api` 모드에서 부를 백엔드 주소                                                                          |
 
+날짜 칩('오늘 / 날짜 선택')은 서울 시간대로 날짜를 셉니다. `snapshot` 모드의 점수는 날씨를 반영하지 않은 날짜 무관 공간 점수라 날짜를 바꿔도 다시 받지 않고, 칩 위에 "날씨 미반영 · 공간 점수는 날짜와 무관" 안내를 띄웁니다. `api` 모드는 고른 날짜와 지금 시각을 `at=YYYY-MM-DDTHH:00`으로 실어 `/api/grid?weather=on`을 다시 부르고, "날씨는 오늘 관측값만 반영" 안내를 띄웁니다(백엔드 기상 가산은 AWS 관측 기반이라 미래 날짜에는 들어가지 않으므로 달력에 날씨 점을 찍지 않습니다). 두 모드 값의 차이는 `docs/DATA_SOURCES.md`에 있습니다.
+
 로컬 백엔드와 함께 쓰는 예:
 
 ```bash

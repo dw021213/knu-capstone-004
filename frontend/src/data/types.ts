@@ -13,6 +13,8 @@ export interface CellScore {
 
 export interface Scores {
   datasetId: string;
+  /** 점수 파일 생성 시각(ISO, snapshot 모드만) */
+  generatedAt?: string;
   cells: Map<string, CellScore>;
   /** off: 반영 안 함(스냅숏), on: 기상 가산 반영, no_data: 그 시각 관측 없음 */
   weather: 'off' | 'on' | 'no_data';

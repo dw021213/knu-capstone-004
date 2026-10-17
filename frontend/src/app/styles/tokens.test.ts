@@ -44,7 +44,17 @@ describe('tokens.css', () => {
     ['--radius-s', '8px'],
     ['--radius-m', '16px'],
     ['--radius-full', '999px'],
+    ['--space-8', '32px'],
+    ['--touch', '44px'],
+    ['--text-xs', '12px'],
+    ['--text-s', '14px'],
+    ['--text-m', '16px'],
+    ['--text-l', '18px'],
   ])('간격·반경 %s = %s', (name, value) => {
     expect(declared(name)).toBe(value);
+  });
+
+  test('시트 뒤 어둡게 하는 색은 ink를 섞어 만든다', () => {
+    expect(declared('--scrim')).toBe('color-mix(in srgb, var(--ink) 40%, transparent)');
   });
 });
