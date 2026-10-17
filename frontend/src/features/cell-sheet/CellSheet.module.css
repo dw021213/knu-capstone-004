@@ -297,3 +297,10 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* 데스크톱 패널은 화면 높이를 다 써서 흐려지는 표시를 두지 않는다 */
+@media (min-width: 769px) {
+  .more {
+    display: none;
+  }
+}

@@ -364,3 +364,11 @@ test('모바일 시트는 화면의 45%까지 커져 처음 열 때 주변 시�
   await sheet.evaluate((el) => el.scrollTo({ top: 0 }));
   await expect(more).toBeVisible();
 });
+
+test('@desktop 데스크톱 셀 패널에는 흐려지는 더 보기 표시를 두지 않는다', async ({ page }) => {
+  await openMap(page);
+  await clickCell(page, latLngToCell(CITY_HALL[1], CITY_HALL[0], 8));
+  await expect(sheet(page)).toBeVisible();
+  await expect(page.getByTestId('help-er')).not.toContainText('…');
+  await expect(page.getByTestId('sheet-more')).toBeHidden();
+});
