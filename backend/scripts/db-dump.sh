@@ -13,7 +13,7 @@ if [[ ${1:-} == --deploy ]]; then deploy=true; shift; fi
 out_dir="${1:-../..}"
 model=$(docker exec jeju-risk-db psql -U jeju -d jeju -Atc "SELECT dataset_id FROM hazard_meta WHERE hazard = 'traffic'" || true)
 tag=nomodel
-if [[ $model == *islands* ]]; then tag=road-islands; elif [[ $model == *road* ]]; then tag=road; fi
+if [[ $model == *_d8_* ]]; then tag=road-d8; elif [[ $model == *islands* ]]; then tag=road-islands; elif [[ $model == *road* ]]; then tag=road; fi
 extra=()
 if $deploy; then tag="$tag-deploy"; extra=(--exclude-table-data=weather_obs --exclude-table-data=risk_combined --exclude-table-data=cell_population_hourly --exclude-table-data=cell_population); fi
 out="$out_dir/jeju_$(date +%Y%m%d)_${tag}.sql.gz"

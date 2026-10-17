@@ -28,7 +28,7 @@
 
 | 구성 | 자료 | 비고 |
 |---|---|---|
-| 모델 위험점수 | ML 팀 **도로 전용 CatBoost, 우도·추자도 포함** (`jeju_h3_r8_road_islands_its20260914_ngii2025_v1`, 본섬 표준노드링크 2026-09-14 / 섬 수치지도 2025) | 날짜와 무관한 고정값. 도로 있는 2,249셀만 점수 있음 |
+| 모델 위험점수 | ML 팀 **도로 전용 CatBoost 깊이 8, 우도·추자도 포함** (`jeju_h3_r8_road_d8_its20260914_ngii2025_v2`, 본섬 표준노드링크 2026-09-14 / 섬 수치지도 2025) | 날짜와 무관한 고정값. 도로 있는 2,249셀만 점수 있음 |
 | 기상 가산 | 기상청 API허브 AWS 정시 관측 (제주 43개 지점, 서버가 15분마다 수집) | 관측 기반. 미래 시각에는 관측이 없어 가산 0 |
 
 - 기상 가산값 근거: 2021 교통사고 구급신고에서 호우 경보급 격자·일의 사고율이 평소의 2.11배 → 모델 점수 0.15점과 같은 효과 (`config/weather_rules.json` 의 `evidence`).
@@ -64,7 +64,7 @@
   "fields": "risk_* = 기상 가산 반영(지도 색), base_* = 가산 전 모델 점수, weather_bonus = 가산점",
   "hazards": [
     { "hazard": "traffic", "name": "교통사고", "label": "도로 특성 기반 상대 교통사고 위험도",
-      "dataset_id": "jeju_h3_r8_road_islands_its20260914_ngii2025_v1", "snapshot_date": "2026-09-14",
+      "dataset_id": "jeju_h3_r8_road_d8_its20260914_ngii2025_v2", "snapshot_date": "2026-09-14",
       "limitations": ["…ML 팀 제한사항(영문)…"] }
   ],
   "hazards_planned": ["traffic", "disaster", "crime"],
