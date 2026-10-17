@@ -13,7 +13,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "data:scores": "node scripts/build-scores.mjs"
+    "data:scores": "node scripts/build-scores.mjs",
+    "data:poi": "node scripts/build-poi.mjs data-src/poi",
+    "data:poi:fetch": "node scripts/fetch-poi.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.3",

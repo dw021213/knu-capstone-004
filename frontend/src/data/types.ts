@@ -68,9 +68,13 @@ export interface ScoresFile {
   cells: Record<string, [number | null, number]>;
 }
 
-/** public/data/poi/<type>.json */
+/** public/data/poi/<type>.json (scripts/build-poi.mjs 생성물). status가 없으면 ready로 본다 */
 export interface PoiFile {
+  type?: PoiType;
+  status?: 'ready' | 'pending';
   source: string;
+  /** 원본을 받은 날(YYYY-MM-DD) */
+  fetchedAt?: string;
   items: Poi[];
 }
 

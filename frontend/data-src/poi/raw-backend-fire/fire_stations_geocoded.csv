@@ -1,0 +1,25 @@
+type,name,address,lat,lng,geocode_query
+fire_station,구좌119안전센터,제주 제주시 구좌읍 세화14길 8,33.520370,126.860190,override: OSM 노드 '구좌119센터' (Nominatim)
+fire_station,남원119안전센터,제주 서귀포시 남원읍 남원체육관로221번길 23,33.281488,126.708484,override: Google Maps plus code 8Q587PJ5+H9X
+fire_station,성산119안전센터,제주 서귀포시 성산읍 일주동로 4120번길 7,33.460262,126.909672,override: Google Maps plus code 8Q58FW65+4V3
+fire_station,조천119안전센터,제주 제주시 조천읍 신북로 337,33.5410862,126.6469280,제주특별자치도 제주시 조천읍 신북로 337
+fire_station,표선119안전센터,제주 서귀포시 표선면 표선동서로 125,33.327137,126.827766,override: Google Maps plus code 8Q588RGH+V42
+fire_station,대신119안전센터,제주 서귀포시 서호남로 20,33.249688,126.513828,override: Google Maps plus code 8Q586GX7+VGG
+fire_station,동홍119안전센터,제주 서귀포시 서홍로 14,33.27688,126.5428872,override: APPROX Nominatim 도로 매칭(서홍로) - 확인 필요
+fire_station,중문119안전센터,제주 서귀포시 일주서로 669,33.254162,126.438016,override: Google Maps plus code 8Q587C3Q+M66
+fire_station,효돈119안전센터,제주 서귀포시 일주동로 8234,33.260837,126.607766,override: Google Maps plus code 8Q587J65+84J
+fire_station,대정119안전센터,제주 서귀포시 대정읍 일주서로 2717,33.232520,126.240810,override: OSM amenity=fire_station '대정119 안전센터'
+fire_station,안덕119안전센터,제주 서귀포시 안덕면 화순서서로 2,33.251062,126.330891,override: Google Maps plus code 8Q58782J+C9C
+fire_station,애월119안전센터,제주 제주시 애월읍 일주서로 6513,33.462038,126.329953,override: Google Maps plus code 8Q58F86H+RX8
+fire_station,영어교육도시119안전센터,제주 서귀포시 대정읍 에듀시티로 238,33.286136,126.2808316,override: APPROX Nominatim 도로 매칭(에듀시티로) - 확인 필요
+fire_station,한경119안전센터,제주 제주시 한경면 일주서로 4218,33.29559,126.18753,override: APPROX Nominatim 도로 매칭(일주서로 고산리) - 확인 필요
+fire_station,한림119안전센터,제주 제주시 한림읍 한림중앙로 150,33.402520,126.270250,override: OSM amenity=fire_station (이름 없음)
+fire_station,노형119안전센터,제주 제주시 광평동로 2(노형동),33.48107,126.47224,override: OSM amenity=fire_station '노형119센터'
+fire_station,삼도119안전센터,제주 제주시 탑동로 101(삼도2동),33.51584,126.51712,override: OSM amenity=fire_station '삼도119센터'
+fire_station,아라119안전센터,제주 제주시 사송길 116(영평동),33.467912,126.565766,override: Google Maps plus code 8Q58FH98+586
+fire_station,연동119안전센터,제주 제주시 문송길 14(연동),33.4876771,126.4973403,override: APPROX Nominatim 도로 매칭(문송길) - 확인 필요
+fire_station,오라119안전센터,제주 제주시 서광로2길 24(오라1동),33.4955019,126.5178367,제주특별자치도 제주시 서광로2길 24
+fire_station,외도119안전센터,제주 제주시 통물길 75(외도1동),33.4866376,126.4374946,제주특별자치도 제주시 통물길 75
+fire_station,이도119안전센터,제주 제주시 중앙로 342(이도2동),33.4910930,126.5368100,제주특별자치도 제주시 중앙로 342
+fire_station,항만119안전센터,제주 제주시 임항로 146(건입동),33.5197222,126.5388889,제주특별자치도 제주시 임항로 146
+fire_station,화북119안전센터,제주 제주시 동화로1길 3(화북1동),33.5194537,126.5735529,제주특별자치도 제주시 동화로1길 3

@@ -57,7 +57,7 @@ export function createSnapshotSource(base = ''): DataSource {
     async getPoi(type: PoiType): Promise<PoiLayer> {
       const file = await fetchOptionalJson<PoiFile>(`${base}/data/poi/${type}.json`);
       if (!file) return { type, status: 'pending', source: '', items: [] };
-      return { type, status: 'ready', source: file.source, items: file.items };
+      return { type, status: file.status ?? 'ready', source: file.source, items: file.items };
     },
     async getCourses(): Promise<CourseList> {
       const file = await fetchOptionalJson<CourseFile>(`${base}/data/courses.json`);

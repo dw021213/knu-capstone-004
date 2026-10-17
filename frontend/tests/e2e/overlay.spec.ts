@@ -69,7 +69,9 @@ async function expectBlocks(page: Page, targets: Locator[]) {
 }
 
 for (const tag of ['', '@desktop ']) {
-  test(`${tag}범례·칩·안내·상단 라벨 위를 눌러도 지도 셀이 선택되지 않는다`, async ({ page }) => {
+  test(`${tag}범례·칩·안내·상단 라벨·레이어 버튼 위를 눌러도 지도 셀이 선택되지 않는다`, async ({
+    page,
+  }) => {
     await zoomIntoLand(page);
     const legend = page.getByTestId('legend');
     // 모바일은 펼친 범례 본문까지 확인한다(데스크톱은 처음부터 펼침)
@@ -82,6 +84,8 @@ for (const tag of ['', '@desktop ']) {
       bar.getByRole('button', { name: '오늘' }),
       page.getByText('날씨 미반영 · 공간 점수는 날짜와 무관', { exact: true }),
       page.getByTestId('risk-tabs'),
+      // 마지막에 둔다: 누르면 패널이 열려 앞 대상들을 가릴 수 있다
+      page.getByRole('button', { name: /^레이어/ }),
     ]);
   });
 }
