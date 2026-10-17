@@ -280,10 +280,12 @@ test('6px 넘게 끌면 선택이 바뀌지 않고, 조금 흔들린 누르기�
   await expect(page.getByTestId('selected-cell')).toHaveText(graded);
 });
 
-test('배경 타일은 채도를 낮춰 위험 색이 잘 보이게 한다', async ({ page }) => {
+test('배경 타일은 채도를 절반쯤 낮춰 위험 색이 잘 보이고 육지와 바다는 구분된다', async ({
+  page,
+}) => {
   await openMap(page);
   const tile = page.getByTestId('map').locator('img').first();
-  await expect(tile).toHaveCSS('filter', /grayscale\(0\.85\)/);
+  await expect(tile).toHaveCSS('filter', /grayscale\(0\.45\)/);
 });
 
 test('@desktop 북쪽 끝까지 끌면 추자도 셀이 화면에 들어온다', async ({ page }) => {

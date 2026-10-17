@@ -10,8 +10,8 @@
   --risk-none-hatch: #8e8e8e;
   --risk-fill-opacity: 0.5;
 
-  /* 배경 지도 타일: 채도를 낮춰 위험 색이 먼저 보이게 */
-  --basemap-filter: grayscale(0.85) brightness(1.05) contrast(0.95);
+  /* 배경 지도 타일: 채도를 절반쯤 낮춰 위험 색이 먼저 보이되 육지와 바다는 구분되게 */
+  --basemap-filter: grayscale(0.45) brightness(1.02);
 
   /* UI 색 */
   --ink: #111111;
