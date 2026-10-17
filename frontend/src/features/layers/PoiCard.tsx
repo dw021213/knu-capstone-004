@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { Poi, PoiLayer } from '../../data/types';
+import { focusRingSource } from '../../shared/a11y/inputModality';
 import { distanceMeters, formatDistance } from '../../shared/geo/distance';
 import { LAYER_DEFS, OSM_COORDS } from './layerDefs';
 import { ShapeIcon } from './ShapeIcon';
@@ -36,6 +37,7 @@ export function PoiCard({ poi, layer, from, onClose }: PoiCardProps) {
     <section
       ref={ref}
       className={styles.card}
+      onFocus={focusRingSource.onFocus}
       role="dialog"
       aria-labelledby={titleId}
       tabIndex={-1}

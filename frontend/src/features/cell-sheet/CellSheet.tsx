@@ -5,6 +5,7 @@ import { countNearby, nearest } from '../../entities/poi/nearby';
 import { buildReason } from '../../entities/risk/reason';
 import { formatDistance } from '../../shared/geo/distance';
 import { cellCenter } from '../../shared/geo/h3';
+import { focusRingSource } from '../../shared/a11y/inputModality';
 import { LAYER_DEFS, OSM_COORDS } from '../layers/layerDefs';
 import { LAYER_TYPES } from '../layers/useLayers';
 import type { SheetData } from './useSheetData';
@@ -159,6 +160,7 @@ export function CellSheet({
       tabIndex={-1}
       hidden={hidden}
       data-testid="cell-sheet"
+      onFocus={focusRingSource.onFocus}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();

@@ -24,6 +24,11 @@ body,
   }
 }
 
+/* 마우스·손가락으로 열려 스스로 포커스를 받은 시트·카드는 테두리를 그리지 않는다(shared/a11y/inputModality) */
+[data-focus-ring='off'][data-focus-ring]:focus-visible {
+  outline: none;
+}
+
 body {
   font-family: var(--font);
   color: var(--ink);
