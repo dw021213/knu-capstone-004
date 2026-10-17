@@ -179,6 +179,10 @@ test.describe('U8-4 코스 상세', () => {
       await expect(items).toHaveCount(6);
       await expect(items.first()).toContainText(/\d+\.\dkm|\d+\.\d~\d+\.\dkm/);
       await expect(items.first()).toContainText('상위');
+      // 경로는 지도 크기를 잰 뒤 그린다. 목록이 먼저 보일 수 있어 그려질 때까지 기다린다
+      await expect
+        .poll(async () => (await page.evaluate(() => window.__mapDebug!.route())).lines)
+        .toBeGreaterThan(6);
       const route = await page.evaluate(() => window.__mapDebug!.route());
       expect(route.lines).toBeGreaterThan(6);
       expect(route.marks.map((m) => m.label)).toEqual(['1', '2', '3', '4', '5', '6']);
