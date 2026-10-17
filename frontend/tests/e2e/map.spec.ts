@@ -2,7 +2,7 @@
 import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
 import { RISK_COLOR } from '../../src/entities/risk/colors';
 import { levelFromPercentile } from '../../src/entities/risk/level';
-import { test, expect } from './fixtures';
+import { test, expect, expectSelectionStays } from './fixtures';
 
 const AIRPORT: [number, number] = [126.493, 33.5113];
 
@@ -99,7 +99,7 @@ test('@desktop 크게 끌어도 제주 경계 밖으로 나가지 않는다', as
   expect(cy).toBeGreaterThan(0);
   expect(cy).toBeLessThan(vp.height);
   // 끌기는 셀 선택이 아니다
-  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  await expectSelectionStays(page, '');
 });
 
 test('핀치로 확대되고 한 손가락으로 끌면 이동한다', async ({ page }) => {
@@ -145,7 +145,7 @@ test('핀치로 확대되고 한 손가락으로 끌면 이동한다', async ({ 
   await expect.poll(async () => (await project(page, ...CENTER))[0]).toBeLessThan(before[0] - 60);
   const after = await project(page, ...CENTER);
   expect(after[1]).toBeLessThan(before[1] - 30);
-  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  await expectSelectionStays(page, '');
 });
 
 /** canvas에서 화면 점 (x, y) 둘레 한 변 2r+1 CSS px 정사각형의 RGBA 픽셀 */
@@ -269,8 +269,7 @@ test('6px 넘게 끌면 선택이 바뀌지 않고, 조금 흔들린 누르기�
   await page.mouse.down();
   for (let i = 1; i <= 5; i++) await page.mouse.move(gx + i * 4, gy);
   await page.mouse.up();
-  await page.waitForTimeout(300);
-  await expect(page.getByTestId('selected-cell')).toHaveText(airport);
+  await expectSelectionStays(page, airport);
 
   // 2px 흔들린 누르기: 그 셀이 선택된다
   [gx, gy] = await gradedCenter();
@@ -299,4 +298,21 @@ test('@desktop 북쪽 끝까지 끌면 추자도 셀이 화면에 들어온다',
   expect(x).toBeLessThan(vp.width);
   expect(y).toBeGreaterThan(0);
   expect(y).toBeLessThan(vp.height);
+});
+
+test('두 번 누르면 확대만 하고 셀을 고르지 않는다(셀 시트가 두 번째 누르기를 가로채지 않게)', async ({
+  page,
+}) => {
+  await openMap(page);
+  // 모바일에서 셀 시트가 열리는 화면 아래쪽 땅(서귀포)
+  const at: [number, number] = [126.56, 33.26];
+  for (let i = 0; i < 2; i++) {
+    const z = await zoomNow(page);
+    const [x, y] = await project(page, ...at);
+    await page.mouse.dblclick(x, y);
+    await expect.poll(() => zoomNow(page)).toBeGreaterThan(z + 0.9);
+  }
+  await page.waitForTimeout(500);
+  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  await expect(page.getByTestId('cell-sheet')).toHaveCount(0);
 });

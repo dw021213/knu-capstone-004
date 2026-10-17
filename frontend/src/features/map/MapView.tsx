@@ -12,12 +12,14 @@ import type { Scores } from '../../data/types';
 import { drawCells, makeHatchPattern, prepareCells } from './cellCanvas';
 import { BASEMAP } from './basemap';
 import { cellAt } from './hitTest';
+import { TAP_DELAY } from './gesture';
 import { drawMarkers, hitTest, type MarkerHit, type MarkerLayout } from './markerCanvas';
 import { tileUrl, visibleTiles } from './tiles';
 import { JEJU_BOUNDS } from './projection';
 import {
   SCALE_EXTENT,
   fitView,
+  focusView,
   lngLatToScreen,
   screenToLngLat,
   worldExtent,
@@ -37,6 +39,16 @@ export interface MapViewProps {
   onMarkerSelect?: (group: string, id: string) => void;
   /** 크게 그릴 마커 id */
   highlight?: string | null;
+  /** 이곳으로 옮기고 확대한다(검색). key가 바뀔 때마다 한 번 */
+  focus?: MapFocus | null;
+}
+
+export interface MapFocus {
+  key: number;
+  /** 맞출 경계 [서, 남, 동, 북] */
+  bbox: [number, number, number, number];
+  /** 화면 위쪽 가운데에 둘 점 [경도, 위도] */
+  point: [number, number];
 }
 
 /** 이 거리(CSS px)보다 덜 움직이고 뗀 포인터만 셀 선택으로 본다 */
@@ -62,6 +74,7 @@ export function MapView({
   markers,
   onMarkerSelect,
   highlight = null,
+  focus = null,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -130,6 +143,38 @@ export function MapView({
     };
   }, [size]);
 
+  // 검색으로 고른 곳으로 옮기고 확대한다
+  const focusKey = focus?.key;
+  const focusRef = useRef(focus);
+  const appliedFocus = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    focusRef.current = focus;
+  });
+  useEffect(() => {
+    const f = focusRef.current;
+    if (focusKey === undefined || !f || !zoomRef.current || !size) return;
+    // 같은 검색 결과로는 한 번만 옮긴다(크기가 바뀌어도 다시 옮기지 않음)
+    if (appliedFocus.current === focusKey) return;
+    appliedFocus.current = focusKey;
+    const { behavior, sel } = zoomRef.current;
+    const [west, south, east, north] = f.bbox;
+    const v = focusView(size.w, size.h, { west, south, east, north }, f.point);
+    const extent: [[number, number], [number, number]] = [
+      [0, 0],
+      [size.w, size.h],
+    ];
+    const t = behavior.constrain()(
+      zoomIdentity.translate(v.x, v.y).scale(v.k),
+      extent,
+      worldExtent(JEJU_BOUNDS),
+    );
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    sel
+      .transition()
+      .duration(reduce ? 0 : 300)
+      .call(behavior.transform, t);
+  }, [focusKey, size]);
+
   // 셀 그리기(조작이 끝났을 때, 크기·데이터·선택이 바뀔 때)
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -144,18 +189,28 @@ export function MapView({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     if (hatchRef.current?.ctx !== ctx) hatchRef.current = { ctx, pattern: makeHatchPattern(ctx) };
+    // 선택한 셀 위 등급 숫자(데이터 부족 셀은 숫자 없이 테두리만)
+    const level = selected ? scores?.cells.get(selected)?.level : null;
     drawCells(ctx, cells, settled, {
       width: size.w,
       height: size.h,
       dpr,
       hatch: hatchRef.current.pattern,
       selected,
+      tag: level
+        ? {
+            text: String(level),
+            ink: cssVar(canvas, '--ink'),
+            white: cssVar(canvas, '--white'),
+            font: cssVar(canvas, '--font'),
+          }
+        : null,
     });
     if (cells.length > 0) {
       performance.mark('cells-drawn');
       window.__mapReady = true;
     }
-  }, [cells, settled, size, selected]);
+  }, [cells, settled, size, selected, scores]);
 
   // 시설 마커(조작이 끝났을 때, 크기·마커·강조가 바뀔 때). 셀 canvas와 같은 방식
   useLayoutEffect(() => {
@@ -250,13 +305,22 @@ export function MapView({
     const el = containerRef.current!;
     const downs = new Map<number, [number, number]>();
     let multi = false;
+    // 기다리는 한 번 누르기, 두 번째 누르기로 취소된 포인터
+    let pendingTap: number | null = null;
+    const secondTap = new Set<number>();
     const onDown = (e: PointerEvent) => {
       downs.set(e.pointerId, [e.clientX, e.clientY]);
       if (downs.size > 1) multi = true;
+      if (pendingTap !== null) {
+        window.clearTimeout(pendingTap);
+        pendingTap = null;
+        secondTap.add(e.pointerId);
+      }
     };
     const onUp = (e: PointerEvent) => {
       const start = downs.get(e.pointerId);
       downs.delete(e.pointerId);
+      const wasSecond = secondTap.delete(e.pointerId);
       const wasMulti = multi;
       if (downs.size === 0) multi = false;
       const v = viewRef.current;
@@ -280,17 +344,23 @@ export function MapView({
         }
         return;
       }
+      if (wasSecond) return;
       const lngLat = screenToLngLat(v, p);
-      selectRef.current?.(known ? cellAt(lngLat[0], lngLat[1], known) : null, lngLat);
+      pendingTap = window.setTimeout(() => {
+        pendingTap = null;
+        selectRef.current?.(known ? cellAt(lngLat[0], lngLat[1], known) : null, lngLat);
+      }, TAP_DELAY);
     };
     const onCancel = (e: PointerEvent) => {
       downs.delete(e.pointerId);
+      secondTap.delete(e.pointerId);
       if (downs.size === 0) multi = false;
     };
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onCancel);
     return () => {
+      if (pendingTap !== null) window.clearTimeout(pendingTap);
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', onCancel);

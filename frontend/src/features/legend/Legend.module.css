@@ -1,7 +1,7 @@
 /* 모바일: 지도 오른쪽 위(상단 '종합' 아래)에 접힌 막대 */
 .legend {
   position: absolute;
-  top: calc(var(--touch) + var(--space-3));
+  top: var(--overlay-top);
   right: var(--space-3);
   max-width: calc(100% - var(--space-6));
   padding: 0 var(--space-2);

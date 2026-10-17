@@ -1,0 +1,257 @@
+/* 모바일: 날짜 칩 바로 위 카드(칩은 시트에 가리지 않는다). 높이를 줄여 지도 가운데를 가리지 않고, 넘치면 안에서 굴린다 */
+.sheet {
+  max-height: 30dvh;
+  margin: 0 var(--space-3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-1) var(--space-4) var(--space-4);
+  background: var(--white);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-m);
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+/* 데스크톱: 오른쪽 패널. 아래 범례 카드(--legend-h)를 가리지 않는다 */
+@media (min-width: 768px) {
+  .sheet {
+    position: absolute;
+    top: var(--overlay-top);
+    right: var(--space-4);
+    width: calc(var(--touch) * 8);
+    max-height: calc(
+      100% - var(--overlay-top) - var(--space-8) - var(--legend-h, 0px) - var(--space-3)
+    );
+    margin: 0;
+  }
+}
+
+.sheet:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -4px;
+}
+
+.sheet[hidden] {
+  display: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.badgeRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+/* 등급 배지: 색 칩 + 1.5px 검정 테두리, 숫자와 이름 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--space-8);
+  padding: 0 var(--space-3);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  font-size: var(--text-m);
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.badge[data-level='1'] {
+  background: var(--risk-1);
+}
+.badge[data-level='2'] {
+  background: var(--risk-2);
+}
+.badge[data-level='3'] {
+  background: var(--risk-3);
+}
+.badge[data-level='4'] {
+  background: var(--risk-4);
+}
+.badge[data-level='5'] {
+  background: var(--risk-5);
+  color: var(--white);
+}
+
+/* 데이터 부족: 흰 바탕 + 지도·범례와 같은 회색 빗금 칸(안전처럼 보이는 색을 쓰지 않는다) */
+.badge[data-level='none'] {
+  gap: var(--space-2);
+  padding-left: var(--space-2);
+  background: var(--white);
+}
+
+.badge[data-level='none']::before {
+  content: '';
+  width: var(--space-4);
+  height: var(--space-4);
+  border-radius: var(--space-1);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--risk-none) 0 3px,
+    var(--risk-none-hatch) 3px 4px
+  );
+}
+
+.badgeNote {
+  font-size: var(--text-s);
+  color: var(--ink2);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--touch);
+  height: var(--touch);
+  margin-right: calc(var(--space-2) * -1);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--ink);
+}
+
+.close svg {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.title {
+  margin: var(--space-1) 0 var(--space-1);
+  font-size: var(--text-l);
+  font-weight: 700;
+  word-break: keep-all;
+}
+
+.basis {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}
+
+.reason {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-s);
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+/* 출처 칩: 줄바꿈 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surf);
+  font-size: var(--text-xs);
+  color: var(--ink2);
+  word-break: keep-all;
+}
+
+.table {
+  width: 100%;
+  margin: 0 0 var(--space-3);
+  border-collapse: collapse;
+  font-size: var(--text-s);
+}
+
+.caption {
+  margin-bottom: var(--space-1);
+  font-weight: 700;
+  text-align: left;
+}
+
+.table th,
+.table td {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+
+.table th:first-child {
+  text-align: left;
+  font-weight: 400;
+}
+
+.table thead th {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--ink2);
+}
+
+.table td {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.help {
+  padding-top: var(--space-1);
+}
+
+.helpTitle {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+.helpRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.helpRow {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--text-s);
+}
+
+.helpRow dt {
+  flex-shrink: 0;
+  width: calc(var(--space-8) * 2 + var(--space-6));
+  color: var(--ink2);
+}
+
+.helpRow dd {
+  margin: 0;
+  font-weight: 700;
+  word-break: keep-all;
+}
+
+.helpNote {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}
+
+/* 바다 시트: 가까운 도움 아래 출처 */
+.help ~ .chips {
+  margin: var(--space-3) 0 0;
+}

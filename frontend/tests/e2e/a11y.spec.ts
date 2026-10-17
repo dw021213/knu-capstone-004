@@ -59,3 +59,43 @@ test('시설 카드를 연 화면에 접근성 critical·serious 위반이 없�
   await expect(page.getByTestId('poi-card')).toBeVisible();
   expect(await seriousViolations(page)).toEqual([]);
 });
+
+for (const tag of ['', '@desktop ']) {
+  test(`${tag}셀 시트를 연 화면에 접근성 critical·serious 위반이 없다`, async ({ page }) => {
+    // 제주시청 셀(등급 5)
+    const [x, y] = await page.evaluate(() => window.__mapDebug!.project(126.5312, 33.4996));
+    await page.mouse.click(x, y);
+    const sheet = page.getByTestId('cell-sheet');
+    await expect(sheet).toBeVisible();
+    // 주변 시설 숫자까지 채워진 뒤 검사한다
+    await expect(sheet.getByRole('table')).not.toContainText('…');
+    expect(await seriousViolations(page)).toEqual([]);
+  });
+}
+
+test('데이터 부족 셀 시트와 바다 시트에 접근성 critical·serious 위반이 없다', async ({ page }) => {
+  let [x, y] = await page.evaluate(() => window.__mapDebug!.project(126.53, 33.36));
+  await page.mouse.click(x, y);
+  const sheet = page.getByTestId('cell-sheet');
+  await expect(sheet.getByTestId('sheet-badge')).toHaveText('데이터 부족');
+  expect(await seriousViolations(page)).toEqual([]);
+  [x, y] = await page.evaluate(() => window.__mapDebug!.project(126.3, 33.7));
+  await page.mouse.click(x, y);
+  await expect(
+    sheet.getByRole('heading', { name: '이 위치는 위험도 정보가 없어요' }),
+  ).toBeVisible();
+  expect(await seriousViolations(page)).toEqual([]);
+});
+
+for (const tag of ['', '@desktop ']) {
+  test(`${tag}검색 목록을 연 화면에 접근성 critical·serious 위반이 없다`, async ({ page }) => {
+    const box = page.getByRole('combobox', { name: '읍면동 검색' });
+    await box.fill('동');
+    await expect(page.getByRole('listbox', { name: '읍면동 검색 결과' })).toBeVisible();
+    await page.keyboard.press('ArrowDown');
+    expect(await seriousViolations(page)).toEqual([]);
+    await box.fill('서울');
+    await expect(page.getByText("'서울'과 일치하는 읍면동이 없어요")).toBeVisible();
+    expect(await seriousViolations(page)).toEqual([]);
+  });
+}

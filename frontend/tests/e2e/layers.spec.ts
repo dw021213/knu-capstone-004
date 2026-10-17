@@ -1,7 +1,7 @@
 /// <reference path="../../src/types/global.d.ts" />
 import { cellToLatLng, latLngToCell } from 'h3-js';
 import { distanceMeters, formatDistance } from '../../src/shared/geo/distance';
-import { test, expect } from './fixtures';
+import { test, expect, expectSelectionStays } from './fixtures';
 import type { Page } from '@playwright/test';
 
 const ROWS = [
@@ -318,7 +318,7 @@ test('클러스터를 누르면 그 위치로 2배 확대되고 셀 선택은 �
     .reduce((a, b) => (a.count! > b.count! ? a : b));
   await page.mouse.click(c.x, c.y);
   await expect.poll(() => zoomNow(page)).toBeCloseTo(z0 + 1, 1);
-  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  await expectSelectionStays(page, '');
   // 누른 묶음 자리를 기준으로 확대해 그 자리에 다시 CCTV가 그려진다
   await page.waitForTimeout(400);
   const after = await drawn(page);
@@ -368,8 +368,21 @@ async function items(page: Page, type: string) {
   return (await (await page.request.get(`/data/poi/${type}.json`)).json()).items as Item[];
 }
 
-/** 이웃과 떨어져 있어 눌러도 헷갈리지 않는 마커 */
-function lonelyMarker(list: Drawn[], vp: { width: number; height: number }, group: string) {
+type Box = { x: number; y: number; width: number; height: number };
+
+/** 이웃과 떨어져 있어 눌러도 헷갈리지 않는 마커. avoid(열린 셀 시트 등)에 가린 마커는 고르지 않는다 */
+function lonelyMarker(
+  list: Drawn[],
+  vp: { width: number; height: number },
+  group: string,
+  avoid: Box | null = null,
+) {
+  const hidden = (m: Drawn) =>
+    avoid !== null &&
+    m.x > avoid.x - 20 &&
+    m.x < avoid.x + avoid.width + 20 &&
+    m.y > avoid.y - 20 &&
+    m.y < avoid.y + avoid.height + 20;
   return list.find(
     (m) =>
       m.kind === 'marker' &&
@@ -378,6 +391,7 @@ function lonelyMarker(list: Drawn[], vp: { width: number; height: number }, grou
       m.x < vp.width - 40 &&
       m.y > 160 &&
       m.y < vp.height - 200 &&
+      !hidden(m) &&
       list.every((o) => o === m || Math.hypot(o.x - m.x, o.y - m.y) > 30),
   );
 }
@@ -404,7 +418,7 @@ test('셀을 고르지 않고 119 마커를 누르면 카드에 이름·종류·
   await expect(c).toContainText('© OpenStreetMap contributors');
   await expect(c.getByText('거리')).toHaveCount(0);
   // 마커 누르기는 셀 선택이 아니다
-  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  await expectSelectionStays(page, '');
   // 닫기
   await c.getByRole('button', { name: '닫기' }).click();
   await expect(c).toBeHidden();
@@ -427,7 +441,10 @@ for (const tag of ['', '@desktop ']) {
     await turnOn(page, 'CCTV');
     await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
     const vp = page.viewportSize()!;
-    const m = lonelyMarker(await drawn(page), vp, 'cctv');
+    // 셀을 고르면 셀 시트가 열려 있으므로 시트에 가린 마커는 고르지 않는다(U6)
+    const sheetBox = await page.getByTestId('cell-sheet').boundingBox();
+    expect(sheetBox).not.toBeNull();
+    const m = lonelyMarker(await drawn(page), vp, 'cctv', sheetBox);
     expect(m).toBeDefined();
     await page.mouse.click(m!.x, m!.y);
     const c = card(page);
@@ -441,7 +458,7 @@ for (const tag of ['', '@desktop ']) {
     const want = formatDistance(distanceMeters([clng, clat], [poi.lng, poi.lat]));
     await expect(c.getByTestId('poi-distance')).toHaveText(`선택한 셀 중심에서 ${want}`);
     // 셀 선택은 그대로, 누른 마커는 크게 그린다
-    await expect(page.getByTestId('selected-cell')).toHaveText(hall);
+    await expectSelectionStays(page, hall);
     // Esc로 닫는다
     await c.focus();
     await page.keyboard.press('Escape');
@@ -459,7 +476,7 @@ test('손가락으로 탭해도 마커는 카드를 열고 클러스터는 확�
   expect(m).toBeDefined();
   await page.touchscreen.tap(m.x, m.y);
   await expect(card(page)).toBeVisible();
-  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  await expectSelectionStays(page, '');
   await card(page).getByRole('button', { name: '닫기' }).click();
   await turnOn(page, 'CCTV');
   await expect.poll(async () => (await drawn(page)).some((i) => i.group === 'cctv')).toBe(true);
@@ -470,7 +487,7 @@ test('손가락으로 탭해도 마커는 카드를 열고 클러스터는 확�
     .reduce((a, b) => (a.count! > b.count! ? a : b));
   await page.touchscreen.tap(c.x, c.y);
   await expect.poll(() => zoomNow(page)).toBeCloseTo(z0 + 1, 1);
-  await expect(page.getByTestId('selected-cell')).toHaveText('');
+  await expectSelectionStays(page, '');
 });
 
 test('카드를 연 채 레이어를 끄거나 지도를 누르면 카드가 닫힌다', async ({ page }) => {

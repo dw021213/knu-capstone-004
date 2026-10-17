@@ -39,6 +39,22 @@ export interface PoiLayer {
   items: Poi[];
 }
 
+/** 응급실(응급의료기관). 레이어가 아니라 셀 시트 '가까운 도움'에만 쓴다 */
+export interface EmergencyRoom {
+  id: string;
+  type: 'er';
+  name: string;
+  lat: number;
+  lng: number;
+  detail?: Record<string, string | number>;
+}
+
+export interface EmergencyList {
+  status: 'ready' | 'pending';
+  source: string;
+  items: EmergencyRoom[];
+}
+
 export interface Course {
   id: string;
   name: string;
@@ -57,6 +73,8 @@ export interface DataSource {
   mode: 'snapshot' | 'api';
   getScores(opts?: { at?: string }): Promise<Scores>;
   getPoi(type: PoiType): Promise<PoiLayer>;
+  /** 응급실. 두 모드 모두 public/data/poi/er.json(백엔드에 응급실 자료가 없음) */
+  getEmergency(): Promise<EmergencyList>;
   getCourses(): Promise<CourseList>;
 }
 
@@ -76,6 +94,14 @@ export interface PoiFile {
   /** 원본을 받은 날(YYYY-MM-DD) */
   fetchedAt?: string;
   items: Poi[];
+}
+
+/** public/data/poi/er.json */
+export interface EmergencyFile {
+  status?: 'ready' | 'pending';
+  source: string;
+  fetchedAt?: string;
+  items: EmergencyRoom[];
 }
 
 /** public/data/courses.json */

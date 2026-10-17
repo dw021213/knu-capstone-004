@@ -1,5 +1,5 @@
 /// <reference path="../../src/types/global.d.ts" />
-import { test, expect } from './fixtures';
+import { test, expect, expectSelectionStays } from './fixtures';
 import type { Locator, Page } from '@playwright/test';
 
 // 지도 위 범례·칩·안내·시트를 누르거나 굴려도 지도 확대·셀 선택이 일어나지 않아야 한다.
@@ -49,7 +49,7 @@ async function expectBlocks(page: Page, targets: Locator[]) {
   const z0 = await zoomNow(page);
   for (const [x, y] of points) {
     await page.mouse.click(x, y);
-    await expect(selected(page)).toHaveText(base);
+    await expectSelectionStays(page, base);
   }
   // 두 번 누르기·휠도 지도로 가지 않는다
   await page.mouse.dblclick(...points[0]);
@@ -94,20 +94,21 @@ test('달력 시트와 뒤 배경을 눌러도 지도 셀이 선택되지 않는
   await zoomIntoLand(page);
   const vp = page.viewportSize()!;
   await page.mouse.click(vp.width / 2, vp.height / 2);
+  // 한 번 누르기는 두 번 누르기와 구별하려고 잠시 뒤에 셀을 고른다(U6). 골라질 때까지 기다린다
+  await expect(selected(page)).not.toHaveText('');
   const base = (await selected(page).textContent())!;
-  expect(base).not.toBe('');
 
   await page.getByRole('button', { name: '날짜 선택' }).click();
   const sheet = page.getByRole('dialog', { name: '날짜 선택' });
   await expect(sheet).toBeVisible();
   // 시트 안 날짜 칸
   await sheet.getByRole('button', { name: '31, 10월 31일 (토)', exact: true }).click();
-  await expect(selected(page)).toHaveText(base);
+  await expectSelectionStays(page, base);
   // 시트 밖 어두운 배경: 시트만 닫히고 셀은 그대로
   const box = (await sheet.boundingBox())!;
   await page.mouse.click(vp.width / 3, box.y / 2);
   await expect(sheet).toBeHidden();
-  await expect(selected(page)).toHaveText(base);
+  await expectSelectionStays(page, base);
 });
 
 for (const tag of ['', '@desktop ']) {
@@ -129,7 +130,7 @@ test('날짜 칩 영역의 빈 곳(안내 옆)은 지도로 통과한다', async
   const vp = page.viewportSize()!;
   const x = n.x + n.width + 40;
   expect(x).toBeLessThan(vp.width - 20);
-  // 확대하며 두 번 누른 곳의 셀이 골라져 있으므로 다른 셀로 바뀌는지 본다
+  // 두 번 누르기는 셀을 고르지 않으므로(U6) 보통 비어 있다. 골라져 있더라도 다른 셀로 바뀌는지 본다
   const base = (await selected(page).textContent()) ?? '';
   await page.mouse.click(x, n.y + n.height / 2);
   await expect(selected(page)).not.toHaveText('');

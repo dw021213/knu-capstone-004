@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "data:scores": "node scripts/build-scores.mjs",
     "data:poi": "node scripts/build-poi.mjs data-src/poi",
-    "data:poi:fetch": "node scripts/fetch-poi.mjs"
+    "data:poi:fetch": "node scripts/fetch-poi.mjs",
+    "data:emd": "node scripts/build-emd.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.3",

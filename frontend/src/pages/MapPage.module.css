@@ -6,9 +6,29 @@
 
 /* 지도 위 층: 빈 곳은 지도로 통과시킨다(상속). 보이는 패널만 pointer-events: auto */
 .overlay {
+  /* 상단 영역(검색창 줄 + '종합' 탭 줄 + 아래 선) 바로 아래 첫 줄(레이어 버튼, 범례, 데스크톱 셀 패널) */
+  --overlay-top: calc(var(--touch) * 2 + var(--space-2) * 2 + 1px + var(--space-3));
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+/* 모바일: 아래쪽에 셀 시트와 날짜 칩을 차례로 쌓는다 */
+.dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 데스크톱: 셀 패널은 오른쪽, 날짜 칩은 아래 가운데에 따로 놓는다 */
+@media (min-width: 768px) {
+  .dock {
+    top: 0;
+  }
 }
 
 .top {

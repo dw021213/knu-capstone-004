@@ -1,9 +1,7 @@
-/* 모바일: 지도 아래 좌우로 꽉 찬 알약. 배경 지도 출처 위로 띄운다 */
+/* 모바일: 지도 아래 좌우로 꽉 찬 알약(MapPage 아래 묶음의 마지막). 배경 지도 출처 위로 띄운다 */
 .bar {
-  position: absolute;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: var(--space-6);
+  position: relative;
+  margin: 0 var(--space-3) var(--space-6);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -13,6 +11,8 @@
 /* 데스크톱: 가운데, 내용만큼 */
 @media (min-width: 768px) {
   .bar {
+    position: absolute;
+    margin: 0;
     left: 50%;
     right: auto;
     bottom: var(--space-8);
