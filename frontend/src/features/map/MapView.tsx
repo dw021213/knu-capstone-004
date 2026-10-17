@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  interpolate,
   select,
   zoom,
   zoomIdentity,
@@ -253,6 +254,8 @@ export function MapView({
       .scaleExtent(SCALE_EXTENT)
       .translateExtent(worldExtent(JEJU_BOUNDS))
       .constrain(constrainBoth)
+      // 옮기기(맞춤·reveal)는 중심과 배율을 곧게 잇는다. 기본(interpolateZoom)은 멀리 옮길 때 잠깐 축소했다 확대한다
+      .interpolate(interpolate)
       .extent(extent)
       .on('zoom', (e: D3ZoomEvent<HTMLDivElement, unknown>) => {
         const v = toView(e.transform);

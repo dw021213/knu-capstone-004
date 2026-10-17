@@ -60,6 +60,17 @@ test('모바일: 화면 아래쪽 셀을 고르면 지도를 옮겨 셀 중심�
   const z0 = await zoomNow(page);
   await page.mouse.click(x, y);
   await expect(page.getByTestId('selected-cell')).toHaveText(h3);
+  // 옮기는 동안에도 확대 수준이 흔들리지 않는다(멀리 옮길 때 잠깐 축소했다 확대하지 않는다)
+  const zs = await page.evaluate(async () => {
+    const out: number[] = [];
+    const t0 = performance.now();
+    while (performance.now() - t0 < 600) {
+      out.push(window.__mapDebug!.zoom());
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    return out;
+  });
+  for (const z of zs) expect(z).toBeCloseTo(z0, 6);
   await expectInside(page, center);
   expect(await zoomNow(page)).toBeCloseTo(z0, 6);
 });
