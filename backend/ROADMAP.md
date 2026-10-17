@@ -337,6 +337,10 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   risk_combined·유동인구 표는 DB 에 남아 있지만 API 가 안 씀(배포 덤프에서 내용 제외). 확인용 지도에서 유동인구 UI 삭제. frontend/ 는 건드리지 않음.
 - 2026-10-17: 교통사고 모델을 **깊이 8**(`jeju_h3_r8_road_d8_its20260914_ngii2025_v2`, 2020 검증 상위 20% 포착률로 선택)로 교체. 형식·격자·도로 입력 동일.
   모델 점수 0.1당 사고율 ×1.63(깊이 6 ×1.62), 호우 경보급 가산 ln 2.10/4.893 = 0.152 → 0.15 유지.
+- 2026-10-17: **운영 배포 완료** — https://jeju-risk.duckdns.org (Vultr 서울 vc2-1c-2gb $10/월, Ubuntu 24.04, 158.247.200.215).
+  docker compose(deploy/docker-compose.prod.yml) db+server+caddy, Let's Encrypt 인증서, ufw 22/80/443, SSH 키 전용(비밀번호 로그인 차단).
+  배포 덤프 road-d8-deploy 복원, 기동 시 24시간 기상 백필(1,032행) 확인. 서버 코드 위치 /root/knu-capstone-004 (feat/backend).
+  Vultr 무료 크레딧 $250 은 2026-11-17 만료 → 이후 카드 과금. 안 쓰면 Destroy. CORS_ORIGINS 는 아직 비어 있음(모두 허용).
 
 ## ▶ 현재 상태 요약 (2026-10-13, 이어서 작업할 때 여기부터)
 - **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (push 완료, main 미병합). 옛 `종프/back` 은 백업
