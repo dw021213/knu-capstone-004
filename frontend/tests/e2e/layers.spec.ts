@@ -464,13 +464,15 @@ for (const tag of ['', '@desktop ']) {
   }) => {
     const cctv = await items(page, 'cctv');
     await openMap(page);
-    await zoomInAt(page, CITY_HALL, 13);
+    // 셀을 고르면 지도가 시청을 시트 위 좁은 영역으로 옮기므로(U10), 그 영역에서도 마커가 떨어져 보이게 14까지 확대한다
+    await zoomInAt(page, CITY_HALL, 14);
     // 시청 셀을 고른다(셀 중심을 눌러 경계 흔들림을 피한다)
     const hall = latLngToCell(CITY_HALL[1], CITY_HALL[0], 8);
     const [clat, clng] = cellToLatLng(hall);
     const [hx, hy] = await project(page, clng, clat);
     await page.mouse.click(hx, hy);
     await expect(page.getByTestId('selected-cell')).toHaveText(hall);
+    await page.waitForFunction(() => window.__mapDebug!.idle());
 
     await turnOn(page, 'CCTV');
     await expect.poll(async () => (await drawn(page)).length).toBeGreaterThan(0);
