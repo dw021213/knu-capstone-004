@@ -327,7 +327,7 @@ for (const tag of ['', '@desktop ']) {
     expect(x / vp.width).toBeGreaterThanOrEqual(0.4);
     expect(x / vp.width).toBeLessThanOrEqual(0.6);
     // 상단(검색·탭) 아래 끝과 날짜 칩 묶음 위 끝 사이의 가운데
-    const top = (await page.locator('main header').first().boundingBox())!;
+    const top = (await page.getByRole('banner').boundingBox())!;
     const bar = (await page.getByTestId('date-bar').boundingBox())!;
     const mid = (top.y + top.height + bar.y) / 2;
     expect(Math.abs(y - mid)).toBeLessThan(12);

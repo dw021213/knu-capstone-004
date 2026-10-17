@@ -35,7 +35,8 @@
 
 .attribution {
   position: absolute;
-  right: 0;
+  /* 데스크톱 오른쪽 패널이 열리면 패널 왼쪽으로 옮긴다(--panel-offset은 화면이 정한다) */
+  right: var(--panel-offset, 0px);
   bottom: 0;
   margin: 0;
   padding: 0 var(--space-1);

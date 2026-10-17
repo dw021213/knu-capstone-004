@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
+import { isWide } from '../app/useBreakpoint';
 import { dataSource, type DataSource } from '../data';
 import { courseReason } from '../entities/course/reason';
 import type { Segment } from '../entities/course/segments';
@@ -25,8 +26,6 @@ import { useScores } from './useScores';
 import styles from './CourseDetailPage.module.css';
 
 const EMD_SOURCE = '읍면동 경계: 통계청 SGIS, vuski/admdongkor(CC BY 4.0)';
-/** 데스크톱 배치(시트가 오른쪽 패널)인지. CSS 미디어 쿼리와 같은 기준 */
-const isWide = () => window.matchMedia?.('(min-width: 768px)').matches ?? false;
 
 /** 데스크톱 오른쪽 패널이 가리는 너비(px). 모바일은 0. 지도 맞춤을 그 왼쪽 영역에 한다 */
 function useRightInset() {

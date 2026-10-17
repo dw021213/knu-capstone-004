@@ -12,17 +12,15 @@
   pointer-events: auto;
 }
 
-/* 데스크톱: 오른쪽 패널. 아래 범례 카드(--legend-h)를 가리지 않는다 */
-@media (min-width: 768px) {
+/* 데스크톱: 오른쪽 패널(MapPage의 보조 영역)을 가득 채운다 */
+@media (min-width: 769px) {
   .sheet {
-    position: absolute;
-    top: var(--overlay-top);
-    right: var(--space-4);
-    width: calc(var(--touch) * 8);
-    max-height: calc(
-      100% - var(--overlay-top) - var(--space-8) - var(--legend-h, 0px) - var(--space-3)
-    );
+    flex: 1;
+    max-height: none;
     margin: 0;
+    padding: var(--space-4) var(--space-6) var(--space-6);
+    border: 0;
+    border-radius: 0;
   }
 }
 

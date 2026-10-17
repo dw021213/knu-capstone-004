@@ -13,11 +13,12 @@
 }
 
 /* 데스크톱: 우하단 카드. 배경 지도 출처 위로 띄운다 */
-@media (min-width: 768px) {
+@media (min-width: 769px) {
   .legend {
     top: auto;
     right: var(--space-4);
-    bottom: var(--space-8);
+    /* 지도 화면이 정한다(좁은 지도 영역에서는 날짜 칩 위) */
+    bottom: var(--legend-bottom, var(--space-8));
     min-width: calc(var(--touch) * 5);
     padding: 0 var(--space-3);
   }

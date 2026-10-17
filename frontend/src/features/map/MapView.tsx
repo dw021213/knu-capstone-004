@@ -52,6 +52,11 @@ export interface MapViewProps {
   route?: MapRoute | null;
   /** 주면 이 셀들만 그대로 칠하고 나머지 셀은 흐리게(코스 화면) */
   dim?: ReadonlySet<string> | null;
+  /**
+   * 오른쪽에 늘 붙어 있는 패널이 가리는 너비(px, 데스크톱 코스 화면). 이동 경계를 그 왼쪽 지도 영역 기준으로
+   * 맞춰, 경계가 화면보다 좁은 줌에서 맞춘 곳이 패널 쪽으로 밀리지 않게 한다
+   */
+  panelRight?: number;
 }
 
 export type { MapRoute };
@@ -102,6 +107,7 @@ export function MapView({
   location = null,
   route = null,
   dim = null,
+  panelRight = 0,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -121,6 +127,8 @@ export function MapView({
   const zoomRef = useRef<{
     behavior: ZoomBehavior<HTMLDivElement, unknown>;
     sel: Selection<HTMLDivElement, unknown, null, undefined>;
+    /** 이동 경계를 맞추는 지도 영역(오른쪽 패널을 뺀 부분) */
+    extent: [[number, number], [number, number]];
   } | null>(null);
   const hatchRef = useRef<{ ctx: CanvasRenderingContext2D; pattern: CanvasPattern | null } | null>(
     null,
@@ -158,7 +166,7 @@ export function MapView({
     const el = containerRef.current!;
     const extent: [[number, number], [number, number]] = [
       [0, 0],
-      [size.w, size.h],
+      [Math.max(1, size.w - panelRight), size.h],
     ];
     const toView = ({ k, x, y }: ZoomTransform): View => ({ k, x, y });
     const behavior = zoom<HTMLDivElement, unknown>()
@@ -173,7 +181,7 @@ export function MapView({
       })
       .on('end', (e: D3ZoomEvent<HTMLDivElement, unknown>) => setSettled(toView(e.transform)));
     const sel = select(el).call(behavior);
-    zoomRef.current = { behavior, sel };
+    zoomRef.current = { behavior, sel, extent };
     const start = viewRef.current ?? homeView(size.w, size.h, insetsRef.current ?? undefined);
     const t = zoomIdentity.translate(start.x, start.y).scale(start.k);
     // zoom.transform은 경계를 적용하지 않으므로 먼저 constrain을 거친다
@@ -182,7 +190,7 @@ export function MapView({
       sel.on('.zoom', null);
       zoomRef.current = null;
     };
-  }, [size]);
+  }, [size, panelRight]);
 
   // 검색으로 고른 곳으로 옮기고 확대한다
   const focusKey = focus?.key;
@@ -199,7 +207,7 @@ export function MapView({
     // 같은 검색 결과로는 한 번만 옮긴다(크기가 바뀌어도 다시 옮기지 않음)
     if (appliedFocus.current === focusKey) return;
     appliedFocus.current = focusKey;
-    const { behavior, sel } = zoomRef.current;
+    const { behavior, sel, extent } = zoomRef.current;
     const [west, south, east, north] = f.bbox;
     const v = focusView(size.w, size.h, { west, south, east, north }, f.point, {
       minZ: f.zoom?.min,
@@ -207,10 +215,6 @@ export function MapView({
       anchorY: f.anchorY,
       right: f.right,
     });
-    const extent: [[number, number], [number, number]] = [
-      [0, 0],
-      [size.w, size.h],
-    ];
     const t = behavior.constrain()(
       zoomIdentity.translate(v.x, v.y).scale(v.k),
       extent,

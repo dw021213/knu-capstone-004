@@ -36,15 +36,24 @@
   pointer-events: auto;
 }
 
-/* 데스크톱: 오른쪽 패널 */
-@media (min-width: 768px) {
+/* 데스크톱: 뒤로 막대 아래부터 바닥까지 오른쪽에 붙는 패널(지도 화면의 셀 패널과 같은 너비).
+   지도 출처는 패널 왼쪽으로 옮긴다 */
+@media (min-width: 769px) {
+  .page {
+    --panel-offset: var(--panel-size);
+  }
+
   .sheet {
-    top: calc(var(--touch) + var(--space-2) + var(--space-3));
+    top: calc(var(--touch) + var(--space-2) + 1px);
     left: auto;
-    right: var(--space-4);
-    bottom: var(--space-8);
-    width: calc(var(--touch) * 9);
+    right: 0;
+    bottom: 0;
+    width: var(--panel-size);
     max-height: none;
+    padding: var(--space-4) var(--space-6) var(--space-6);
+    border: 0;
+    border-left: 1px solid var(--line);
+    border-radius: 0;
   }
 }
 
