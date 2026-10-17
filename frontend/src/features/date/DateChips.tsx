@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { DataSource } from '../../data/types';
+import type { DataSource, Scores } from '../../data/types';
 import { DatePickerSheet } from './DatePickerSheet';
 import { CalendarIcon } from './CalendarIcon';
 import { chipLabel, kstNow } from './kst';
@@ -13,7 +13,19 @@ const NOTICE: Record<DataSource['mode'], string> = {
 };
 
 /** 지도 아래 '오늘 / 날짜 선택' 칩. 날짜 선택은 달력 시트로 연다 */
-export function DateChips({ mode }: { mode: DataSource['mode'] }) {
+export function DateChips({
+  mode,
+  disabled = false,
+  weather,
+}: {
+  mode: DataSource['mode'];
+  /** 점수를 받는 동안: 눌러도 반응하지 않는다 */
+  disabled?: boolean;
+  /** 받은 점수의 기상 반영 상태. api 모드에서 가산이 빠졌으면 범례 아래 안내 하나만 둔다 */
+  weather?: Scores['weather'];
+}) {
+  const notice =
+    mode === 'api' && (weather === 'no_data' || weather === 'off') ? null : NOTICE[mode];
   const { date, isToday, setDate } = useSelectedDate();
   const [open, setOpen] = useState(false);
   const pickRef = useRef<HTMLButtonElement>(null);
@@ -26,13 +38,16 @@ export function DateChips({ mode }: { mode: DataSource['mode'] }) {
 
   return (
     <div className={styles.bar} data-testid="date-bar">
-      <p className={styles.notice}>{NOTICE[mode]}</p>
+      {notice && <p className={styles.notice}>{notice}</p>}
       <div className={styles.chips} role="group" aria-label="날짜">
         <button
           type="button"
           className={styles.chip}
           aria-pressed={isToday}
-          onClick={() => setDate(kstNow().date)}
+          aria-disabled={disabled || undefined}
+          onClick={() => {
+            if (!disabled) setDate(kstNow().date);
+          }}
         >
           오늘
         </button>
@@ -42,7 +57,10 @@ export function DateChips({ mode }: { mode: DataSource['mode'] }) {
           className={styles.chip}
           aria-pressed={!isToday}
           aria-haspopup="dialog"
-          onClick={() => setOpen(true)}
+          aria-disabled={disabled || undefined}
+          onClick={() => {
+            if (!disabled) setOpen(true);
+          }}
         >
           <CalendarIcon className={styles.icon} />
           {isToday ? '날짜 선택' : chipLabel(date)}

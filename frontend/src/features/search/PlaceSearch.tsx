@@ -22,7 +22,11 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
   const [active, setActive] = useState(-1);
   // 처음 포커스할 때 목록 파일을 받는다
   const [wanted, setWanted] = useState(false);
-  const { data: emd } = useQuery({ queryKey: EMD_QUERY_KEY, queryFn: fetchEmd, enabled: wanted });
+  const { data: emd, isError } = useQuery({
+    queryKey: EMD_QUERY_KEY,
+    queryFn: fetchEmd,
+    enabled: wanted,
+  });
   const inputId = useId();
   const listId = useId();
   const optionId = (i: number) => `${listId}-${i}`;
@@ -31,6 +35,13 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
   const typed = query.trim().length > 0;
   const showList = open && results.length > 0;
   const noMatch = open && typed && emd !== undefined && results.length === 0;
+  // 목록 파일을 받지 못함: 검색만 못 하고 지도는 그대로 쓴다
+  const failed = open && typed && emd === undefined && isError;
+  const message = noMatch
+    ? `'${query.trim()}'${andParticle(query)} 일치하는 읍면동이 없어요`
+    : failed
+      ? '읍면동 목록을 불러오지 못했어요'
+      : '';
 
   const pick = (item: EmdItem, input: HTMLInputElement) => {
     setQuery(`${item.sgg} ${item.name}`);
@@ -115,8 +126,8 @@ export function PlaceSearch({ onPick }: PlaceSearchProps) {
           ))}
         </ul>
       )}
-      <p role="status" className={noMatch ? styles.empty : 'sr-only'}>
-        {noMatch ? `'${query.trim()}'${andParticle(query)} 일치하는 읍면동이 없어요` : ''}
+      <p role="status" className={message ? styles.empty : 'sr-only'}>
+        {message}
       </p>
     </div>
   );

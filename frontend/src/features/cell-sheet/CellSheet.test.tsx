@@ -43,6 +43,7 @@ function data(over: Partial<SheetData> = {}): SheetData {
     },
     emergency: { status: 'done', list: ER },
     emd: null,
+    emdError: false,
     ...over,
   };
 }
@@ -174,5 +175,51 @@ describe('CellSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole('button', { name: '닫기' }));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  describe('일부 자료를 받지 못했을 때', () => {
+    it('그 시설 줄만 불러오지 못했다고 하고 나머지 줄과 등급·근거는 그대로', () => {
+      const d = data();
+      renderSheet({ data: { ...d, facilities: { ...d.facilities, cctv: { status: 'error' } } } });
+      const rows = screen.getAllByRole('row').map((r) => r.textContent);
+      expect(rows).toEqual([
+        '시설300m 안500m 안',
+        'CCTV불러오지 못했어요',
+        '편의점00',
+        '숙박……',
+        '경찰준비 중준비 중',
+        '119안전센터00',
+      ]);
+      expect(screen.getByTestId('sheet-badge')).toHaveTextContent('4 · 높음');
+      expect(screen.getByTestId('sheet-reason')).not.toHaveTextContent('CCTV');
+    });
+
+    it('119·응급실을 받지 못하면 가까운 도움의 그 줄만 불러오지 못했다고 한다', () => {
+      const d = data();
+      renderSheet({
+        data: { ...d, facilities: { ...d.facilities, fire: { status: 'error' } } },
+      });
+      expect(screen.getByTestId('help-fire')).toHaveTextContent('119안전센터불러오지 못했어요');
+      expect(screen.getByTestId('help-er')).toHaveTextContent('테스트병원');
+      cleanup();
+      renderSheet({ data: data({ emergency: { status: 'error' } }) });
+      expect(screen.getByTestId('help-er')).toHaveTextContent('응급실불러오지 못했어요');
+      expect(screen.getByTestId('help-fire')).toHaveTextContent('중앙119안전센터');
+    });
+
+    it('읍면동 경계를 받지 못하면 지역 이름 자리에 불러오지 못했다고 한다', () => {
+      renderSheet({ data: data({ emdError: true }) });
+      expect(screen.getByTestId('sheet-place-error')).toHaveTextContent(
+        '지역 이름을 불러오지 못했어요',
+      );
+      expect(screen.getByTestId('sheet-badge')).toHaveTextContent('4 · 높음');
+      cleanup();
+      renderSheet({
+        data: data({ emdError: true }),
+        target: { kind: 'sea', lngLat: [126.3, 33.7] },
+        cell: undefined,
+      });
+      expect(screen.getByTestId('sheet-place-error')).toBeInTheDocument();
+    });
   });
 });

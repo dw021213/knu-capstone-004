@@ -1,0 +1,75 @@
+/* 지도 위 상태 카드: 레이어 버튼·범례 줄 바로 아래. 흰 바탕 + 1.5px 검정 테두리 */
+.card {
+  position: absolute;
+  top: calc(var(--overlay-top) + var(--touch) + var(--space-3));
+  left: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--white);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+@media (min-width: 768px) {
+  .card {
+    left: 50%;
+    right: auto;
+    width: calc(var(--touch) * 9);
+    translate: -50% 0;
+  }
+}
+
+.icon {
+  flex-shrink: 0;
+  width: var(--space-6);
+  height: var(--space-6);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+.sub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}
+
+/* 카드 안 주 버튼: 검정 채움 */
+.action {
+  flex-shrink: 0;
+  align-self: center;
+  min-width: var(--touch);
+  min-height: var(--touch);
+  padding: 0 var(--space-3);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--ink);
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-s);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}

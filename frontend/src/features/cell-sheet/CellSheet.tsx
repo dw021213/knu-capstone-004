@@ -171,6 +171,11 @@ export function CellSheet({
       </div>
 
       {target.kind === 'cell' && heading}
+      {data.emdError && (
+        <p className={styles.basis} data-testid="sheet-place-error">
+          지역 이름을 불러오지 못했어요
+        </p>
+      )}
       {target.kind === 'sea' && place && (
         <p className={styles.basis}>가까운 지역: {placeLabel({ ...place, inside: true })}</p>
       )}
@@ -207,14 +212,19 @@ export function CellSheet({
                   ? String(c[n])
                   : st === 'pending'
                     ? '준비 중'
-                    : st === 'error'
-                      ? '불러오지 못함'
-                      : '…';
+                    : '…';
               return (
                 <tr key={t}>
                   <th scope="row">{LAYER_DEFS[t].name}</th>
-                  <td>{cellText('r300')}</td>
-                  <td>{cellText('r500')}</td>
+                  {/* 받지 못한 종류는 두 칸을 합쳐 한 번만 알린다(나머지 줄은 그대로) */}
+                  {st === 'error' ? (
+                    <td colSpan={2}>불러오지 못했어요</td>
+                  ) : (
+                    <>
+                      <td>{cellText('r300')}</td>
+                      <td>{cellText('r500')}</td>
+                    </>
+                  )}
                 </tr>
               );
             })}
@@ -235,7 +245,7 @@ export function CellSheet({
                 : fireState.status === 'pending'
                   ? '자료 준비 중'
                   : fireState.status === 'error'
-                    ? '불러오지 못함'
+                    ? '불러오지 못했어요'
                     : '…'}
             </dd>
           </div>
@@ -247,7 +257,7 @@ export function CellSheet({
                 {erNear
                   ? `${erNear.poi.name} ${formatDistance(erNear.meters)}`
                   : emergency.status === 'error'
-                    ? '불러오지 못함'
+                    ? '불러오지 못했어요'
                     : '…'}
               </dd>
             </div>

@@ -316,3 +316,20 @@ test('두 번 누르면 확대만 하고 셀을 고르지 않는다(셀 시트�
   await expect(page.getByTestId('selected-cell')).toHaveText('');
   await expect(page.getByTestId('cell-sheet')).toHaveCount(0);
 });
+
+for (const tag of ['', '@desktop ']) {
+  test(`${tag}첫 화면은 본섬 중심을 검색창과 날짜 칩 사이 영역 가운데에 둔다`, async ({ page }) => {
+    await openMap(page);
+    const vp = page.viewportSize()!;
+    const [x, y] = await project(page, ...CENTER);
+    expect(y / vp.height).toBeGreaterThanOrEqual(0.4);
+    expect(y / vp.height).toBeLessThanOrEqual(0.6);
+    expect(x / vp.width).toBeGreaterThanOrEqual(0.4);
+    expect(x / vp.width).toBeLessThanOrEqual(0.6);
+    // 상단(검색·탭) 아래 끝과 날짜 칩 묶음 위 끝 사이의 가운데
+    const top = (await page.locator('main header').first().boundingBox())!;
+    const bar = (await page.getByTestId('date-bar').boundingBox())!;
+    const mid = (top.y + top.height + bar.y) / 2;
+    expect(Math.abs(y - mid)).toBeLessThan(12);
+  });
+}

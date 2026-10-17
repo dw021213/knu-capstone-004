@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { LEVEL_NAME, type Level } from '../../entities/risk/level';
-import type { DataSource } from '../../data/types';
+import type { DataSource, Scores } from '../../data/types';
 import { dotDate, kstNow } from '../date/kst';
 import styles from './Legend.module.css';
 
@@ -15,6 +15,14 @@ const BASIS: Record<DataSource['mode'], string> = {
   snapshot: '교통사고 도로 모델 · 날짜와 무관한 공간 점수',
   api: '교통사고 도로 모델 · 기상 가산 반영',
 };
+
+/** api 모드에서 기상 가산이 빠진 경우의 범례 아래 안내. 백엔드 weather.status 기준(ok | no_data | off) */
+function weatherNotice(mode: DataSource['mode'], weather: Scores['weather'] | undefined) {
+  if (mode !== 'api') return null;
+  if (weather === 'no_data') return '날씨 미반영 · 이 시각 관측 없음';
+  if (weather === 'off') return '날씨 미반영';
+  return null;
+}
 
 function isDesktop(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia(DESKTOP_QUERY).matches;
@@ -32,11 +40,18 @@ interface LegendProps {
   mode: DataSource['mode'];
   /** snapshot 점수 파일의 생성 시각(ISO). api 모드는 at 시각 기준이라 적지 않는다 */
   generatedAt?: string;
+  /** 점수를 받는 동안: 눌러도 펼치지 않는다 */
+  disabled?: boolean;
+  /** 받은 점수의 기상 반영 상태(api 모드) */
+  weather?: Scores['weather'];
 }
 
-export function Legend({ mode, generatedAt }: LegendProps) {
+export function Legend({ mode, generatedAt, disabled = false, weather }: LegendProps) {
   const [open, setOpen] = useState(isDesktop);
   const time = mode === 'snapshot' ? basisTime(generatedAt) : null;
+  const notice = weatherNotice(mode, weather);
+  // 가산이 빠졌으면 '기상 가산 반영'이라고 적지 않는다
+  const basis = notice ? '교통사고 도로 모델' : BASIS[mode];
   const listId = useId();
 
   return (
@@ -46,7 +61,10 @@ export function Legend({ mode, generatedAt }: LegendProps) {
         className={styles.head}
         aria-expanded={open}
         aria-controls={listId}
-        onClick={() => setOpen((o) => !o)}
+        aria-disabled={disabled || undefined}
+        onClick={() => {
+          if (!disabled) setOpen((o) => !o);
+        }}
       >
         <span className={styles.ramp}>
           {LEVELS_UP.map((lv) => (
@@ -80,9 +98,15 @@ export function Legend({ mode, generatedAt }: LegendProps) {
           />
           <span>데이터 부족(도로 자료 미확인)</span>
         </p>
-        <p className={styles.basis}>{BASIS[mode]}</p>
+        <p className={styles.basis}>{basis}</p>
         {time && <p className={styles.time}>{time}</p>}
       </div>
+      {/* 접혀 있어도 보이게 본문 밖, 범례 맨 아래에 둔다 */}
+      {notice && (
+        <p className={styles.weather} data-testid="weather-notice">
+          {notice}
+        </p>
+      )}
     </section>
   );
 }

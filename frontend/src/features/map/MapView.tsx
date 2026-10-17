@@ -18,12 +18,14 @@ import { tileUrl, visibleTiles } from './tiles';
 import { JEJU_BOUNDS } from './projection';
 import {
   SCALE_EXTENT,
-  fitView,
+  constrainView,
   focusView,
+  homeView,
   lngLatToScreen,
   screenToLngLat,
   worldExtent,
   zoomLevel,
+  type Insets,
   type View,
 } from './view';
 import styles from './MapView.module.css';
@@ -41,7 +43,15 @@ export interface MapViewProps {
   highlight?: string | null;
   /** 이곳으로 옮기고 확대한다(검색). key가 바뀔 때마다 한 번 */
   focus?: MapFocus | null;
+  /** 지도 위 검색·날짜 칩이 가리는 위·아래 높이. 첫 화면은 그 사이 가운데에 본섬을 둔다 */
+  insets?: Insets | null;
+  /** 지도에 찍을 위치 점. me: 내 위치, fallback: 위치를 못 써서 기준으로 삼은 곳(이름을 붙인다) */
+  location?: MapLocation | null;
 }
+
+export type MapLocation =
+  | { kind: 'me'; lngLat: [number, number] }
+  | { kind: 'fallback'; lngLat: [number, number]; label: string };
 
 export interface MapFocus {
   key: number;
@@ -75,6 +85,8 @@ export function MapView({
   onMarkerSelect,
   highlight = null,
   focus = null,
+  insets = null,
+  location = null,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -112,6 +124,12 @@ export function MapView({
     return () => ro.disconnect();
   }, []);
 
+  // 첫 화면 맞춤에만 쓴다(나중에 바뀌어도 화면을 옮기지 않는다)
+  const insetsRef = useRef(insets);
+  useLayoutEffect(() => {
+    insetsRef.current = insets;
+  });
+
   // 확대·이동: d3-zoom(휠, 핀치, 드래그, 두 번 누르기). 처음에는 제주 본섬에 맞춘다
   useEffect(() => {
     if (!size) return;
@@ -124,6 +142,7 @@ export function MapView({
     const behavior = zoom<HTMLDivElement, unknown>()
       .scaleExtent(SCALE_EXTENT)
       .translateExtent(worldExtent(JEJU_BOUNDS))
+      .constrain(constrainView)
       .extent(extent)
       .on('zoom', (e: D3ZoomEvent<HTMLDivElement, unknown>) => {
         const v = toView(e.transform);
@@ -133,7 +152,7 @@ export function MapView({
       .on('end', (e: D3ZoomEvent<HTMLDivElement, unknown>) => setSettled(toView(e.transform)));
     const sel = select(el).call(behavior);
     zoomRef.current = { behavior, sel };
-    const start = viewRef.current ?? fitView(size.w, size.h);
+    const start = viewRef.current ?? homeView(size.w, size.h, insetsRef.current ?? undefined);
     const t = zoomIdentity.translate(start.x, start.y).scale(start.k);
     // zoom.transform은 경계를 적용하지 않으므로 먼저 constrain을 거친다
     sel.call(behavior.transform, behavior.constrain()(t, extent, worldExtent(JEJU_BOUNDS)));
@@ -399,6 +418,7 @@ export function MapView({
           data-testid="marker-canvas"
           style={canvasTransform ? { transform: canvasTransform } : undefined}
         />
+        {location && view && <LocationMark location={location} view={view} />}
         {overlays}
       </div>
       <p className={styles.attribution}>
@@ -406,6 +426,27 @@ export function MapView({
           {BASEMAP.attribution}
         </a>
       </p>
+    </div>
+  );
+}
+
+/** 위치 점(누르기를 가로채지 않는다). 지금 변환으로 놓아 끄는 동안에도 따라간다 */
+function LocationMark({ location, view }: { location: MapLocation; view: View }) {
+  const [x, y] = lngLatToScreen(view, ...location.lngLat);
+  if (location.kind === 'me') {
+    return (
+      <div
+        className={styles.me}
+        style={{ left: x, top: y }}
+        data-testid="my-location"
+        aria-hidden="true"
+      />
+    );
+  }
+  return (
+    <div className={styles.fallback} style={{ left: x, top: y }} data-testid="fallback-location">
+      <span className={styles.diamond} aria-hidden="true" />
+      <span className={styles.placeLabel}>{location.label}</span>
     </div>
   );
 }
