@@ -309,6 +309,23 @@ test.describe('U8-4 코스 상세', () => {
     await expect(courseList(page)).toBeVisible();
   });
 
+  for (const tag of ['', '@desktop ']) {
+    test(`${tag}코스 상세에서 처음 Tab을 누르면 뒤로 버튼으로 간다`, async ({ page }) => {
+      await page.goto('/courses/olle-20');
+      await expect(page.getByRole('heading', { level: 1, name: '제주올레 20코스' })).toBeVisible();
+      await expect(page.getByTestId('course-sheet')).toBeVisible();
+      await page.keyboard.press('Tab');
+      await expect(page.getByRole('button', { name: '뒤로' })).toBeFocused();
+      // 뒤로 막대는 지도와 출처 위에 그대로 보인다
+      const back = (await page.getByRole('button', { name: '뒤로' }).boundingBox())!;
+      const top = await page.evaluate(
+        ([x, y]) => document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label'),
+        [back.x + back.width / 2, back.y + back.height / 2] as const,
+      );
+      expect(top).toBe('뒤로');
+    });
+  }
+
   test('없는 코스 주소는 찾지 못했다고 하고 목록으로 가는 길을 준다', async ({ page }) => {
     await page.goto('/courses/olle-99');
     await expect(page.getByText('코스를 찾지 못했어요')).toBeVisible();
