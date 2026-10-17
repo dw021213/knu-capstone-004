@@ -70,4 +70,19 @@ PR 전에 `npm run typecheck && npm run lint && npm run format:check && npm run 
 
 ## 지도 배경
 
-배경 타일은 CARTO Voyager이고 화면에 "© OpenStreetMap contributors © CARTO"를 표기합니다.
+배경 타일은 OSM 표준 타일(`https://tile.openstreetmap.org/{z}/{x}/{y}.png`)이고, 화면 오른쪽 아래에 "© OpenStreetMap contributors"를 저작권 페이지 링크와 함께 표기합니다. 공급자 주소와 출처 문구는 `src/features/map/basemap.ts` 한 곳에 있어 공급자를 바꿀 때 이 파일만 고칩니다(CARTO는 키 없이 워터마크 타일만 줘서 쓰지 않습니다).
+
+OSM 타일 사용 정책상 대량 트래픽 서비스에는 쓰지 않습니다. 배포가 커지면 키가 있는 공급자로 바꿉니다.
+
+## 지도 모듈
+
+`src/features/map/`이 투영(웹 메르카토르, 기준 줌 z9), 확대·이동(d3-zoom, z9~16, 제주 경계 안), 배경 타일, 셀 canvas 그리기, 셀 찾기를 맡습니다. 이 폴더 밖에서는 투영을 직접 쓰지 않습니다.
+
+e2e 테스트는 아래 읽기 전용 창구를 씁니다.
+
+| 이름                                 | 뜻                                                        |
+| ------------------------------------ | --------------------------------------------------------- |
+| `window.__mapReady`                  | 셀을 처음 그린 뒤 `true`                                  |
+| `window.__mapDebug.project(lng,lat)` | 위경도의 화면(뷰포트) 좌표 `[x, y]`                       |
+| `window.__mapDebug.zoom()`           | 지금 줌 단계(소수)                                        |
+| `performance` mark `cells-drawn`     | 셀을 그릴 때마다 남김. 첫 항목이 첫 화면 그리기 완료 시각 |

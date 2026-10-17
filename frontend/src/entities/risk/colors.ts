@@ -13,3 +13,13 @@ export const RISK_COLOR: Record<Level, string> = {
 export const NO_DATA_COLOR = '#BDBDBD';
 
 export const CELL_FILL_OPACITY = 0.5;
+
+/** 데이터 부족 빗금 선. 바탕(NO_DATA_COLOR)보다 진한 회색 */
+export const NO_DATA_HATCH_COLOR = '#8E8E8E';
+
+/** 셀 경계선: 흰색(tokens.css --white), 화면 기준 0.5px */
+export const CELL_STROKE_COLOR = '#FFFFFF';
+export const CELL_STROKE_WIDTH = 0.5;
+
+/** 선택한 셀 테두리(tokens.css --ink) */
+export const SELECTED_STROKE_COLOR = '#111111';

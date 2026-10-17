@@ -3,8 +3,3 @@
   flex-direction: column;
   height: 100%;
 }
-
-.map {
-  flex: 1;
-  background: var(--surf);
-}

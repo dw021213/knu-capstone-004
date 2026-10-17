@@ -48,7 +48,7 @@
 
 ## 배경 지도
 
-CARTO Voyager 래스터 타일을 씁니다. 화면에 "© OpenStreetMap contributors © CARTO"를 표기합니다.
+OpenStreetMap 표준 타일(`https://tile.openstreetmap.org/{z}/{x}/{y}.png`, ODbL 데이터, 타일 이용은 [OSM 타일 사용 정책](https://operations.osmfoundation.org/policies/tiles/))을 씁니다. 화면에 "© OpenStreetMap contributors"를 [저작권 페이지](https://www.openstreetmap.org/copyright) 링크로 표기합니다. 대량 트래픽에는 쓰지 않고, 배포가 커지면 키가 있는 공급자로 바꿉니다(`src/features/map/basemap.ts`).
 
 ## 시설과 코스
 

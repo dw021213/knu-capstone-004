@@ -1,10 +1,19 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MapPage } from '../pages/MapPage';
 import styles from './App.module.css';
+
+// 스냅숏 데이터는 배포 사이에 바뀌지 않는다
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: Infinity, retry: 1 } },
+});
 
 export default function App() {
   return (
-    <div className={styles.app}>
-      <h1 className="sr-only">제주 안전지도</h1>
-      <main className={styles.map} aria-label="지도" />
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <div className={styles.app}>
+        <h1 className="sr-only">제주 안전지도</h1>
+        <MapPage />
+      </div>
+    </QueryClientProvider>
   );
 }
