@@ -66,12 +66,14 @@
   margin: 0;
   font-size: var(--text-s);
   font-weight: 700;
+  word-break: keep-all;
 }
 
 .bannerSub {
   margin: var(--space-1) 0 0;
   font-size: var(--text-xs);
   color: var(--ink2);
+  word-break: keep-all;
 }
 
 .close {

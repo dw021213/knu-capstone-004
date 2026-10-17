@@ -316,3 +316,38 @@ test.describe('시설·읍면동·응급실 일부 실패', () => {
     await expect(page.getByTestId('sheet-badge')).toBeVisible();
   });
 });
+
+test.describe('U10 상태 문구와 비활성 겉모습', () => {
+  test('오류·로딩 안내 문구는 낱말 중간에서 줄을 바꾸지 않는다(word-break: keep-all)', async ({
+    page,
+  }) => {
+    const release = await holdScores(page);
+    await page.goto('/');
+    const loading = page.getByTestId('loading-banner');
+    await expect(loading).toBeVisible();
+    for (const p of await loading.locator('p').all())
+      await expect(p).toHaveCSS('word-break', 'keep-all');
+    release();
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+
+    await page.route('**/data/scores.json', (route) => route.abort());
+    await page.reload();
+    const error = page.getByTestId('error-state');
+    await expect(error).toBeVisible();
+    for (const p of await error.locator('p').all())
+      await expect(p).toHaveCSS('word-break', 'keep-all');
+  });
+
+  test('위치 권한 안내 배너 문구도 낱말 중간에서 줄을 바꾸지 않는다', async ({ page, context }) => {
+    await context.grantPermissions([]);
+    await page.goto('/');
+    await page.waitForFunction(() => window.__mapReady === true);
+    await page.getByRole('button', { name: '내 위치' }).click();
+    const banner = page
+      .getByRole('status')
+      .filter({ hasText: '위치 권한을 켜면 내 주변 위험도를 볼 수 있어요' });
+    await expect(banner).toBeVisible();
+    for (const p of await banner.locator('p').all())
+      await expect(p).toHaveCSS('word-break', 'keep-all');
+  });
+});
