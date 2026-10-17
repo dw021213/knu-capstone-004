@@ -8,7 +8,6 @@ import {
   screenToLngLat,
   viewProjection,
   zoomLevel,
-  fitView,
   focusView,
   homeView,
   constrainView,
@@ -16,6 +15,7 @@ import {
   ISLAND_CENTER,
 } from './view';
 import { cellAtScreen } from './hitTest';
+import { fitView } from './fitView.fixture';
 import { JEJU_BOUNDS } from './projection';
 
 const scores = JSON.parse(

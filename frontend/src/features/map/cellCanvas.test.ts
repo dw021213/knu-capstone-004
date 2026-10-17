@@ -10,7 +10,8 @@ import {
   DIM_FILL_OPACITY,
 } from '../../entities/risk/colors';
 import { cellFillColor, drawCells, prepareCells } from './cellCanvas';
-import { fitView, lngLatToScreen } from './view';
+import { fitView } from './fitView.fixture';
+import { lngLatToScreen } from './view';
 import { cellCenter } from '../../shared/geo/h3';
 
 type Op = {
