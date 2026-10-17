@@ -623,7 +623,7 @@ export function MapView({
             src={tileUrl(t)}
             alt=""
             draggable={false}
-            style={{ left: t.left, top: t.top, width: t.size, height: t.size }}
+            style={{ left: t.left, top: t.top, width: t.width, height: t.height }}
           />
         ))}
         <canvas
