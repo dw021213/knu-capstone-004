@@ -42,6 +42,7 @@
 
 .head[aria-disabled='true'] {
   cursor: default;
+  opacity: var(--disabled-opacity);
 }
 
 .head:focus-visible {

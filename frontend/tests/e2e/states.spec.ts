@@ -350,4 +350,31 @@ test.describe('U10 상태 문구와 비활성 겉모습', () => {
     for (const p of await banner.locator('p').all())
       await expect(p).toHaveCSS('word-break', 'keep-all');
   });
+
+  test('받는 동안 범례·날짜 칩은 흐리게 보여 누를 수 없음을 알리고, 다 받으면 원래대로 보인다', async ({
+    page,
+  }) => {
+    const release = await holdScores(page);
+    await page.goto('/');
+    await expect(page.getByTestId('loading-banner')).toBeVisible();
+    const legendToggle = page.getByRole('button', { name: '위험도 범례' });
+    const bar = page.getByTestId('date-bar');
+    const controls = [
+      legendToggle,
+      bar.getByRole('button', { name: '오늘' }),
+      bar.getByRole('button', { name: '날짜 선택' }),
+    ];
+    const opacity = (l: import('@playwright/test').Locator) =>
+      l.evaluate((el) => {
+        // 자신과 조상의 불투명도를 곱한 값(실제로 보이는 정도)
+        let o = 1;
+        for (let n: Element | null = el; n; n = n.parentElement)
+          o *= parseFloat(getComputedStyle(n).opacity);
+        return o;
+      });
+    for (const c of controls) expect(await opacity(c)).toBeLessThanOrEqual(0.5);
+    release();
+    await page.waitForFunction(() => window.__mapReady === true);
+    for (const c of controls) await expect.poll(() => opacity(c)).toBe(1);
+  });
 });
