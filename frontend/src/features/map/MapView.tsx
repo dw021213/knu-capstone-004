@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   select,
   zoom,
@@ -185,20 +193,51 @@ export function MapView({
     insetsRef.current = insets;
   });
 
-  // 이동 경계를 맞추는 지도 영역: 오른쪽 패널과 열린 시트·패널이 가리는 곳을 뺀 부분
+  // 이동 경계를 맞추는 지도 영역. full: 오른쪽에 늘 붙은 패널만 뺀 부분, area: 열린 시트·패널이 가리는 곳까지 뺀 부분
   const coverTop = cover?.top ?? 0;
   const coverRight = Math.max(panelRight, cover?.right ?? 0);
   const coverBottom = cover?.bottom ?? 0;
-  const extentRef = useRef<(w: number, h: number) => [[number, number], [number, number]]>(() => [
-    [0, 0],
-    [1, 1],
-  ]);
+  type Extent = [[number, number], [number, number]];
+  const extentRef = useRef<(w: number, h: number) => { full: Extent; area: Extent }>(() => ({
+    full: [
+      [0, 0],
+      [1, 1],
+    ],
+    area: [
+      [0, 0],
+      [1, 1],
+    ],
+  }));
   useLayoutEffect(() => {
-    extentRef.current = (w, h) => [
-      [0, Math.min(coverTop, h - 1)],
-      [Math.max(1, w - coverRight), Math.max(coverTop + 1, h - coverBottom)],
-    ];
+    extentRef.current = (w, h) => ({
+      full: [
+        [0, 0],
+        [Math.max(1, w - panelRight), h],
+      ],
+      area: [
+        [0, Math.min(coverTop, h - 1)],
+        [Math.max(1, w - coverRight), Math.max(coverTop + 1, h - coverBottom)],
+      ],
+    });
   });
+  // 지금 경계(full). constrain이 읽는다
+  const fullRef = useRef<Extent | null>(null);
+  // 시트·패널을 닫았을 때 그 영역 기준으로 옮겨 둔 화면이면, 사용자가 제자리 범위로 끌어올 때까지 그 영역도 허용한다
+  const stickyRef = useRef<Extent | null>(null);
+  /**
+   * 화면이 full 기준으로도, 보이는 영역(area, d3 extent) 기준으로도 경계 안이면 그대로 둔다. 둘 다 벗어나면 덜 옮기는
+   * 쪽으로 들인다. 시트를 열거나 닫아도 지도가 저절로 움직이지 않고, 가린 곳 밑의 셀은 보이는 영역까지 끌어올 수 있다
+   */
+  const constrainBoth = useCallback((t: ZoomTransform, area: Extent, te: Extent): ZoomTransform => {
+    const full = fullRef.current;
+    const moved = (c: ZoomTransform) => Math.hypot(c.x - t.x, c.y - t.y);
+    const options = [area, full, stickyRef.current].filter((e) => e !== null);
+    const out = options
+      .map((e) => constrainView(t, e, te))
+      .reduce((a, b) => (moved(b) < moved(a) ? b : a));
+    if (full && moved(constrainView(t, full, te)) < 0.5) stickyRef.current = null;
+    return out;
+  }, []);
   // 진행 중인 맞춤(focus) 옮기기. 끝나면 기다리던 reveal을 한다
   const focusing = useRef(false);
   const afterFocus = useRef<(() => void) | null>(null);
@@ -207,12 +246,13 @@ export function MapView({
   useEffect(() => {
     if (!size) return;
     const el = containerRef.current!;
-    const extent = extentRef.current(size.w, size.h);
+    const { full, area: extent } = extentRef.current(size.w, size.h);
+    fullRef.current = full;
     const toView = ({ k, x, y }: ZoomTransform): View => ({ k, x, y });
     const behavior = zoom<HTMLDivElement, unknown>()
       .scaleExtent(SCALE_EXTENT)
       .translateExtent(worldExtent(JEJU_BOUNDS))
-      .constrain(constrainView)
+      .constrain(constrainBoth)
       .extent(extent)
       .on('zoom', (e: D3ZoomEvent<HTMLDivElement, unknown>) => {
         const v = toView(e.transform);
@@ -230,26 +270,24 @@ export function MapView({
       sel.on('.zoom', null);
       zoomRef.current = null;
     };
-  }, [size]);
+  }, [size, constrainBoth]);
 
-  // 가림(패널·시트)이 바뀌면 이동 경계만 바꾼다. 옮기는 중이 아니고 지금 화면이 새 경계 밖이면 부드럽게 들인다
+  // 가림(패널·시트)이 바뀌면 이동 경계만 바꾼다. 지도는 옮기지 않는다(닫을 때는 앞 영역을 잠시 허용)
   useEffect(() => {
     const z = zoomRef.current;
     if (!z || !size) return;
-    const extent = extentRef.current(size.w, size.h);
+    const { full, area: extent } = extentRef.current(size.w, size.h);
+    fullRef.current = full;
     const same = extent.every((p, i) => p[0] === z.extent[i][0] && p[1] === z.extent[i][1]);
     if (same) return;
+    const before = z.extent;
     z.extent = extent;
     z.behavior.extent(extent);
     const v = viewRef.current;
-    if (!v || focusing.current) return;
+    if (!v) return;
     const t = zoomIdentity.translate(v.x, v.y).scale(v.k);
     const c = z.behavior.constrain()(t, extent, worldExtent(JEJU_BOUNDS));
-    if (Math.hypot(c.x - t.x, c.y - t.y) < 0.5) return;
-    z.sel
-      .transition()
-      .duration(reducedMotion() ? 0 : 300)
-      .call(z.behavior.transform, c);
+    if (Math.hypot(c.x - t.x, c.y - t.y) >= 0.5) stickyRef.current = before;
   }, [size, coverTop, coverRight, coverBottom]);
 
   // 검색으로 고른 곳으로 옮기고 확대한다
@@ -332,7 +370,7 @@ export function MapView({
         .transition()
         .duration(reducedMotion() ? 0 : 300)
         .call(z.behavior.transform, t)
-        .on('end', () => {
+        .on('end interrupt', () => {
           doneReveal.current = revealKey;
         });
     };
@@ -445,6 +483,9 @@ export function MapView({
       },
       revealDone() {
         return doneReveal.current;
+      },
+      idle() {
+        return !focusing.current && appliedReveal.current === doneReveal.current;
       },
       route() {
         const v = viewRef.current;
