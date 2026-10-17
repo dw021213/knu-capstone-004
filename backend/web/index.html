@@ -55,7 +55,12 @@ function scoreColor(score) {
 }
 const GRADIENT_CSS = `linear-gradient(to top, ${COLOR_STOPS.map(([s, c]) => `${c} ${s * 100}%`).join(', ')})`;
 
-const map = L.map('map', { preferCanvas: true }).setView([33.38, 126.55], 10);
+// ?view=위도,경도,줌 으로 처음 보는 위치를 지정할 수 있다 (예: ?view=33.30,126.62,12)
+const initView = (() => {
+  const v = (new URLSearchParams(location.search).get('view') || '').split(',').map(Number);
+  return v.length === 3 && v.every(Number.isFinite) ? { c: [v[0], v[1]], z: v[2] } : { c: [33.38, 126.55], z: 10 };
+})();
+const map = L.map('map', { preferCanvas: true }).setView(initView.c, initView.z);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18,
   attribution: '&copy; OpenStreetMap contributors',
