@@ -1,0 +1,13 @@
+{
+  "fetchedAt": "2026-10-17",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "tagsQuery": "[out:json][timeout:90];\narea[\"name\"=\"제주특별자치도\"]->.a;\nrelation(area.a)[\"route\"~\"hiking|foot\"];\nout tags;",
+  "geometryQuery": "[out:json][timeout:90];\nrelation(<id>);\nout geom;",
+  "relations": [
+    3793143,
+    5232945,
+    5535857,
+    7248522,
+    9180869
+  ]
+}

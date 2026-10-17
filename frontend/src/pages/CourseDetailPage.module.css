@@ -1,0 +1,119 @@
+.page {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 지도 위 층: 빈 곳은 지도로 통과시킨다 */
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: auto;
+}
+
+/* 모바일: 아래 카드(배경 지도 출처 위). 넘치면 안에서 굴린다 */
+.sheet {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-6);
+  max-height: 45dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: var(--white);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-m);
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+/* 데스크톱: 오른쪽 패널 */
+@media (min-width: 768px) {
+  .sheet {
+    top: calc(var(--touch) + var(--space-2) + var(--space-3));
+    left: auto;
+    right: var(--space-4);
+    bottom: var(--space-8);
+    width: calc(var(--touch) * 9);
+    max-height: none;
+  }
+}
+
+.badgeRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.badgeNote {
+  font-size: var(--text-s);
+  color: var(--ink2);
+}
+
+.basis {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}
+
+.reason {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-s);
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.subTitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+.listLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  padding: 0 var(--space-3);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--ink);
+  color: var(--white);
+  font-size: var(--text-s);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.listLink:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surf);
+  font-size: var(--text-xs);
+  color: var(--ink2);
+  word-break: keep-all;
+}

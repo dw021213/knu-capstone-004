@@ -163,3 +163,40 @@ test.describe('상태 화면', () => {
     });
   }
 });
+
+// 코스 화면(U8): 목록, 상세, 주의 구간을 고른 상세, 받지 못한 목록
+test.describe('코스 화면', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-10-17T10:00:00+09:00'));
+  });
+
+  for (const tag of ['', '@desktop ']) {
+    test(`${tag}코스 목록에 접근성 critical·serious 위반이 없다`, async ({ page }) => {
+      await page.goto('/courses');
+      await expect(page.getByRole('list', { name: '코스 목록' }).getByRole('listitem')).toHaveCount(
+        3,
+      );
+      expect(await seriousViolations(page)).toEqual([]);
+    });
+
+    test(`${tag}코스 상세와 주의 구간을 고른 화면에 접근성 critical·serious 위반이 없다`, async ({
+      page,
+    }) => {
+      await page.goto('/courses/olle-1');
+      await page.waitForFunction(() => window.__mapReady === true);
+      const items = page.getByRole('list', { name: '주의 구간 목록' }).getByRole('button');
+      await expect(items).toHaveCount(6);
+      expect(await seriousViolations(page)).toEqual([]);
+      await items.first().click();
+      await expect(items.first()).toHaveAttribute('aria-pressed', 'true');
+      expect(await seriousViolations(page)).toEqual([]);
+    });
+  }
+
+  test('코스를 받지 못한 목록에 접근성 critical·serious 위반이 없다', async ({ page }) => {
+    await page.route('**/data/courses.json', (route) => route.abort());
+    await page.goto('/courses');
+    await expect(page.getByRole('button', { name: '다시 시도' })).toBeVisible();
+    expect(await seriousViolations(page)).toEqual([]);
+  });
+});

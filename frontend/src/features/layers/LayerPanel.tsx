@@ -41,6 +41,7 @@ export function LayerPanel({ on, toggle, count, states }: LayerPanelProps) {
         ref={buttonRef}
         type="button"
         className={styles.button}
+        data-testid="layer-button"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}

@@ -1,0 +1,324 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-10-16T22:06:03Z",
+    "timestamp_areas_base": "2026-10-15T06:58:54Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "relation",
+  "id": 3793143,
+  "tags": {
+    "name": "Jeju Olle trail 7",
+    "name:en": "Olle trail 7",
+    "name:ko": "올레길7",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 3793206,
+  "tags": {
+    "name": "올레길6 (Ollegil 6)",
+    "name:en": "Olle trail 6",
+    "name:ko": "올레길6",
+    "network": "rwn",
+    "ref": "JOT6",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 3809942,
+  "tags": {
+    "name": "올레길4 (Ollegil 4)",
+    "name:en": "Olle trail 4",
+    "name:ko-Latn": "올레길4",
+    "network": "rwn",
+    "ref": "JOT4",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 3878188,
+  "tags": {
+    "name": "올레길5 (Ollegil 5)",
+    "name:en": "Olle trail 5",
+    "name:ko": "올레길5",
+    "name:ko-Latn": "Ollegil 5",
+    "network": "rwn",
+    "ref": "JOT5",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 4869085,
+  "tags": {
+    "name": "올레길2",
+    "name:en": "Ollegil 2",
+    "name:ko": "올레길2",
+    "name:ko-Latn": "Ollegil 2",
+    "network": "rwn",
+    "note": "Jeju-do walking trail",
+    "ref": "JOT2",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 5232945,
+  "tags": {
+    "name": "올레길1",
+    "name:en": "Olle trail 1",
+    "name:ko": "올레길1",
+    "name:ko-Latn": "Ollegil 1",
+    "network": "rwn",
+    "ref": "JOT1",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 5458299,
+  "tags": {
+    "name": "올레길3 (Ollegil 3)",
+    "name:en": "Olle trail 3",
+    "name:ko-Latn": "Ollegil 3",
+    "network": "rwn",
+    "ref": "JOT3",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 5535857,
+  "tags": {
+    "name:en": "Olle trail 20",
+    "name:ko-Latn": "올레길 20",
+    "ref": "JOT20",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 5637062,
+  "tags": {
+    "name": "Olle trail 6(B)",
+    "name:ko": "올레길6(B)",
+    "name:ko-Latn": "Ollegil 6(B)",
+    "ref": "JOT6B",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 5650389,
+  "tags": {
+    "name:en": "Olle trail 6(A)",
+    "name:ko": "올레길6(A)",
+    "name:ko-Latn": "Ollegil 6(A)",
+    "network": "lwn",
+    "ref": "JOT6A",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 6089470,
+  "tags": {
+    "name": "올레길3A",
+    "name:en": "Ollegil 3A",
+    "network": "rwn",
+    "ref": "JOT3A",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 6089589,
+  "tags": {
+    "name": "올레길3B",
+    "name:en": "Ollegil 3B",
+    "network": "rwn",
+    "ref": "JOT3B",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 6107767,
+  "tags": {
+    "name:en": "Ollegil 14",
+    "network": "rwn",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 7248520,
+  "tags": {
+    "name": "Ollegil 8",
+    "route": "foot",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 7248521,
+  "tags": {
+    "name": "Ollegil 9",
+    "route": "foot",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 7248522,
+  "tags": {
+    "name": "Ollegil 10",
+    "route": "foot",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 7248523,
+  "tags": {
+    "name": "Ollegil 11",
+    "route": "foot",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 8246395,
+  "tags": {
+    "name": "올레길5 (Ollegil 5) wheelchair",
+    "name:en": "Olle trail 5 wheelchair",
+    "name:ko": "올레길5",
+    "name:ko-Latn": "Ollegil 5",
+    "network": "rwn",
+    "ref": "JOT5",
+    "route": "hiking",
+    "type": "route"
+  }
+},
+{
+  "type": "relation",
+  "id": 9149294,
+  "tags": {
+    "name": "올레길 16코스",
+    "name:en": "Jeju Olle Trail 16",
+    "name:ko": "올레길 16코스",
+    "network": "rcn",
+    "route": "hiking",
+    "type": "route",
+    "wikidata": "Q2656801",
+    "wikipedia": "ko:올레길"
+  }
+},
+{
+  "type": "relation",
+  "id": 9149725,
+  "tags": {
+    "name": "올레길 18코스",
+    "name:en": "Jeju Olle Trail 18",
+    "name:ko": "올레길 18코스",
+    "network": "rcn",
+    "route": "hiking",
+    "type": "route",
+    "wikidata": "Q2656801",
+    "wikipedia": "ko:올레길"
+  }
+},
+{
+  "type": "relation",
+  "id": 9173551,
+  "tags": {
+    "name": "올레길 19코스",
+    "name:en": "Jeju Olle Trail 19",
+    "name:ko": "올레길 19코스",
+    "network": "rcn",
+    "route": "hiking",
+    "type": "route",
+    "wikidata": "Q2656801",
+    "wikipedia": "ko:올레길"
+  }
+},
+{
+  "type": "relation",
+  "id": 9180869,
+  "tags": {
+    "name": "올레길 20코스",
+    "name:en": "Jeju Olle Trail 20",
+    "name:ko": "올레길 20코스",
+    "network": "rcn",
+    "route": "hiking",
+    "type": "route",
+    "wikidata": "Q2656801",
+    "wikipedia": "ko:올레길"
+  }
+},
+{
+  "type": "relation",
+  "id": 16555366,
+  "tags": {
+    "from": "성판악",
+    "name": "성판악코스",
+    "name:en": "Seongpanak Trail",
+    "name:ko": "성판악코스",
+    "network": "rwn",
+    "route": "hiking",
+    "to": "한라산 백록담",
+    "type": "route",
+    "via": "진달래밭"
+  }
+},
+{
+  "type": "relation",
+  "id": 16555367,
+  "tags": {
+    "from": "관음사지구야영장",
+    "name": "관음사코스",
+    "name:en": "Gwaneumsa Trail",
+    "name:ko": "관음사코스",
+    "network": "rwn",
+    "route": "hiking",
+    "to": "동능정상",
+    "type": "route",
+    "via": "삼각봉대피소"
+  }
+},
+{
+  "type": "relation",
+  "id": 16569254,
+  "tags": {
+    "name": "사라오름코스",
+    "name:en": "Sara Oreum Trail",
+    "name:ko": "사라오름코스",
+    "network": "rwn",
+    "route": "hiking",
+    "type": "route"
+  }
+}
+
+  ]
+}

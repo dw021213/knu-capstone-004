@@ -5,6 +5,7 @@ import {
   CELL_FILL_OPACITY,
   CELL_STROKE_COLOR,
   CELL_STROKE_WIDTH,
+  DIM_FILL_OPACITY,
   NO_DATA_COLOR,
   NO_DATA_HATCH_COLOR,
   RISK_COLOR,
@@ -83,6 +84,8 @@ export interface DrawOptions {
   hatch: CanvasPattern | null;
   selected?: string | null;
   tag?: CellTag | null;
+  /** 주면 이 셀들만 그대로 칠하고 나머지는 DIM_FILL_OPACITY로 흐리게(코스 화면) */
+  dim?: ReadonlySet<string> | null;
 }
 
 /** 숫자 태그 반지름과 셀 꼭대기에서 띄우는 거리(CSS px) */
@@ -117,7 +120,7 @@ export function drawCells(
   ctx: CanvasRenderingContext2D,
   cells: PreparedCell[],
   view: View,
-  { width, height, dpr, hatch, selected, tag }: DrawOptions,
+  { width, height, dpr, hatch, selected, tag, dim }: DrawOptions,
 ): void {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
@@ -132,19 +135,24 @@ export function drawCells(
   });
   if (visible.length === 0) return;
 
-  const groups = new Map<Level | null, PreparedCell[]>();
+  // 등급과 흐림 여부로 묶어 한 번씩 칠한다
+  const groups = new Map<string, { lv: Level | null; dimmed: boolean; cells: PreparedCell[] }>();
   for (const c of visible) {
-    const g = groups.get(c.level);
-    if (g) g.push(c);
-    else groups.set(c.level, [c]);
+    const dimmed = dim ? !dim.has(c.h3) : false;
+    const key = `${c.level}:${dimmed}`;
+    const g = groups.get(key);
+    if (g) g.cells.push(c);
+    else groups.set(key, { lv: c.level, dimmed, cells: [c] });
   }
-  for (const [lv, group] of groups) {
+  for (const { lv, dimmed, cells: group } of groups.values()) {
     ctx.beginPath();
     for (const c of group) path(c.polygon);
     ctx.fillStyle =
       lv === null ? (hatch ?? rgba(NO_DATA_COLOR, CELL_FILL_OPACITY)) : cellFillColor(lv);
+    ctx.globalAlpha = dimmed ? DIM_FILL_OPACITY / CELL_FILL_OPACITY : 1;
     ctx.fill();
   }
+  ctx.globalAlpha = 1;
 
   ctx.beginPath();
   for (const c of visible) path(c.polygon);

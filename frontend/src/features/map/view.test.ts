@@ -128,6 +128,19 @@ describe('focusView', () => {
   });
 });
 
+describe('focusView 오른쪽 가림(데스크톱 코스 패널)', () => {
+  const big = { west: 126.25, south: 33.35, east: 126.5, north: 33.5 };
+  it('오른쪽 right px를 뺀 영역의 가로 가운데에 점을 두고 그 너비에 맞춘다', () => {
+    const v = focusView(1440, 900, big, [126.375, 33.425], { minZ: 9, maxZ: 14, right: 412 });
+    const [x] = lngLatToScreen(v, 126.375, 33.425);
+    expect(x).toBeCloseTo((1440 - 412) / 2, 6);
+    const [x0] = lngLatToScreen(v, big.west, big.south);
+    const [x1] = lngLatToScreen(v, big.east, big.north);
+    expect(x1 - x0).toBeLessThanOrEqual((1440 - 412) * 0.8 + 1e-6);
+    expect(x1).toBeLessThan(1440 - 412);
+  });
+});
+
 describe('homeView: 첫 화면은 본섬 중심을 위·아래 가림 사이 영역 가운데에 둔다', () => {
   const cases = [
     { w: 390, h: 844, top: 105, bottom: 111 },

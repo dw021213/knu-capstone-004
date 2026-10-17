@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { dataSource, type DataSource } from '../data';
 import { CellSheet, type SheetTarget } from '../features/cell-sheet/CellSheet';
 import { useSheetData } from '../features/cell-sheet/useSheetData';
@@ -116,11 +117,14 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
     const overlay = overlayRef.current;
     const legend = overlay?.querySelector('[data-testid="legend"]');
     const header = overlay?.querySelector('header');
-    if (!overlay || !legend || !header) return;
+    const layer = overlay?.querySelector('[data-testid="layer-button"]');
+    if (!overlay || !legend || !header || !layer) return;
     const ro = new ResizeObserver(() => {
       const box = legend.getBoundingClientRect();
       overlay.style.setProperty('--legend-h', `${box.height}px`);
       overlay.style.setProperty('--legend-w', `${box.width}px`);
+      // 데스크톱 '오늘 안전한 코스'를 레이어 버튼 바로 옆에 둔다(켠 개수 배지로 너비가 바뀐다)
+      overlay.style.setProperty('--layer-w', `${layer.getBoundingClientRect().width}px`);
       overlay.style.setProperty(
         '--overlay-top',
         `calc(${header.getBoundingClientRect().height}px + var(--space-3))`,
@@ -128,6 +132,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
     });
     ro.observe(legend);
     ro.observe(header);
+    ro.observe(layer);
     return () => ro.disconnect();
   }, []);
 
@@ -189,7 +194,18 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
         <div className={styles.dock}>
           {/* 모바일에서 셀 시트를 열면 지도를 덜 가리도록 숨긴다(데스크톱은 시트가 오른쪽 패널이라 그대로) */}
           <div className={target ? `${styles.actions} ${styles.underSheet}` : styles.actions}>
-            <LocateButton busy={my.state.status === 'locating'} onClick={my.locate} />
+            {/* 모바일은 날짜 칩 위 왼쪽, 데스크톱은 좌상단 레이어 버튼 옆 */}
+            <Link to="/courses" className={styles.courseLink}>
+              <svg className={styles.courseIcon} viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="3.5" cy="12.5" r="1.75" />
+                <circle cx="12.5" cy="3.5" r="1.75" />
+                <path d="M5.25 12.5h4a2.25 2.25 0 0 0 0-4.5h-2.5a2.25 2.25 0 0 1 0-4.5h4" />
+              </svg>
+              오늘 안전한 코스
+            </Link>
+            <div className={styles.locate}>
+              <LocateButton busy={my.state.status === 'locating'} onClick={my.locate} />
+            </div>
           </div>
           {target && (
             <CellSheet

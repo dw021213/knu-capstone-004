@@ -82,19 +82,21 @@ export function fitView(
 /**
  * 검색으로 고른 곳 보기: 경계 상자가 화면 가로 80%·세로 50% 안에 들도록 맞춘 줌을 minZ~maxZ로 자르고,
  * 점은 가로 가운데·세로 anchorY(모바일 셀 시트 위쪽)에 둔다.
+ * right: 오른쪽에서 가리는 너비(px, 데스크톱 코스 패널). 가로는 그 왼쪽 영역 기준으로 맞춘다
  */
 export function focusView(
   width: number,
   height: number,
   b: Bounds,
   [lng, lat]: [number, number],
-  { minZ = 12, maxZ = 14, anchorY = 0.4 } = {},
+  { minZ = 12, maxZ = 14, anchorY = 0.4, right = 0 } = {},
 ): View {
   const [[x0, y0], [x1, y1]] = worldExtent(b);
-  const fit = Math.min((width * 0.8) / (x1 - x0), (height * 0.5) / (y1 - y0));
+  const area = Math.max(1, width - right);
+  const fit = Math.min((area * 0.8) / (x1 - x0), (height * 0.5) / (y1 - y0));
   const k = Math.min(2 ** (maxZ - BASE_Z), Math.max(2 ** (minZ - BASE_Z), fit));
   const [wx, wy] = base([lng, lat])!;
-  return { k, x: width / 2 - wx * k, y: height * anchorY - wy * k };
+  return { k, x: area / 2 - wx * k, y: height * anchorY - wy * k };
 }
 
 /**
