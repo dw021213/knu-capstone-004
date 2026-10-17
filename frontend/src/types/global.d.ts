@@ -7,6 +7,8 @@ declare global {
       zoom(): number;
       /** 옮기기를 끝낸 마지막 맞춤(focus) key. 아직 없으면 null */
       focusDone(): number | null;
+      /** 고른 곳을 보이는 영역으로 옮기기를 끝낸 마지막 reveal key. 아직 없으면 null */
+      revealDone(): number | null;
       /** 지금 그린 코스 구간 수, 주의 지점, 시작·끝 표지(페이지 좌표) */
       route(): {
         lines: number;

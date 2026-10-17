@@ -17,7 +17,13 @@ import { cellAt } from '../features/map/hitTest';
 import { LocateButton } from '../features/locate/LocateButton';
 import { LocationBanner } from '../features/locate/LocationBanner';
 import { CITY_HALL, useMyLocation } from '../features/locate/useMyLocation';
-import { MapView, type MapFocus, type MapLocation } from '../features/map/MapView';
+import {
+  MapView,
+  type Cover,
+  type MapFocus,
+  type MapLocation,
+  type MapReveal,
+} from '../features/map/MapView';
 import type { Insets } from '../features/map/view';
 import { PlaceSearch } from '../features/search/PlaceSearch';
 import { ErrorState } from '../features/status/ErrorState';
@@ -150,6 +156,39 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
 
   // 데스크톱: 셀 정보는 머리글 아래 오른쪽 패널(지도 main 밖 보조 영역). 모바일: 날짜 칩 위 카드
   const wide = useWide();
+
+  // 시트·패널이 가리는 곳과, 새로 고른 곳을 그 밖(보이는 지도 영역)으로 옮기기.
+  // 모바일 시트는 내용이 다 들어오면 커지므로 최대 높이(max-height)로 잰다
+  const [shown, setShown] = useState<{ cover: Cover; reveal: MapReveal | null } | null>(null);
+  const revealedFor = useRef<SheetTarget | null>(null);
+  const revealSeq = useRef(0);
+  const sheetShown = target !== null && pickedPoi === null;
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const header = headerRef.current;
+    const sheetEl = root?.querySelector<HTMLElement>('[data-testid="cell-sheet"]');
+    if (!root || !header || !target || !sheetShown || !sheetEl) {
+      setShown(null);
+      return;
+    }
+    const box = root.getBoundingClientRect();
+    const top = header.getBoundingClientRect().bottom - box.top;
+    const sheet = sheetEl.getBoundingClientRect();
+    let cover: Cover;
+    if (wide) {
+      cover = { top, right: Math.max(0, box.right - sheet.left), bottom: 0 };
+    } else {
+      const maxH = parseFloat(getComputedStyle(sheetEl).maxHeight);
+      const sheetTop = sheet.bottom - Math.max(sheet.height, Number.isFinite(maxH) ? maxH : 0);
+      cover = { top, right: 0, bottom: Math.max(0, box.bottom - sheetTop) };
+    }
+    // 같은 곳 시트를 시설 카드 뒤에서 다시 보일 때는 옮기지 않는다
+    const fresh = revealedFor.current !== target;
+    revealedFor.current = target;
+    if (fresh) revealSeq.current += 1;
+    const point = target.kind === 'cell' ? cellCenter(target.h3) : target.lngLat;
+    setShown({ cover, reveal: { key: revealSeq.current, point } });
+  }, [target, sheetShown, wide]);
   const sheet = target && (
     <CellSheet
       target={target}
@@ -217,6 +256,8 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
           highlight={pickedPoi?.id ?? null}
           focus={focus}
           insets={insets}
+          cover={shown?.cover ?? null}
+          reveal={shown?.reveal ?? null}
           location={mapLocation}
         />
         {/* 지도 위에 얹는 층. MapView 밖(형제)에 두어 여기서 누른 것은 확대·셀 선택으로 가지 않는다 */}
