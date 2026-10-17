@@ -69,9 +69,9 @@ func runFacilities(ctx context.Context, pool *pgxpool.Pool) error {
 		if err != nil {
 			return err
 		}
-		batch.Queue(`INSERT INTO facility (type, name, address, geom, h3_index)
-			VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6)
-			ON CONFLICT (type, name) DO UPDATE
+		batch.Queue(`INSERT INTO facility (type, ext_id, name, address, geom, h3_index, source)
+			VALUES ($1, $2, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6, '소방청 119안전센터 현황')
+			ON CONFLICT (type, ext_id) DO UPDATE
 			SET address = EXCLUDED.address, geom = EXCLUDED.geom, h3_index = EXCLUDED.h3_index`,
 			r["type"], r["name"], r["address"], lng, lat, cell.String())
 		n++

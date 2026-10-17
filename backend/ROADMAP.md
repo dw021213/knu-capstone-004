@@ -329,6 +329,9 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   (셀 위험도·월 보정 시 ×2.44 → +0.18 이었으나 설명을 단순하게 하기로 결정)
 - 2026-10-17: main(프론트·시설 POI) 병합. 배포 준비: `Dockerfile`(server+etl, cgo), `deploy/`(docker-compose.prod.yml: db+server+caddy, Caddyfile, .env.example, DEPLOY.md).
   로컬에서 운영 구성 전체(HTTPS 포함) 기동·덤프 복원·API 확인. 호스팅은 Vultr 서울 2GB 로 결정, 주소는 DuckDNS 무료 서브도메인.
+- 2026-10-17: 시설 POI 5종(CCTV 1,291·편의점 1,300·숙박 1,153·경찰 25·응급실 6)을 프론트 POI 파일에서 facility 로 적재(`etl poi`, migration 012: ext_id·detail·source, (type, ext_id) 고유) → 셀별 통계 6종.
+  `/api/grid` 에 base_hazard_percentile·base_hazard_level·road_source·facility_counts 추가, `/api/facilities` 에 detail·source·ext_id.
+  서버 기동 시 최근 24시간 기상 백필. `db-dump.sh --deploy`(weather_obs 내용 제외, 19MB). 운영은 실시간 기상만 쓰기로.
 
 ## ▶ 현재 상태 요약 (2026-10-13, 이어서 작업할 때 여기부터)
 - **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (push 완료, main 미병합). 옛 `종프/back` 은 백업

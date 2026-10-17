@@ -150,6 +150,10 @@ WITH dummy AS (
   ORDER BY h3_index, ts DESC
 ), ems AS (
   SELECT h3_index, sum(count)::int AS count FROM cell_ems_count GROUP BY h3_index
+), fac AS (
+  -- 셀 안 시설 수 (종류별, 0 은 뺌)
+  SELECT h3_index, json_object_agg(type, count_in_cell) AS counts
+  FROM cell_facility_stat WHERE count_in_cell > 0 GROUP BY h3_index
 ), crowd AS (
   SELECT DISTINCT ON (h3_index) h3_index, value
   FROM congestion
@@ -174,12 +178,16 @@ SELECT json_build_object(
       'hazard_level', adj.hlvl,
       'base_percentile', round(rc.percentile::numeric, 2),
       'base_level', rc.level,
+      'base_hazard_percentile', round(rc.hazard_percentile::numeric, 2),
+      'base_hazard_level', rc.hazard_level,
       'weather_bonus', CASE WHEN rc.score IS NULL THEN NULL ELSE round(w.bonus::numeric, 3) END,
       'weather_alerts', COALESCE(w.alerts, '[]'::jsonb),
       'weather_stn', cw.stn,
       'isolation', round(rc.isolation::numeric, 4),
       'traffic_percentile', round(ht.percentile::numeric, 2),
       'has_road', ht.available,
+      'road_source', ht.detail->>'road_source',
+      'facility_counts', COALESCE(fc.counts, '{}'::json),
       'population', round(p.population::numeric, 1),
       'fire_station_dist_m', round(s.nearest_dist_m::numeric),
       'fire_station_drive_min', round(s.nearest_drive_min::numeric, 1),
@@ -199,6 +207,7 @@ LEFT JOIN dummy d ON d.h3_index = c.h3_index
 LEFT JOIN crowd g ON g.h3_index = c.h3_index
 LEFT JOIN ems e ON e.h3_index = c.h3_index
 LEFT JOIN cell_facility_stat s ON s.h3_index = c.h3_index AND s.type = 'fire_station'
+LEFT JOIN fac fc ON fc.h3_index = c.h3_index
 LEFT JOIN cell_weather_station cw ON cw.h3_index = c.h3_index
 -- 기상 가산: 셀의 지점 판별 결과($10: 지점번호 → {bonus, alerts, …})
 CROSS JOIN LATERAL (
@@ -256,7 +265,8 @@ SELECT json_build_object(
     'type', 'Feature',
     'geometry', ST_AsGeoJSON(geom, 6)::json,
     'properties', json_build_object(
-      'id', id, 'type', type, 'name', name, 'address', address, 'h3', h3_index)
+      'id', id, 'ext_id', ext_id, 'type', type, 'name', name, 'address', address, 'h3', h3_index,
+      'detail', detail, 'source', source)
   ) ORDER BY id), '[]'::json)
 )
 FROM facility

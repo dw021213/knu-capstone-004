@@ -9,6 +9,14 @@
 - CORS 허용됨 (다른 포트·주소의 프론트에서 바로 호출 가능)
 - 좌표는 GeoJSON 표준 **[경도, 위도]**
 
+> **2026-10-17 변경 (프론트 반영 필요한 것)**
+> 1. `/api/grid` 에 **`base_hazard_percentile`, `base_hazard_level`** 추가 — 프론트가 칠하는 `hazard_percentile` 의 **기상 가산 전** 값.
+>    (`base_percentile` 은 유동인구를 켠 `risk_percentile` 의 가산 전 값이라 프론트 기본 모드와 짝이 아니다)
+> 2. `/api/grid` 에 **`road_source`** 추가 (`ITS_standard_nodelink` / `NGII_digital_map` / `no_mapped_road`) — 스냅숏 파일 없이 도로 출처 표시 가능.
+> 3. `/api/grid` 에 **`facility_counts`** 추가 — 셀 안 시설 수 `{"cctv": 3, "convenience": 1, …}` (0 은 생략).
+> 4. `/api/facilities?type=` 에 **`cctv`, `convenience`, `lodging`, `police`, `er`** 추가 (프론트 `public/data/poi/*.json` 과 같은 원천·같은 id → `ext_id`). 속성에 `detail`, `source` 포함.
+> 5. 기상 가산은 **호우 경보급일 때만 +0.15** (규칙 v4). "최대 0.3" 문구는 상한일 뿐 실제로는 0 또는 0.15.
+
 ## 위험도는 어떻게 만들었나 (`combined_v2`)
 
 ```
@@ -189,13 +197,16 @@
 | `risk_score` | 최종 점수 0~1 | 부가 표시 |
 | `hazard` | 위해도 0~1 (위험 모델 백분위 평균) | 상세 패널 |
 | `hazard_percentile`, `hazard_level` | **유동인구를 끈** 위험도 순위·등급 (위해도만, 기상 가산 포함) | 유동인구 끔일 때 색 |
-| `base_percentile`, `base_level` | 기상 가산 **전** 순위·등급 | "기상 때문에 올랐다" 표시 |
+| `base_percentile`, `base_level` | `risk_*`(유동인구 켬)의 기상 가산 **전** 순위·등급 | 유동인구 켬일 때 "기상 때문에 올랐다" |
+| **`base_hazard_percentile`, `base_hazard_level`** | **`hazard_*`(유동인구 끔, 기본)의 기상 가산 전** 순위·등급 | 기본 모드에서 "기상 때문에 올랐다" 표시 |
 | `weather_bonus` | 기상 가산점 (상한 0.3, 현재 규칙 v4 는 호우 경보급 +0.15 만) | 툴팁 |
 | `weather_alerts` | 기준 초과 항목 `[{key, label, level(advisory/warning), metric, value, bonus}]` | 경고 아이콘·문구 |
 | `weather_stn` | 연결된 AWS 지점 번호 | 참고 |
 | `isolation` | 고립도 0~1 (1 = 가장 한산) | 상세 패널 |
 | `traffic_percentile` | 교통사고(도로) 모델 백분위 0~100 | 상세 패널 |
 | `has_road` | 이 셀에 도로 자료가 있는지 | `false` 면 "도로 자료 없음" |
+| `road_source` | 도로 자료 출처: `ITS_standard_nodelink`(본섬 표준노드링크 2026-09-14) / `NGII_digital_map`(우도·추자도 수치지도 2025) / `no_mapped_road` | 출처 칩 |
+| `facility_counts` | 셀 안 시설 수 `{type: 개수}` (0 은 생략, 종류는 ④ 참고) | 셀 시트 "주변 시설" |
 | `population` | 그 조건·시간대 유동인구 합 (없으면 null = 0명으로 계산) | 상세 패널 |
 | `fire_station_*` | 가장 가까운 119 거리(m)·예상 주행시간(분, 근사)·인접 119 수 | 툴팁 참고 정보 |
 | `dummy_score`, `dummy_level`, `ems_count`, `congestion` | 백엔드 테스트용 값 | **사용하지 않음** |
@@ -275,7 +286,16 @@
 
 ## ④ `GET /api/facilities?type={시설종류}` — 시설 마커 (선택)
 
-119안전센터 24곳. 디자인에 마커가 없으면 호출하지 않아도 된다.
+| `type` | 시설 | 개수 | 원천 |
+|---|---|---|---|
+| `fire_station` | 119안전센터 | 24 | 소방청 119안전센터 현황 |
+| `cctv` | CCTV | 1,291 | 행정안전부 전국CCTV표준데이터 (2020년 기준 일부) |
+| `convenience` | 편의점 | 1,300 | 소상공인시장진흥공단 상가정보 2026-06 |
+| `lodging` | 숙박 | 1,153 | 소상공인시장진흥공단 상가정보 2026-06 |
+| `police` | 지구대·파출소 | 25 | 경찰청 2025-12-31 (좌표 Nominatim) |
+| `er` | 응급의료기관 | 6 | 제주특별자치도 2025-12-31 (좌표 Nominatim) |
+
+`type` 을 빼면 전부 돌려준다. 프론트 POI 파일과 같은 원천이며 `ext_id` 가 프론트 `id` 와 같다(`cctv-1` 등).
 
 ```json
 {
@@ -284,7 +304,7 @@
     {
       "type": "Feature",
       "geometry": { "type": "Point", "coordinates": [126.86019, 33.52037] },
-      "properties": { "id": 1, "type": "fire_station", "name": "구좌119안전센터", "address": "제주 제주시 구좌읍 세화14길 8", "h3": "8830d101e9fffff" }
+      "properties": { "id": 1, "ext_id": "구좌119안전센터", "type": "fire_station", "name": "구좌119안전센터", "address": "제주 제주시 구좌읍 세화14길 8", "h3": "8830d101e9fffff", "detail": {}, "source": "소방청 119안전센터 현황" }
     }
   ]
 }

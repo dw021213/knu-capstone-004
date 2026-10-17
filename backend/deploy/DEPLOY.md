@@ -5,7 +5,8 @@ DB 포트는 밖으로 열지 않고, 80·443 만 연다. 데이터는 로컬에
 
 ## 0. 준비물
 - Vultr 계정과 결제 수단
-- 로컬의 DB 덤프: `backend/scripts/db-dump.sh` → `jeju_YYYYMMDD_….sql.gz`
+- 로컬의 **배포용** DB 덤프: `backend/scripts/db-dump.sh --deploy` → `jeju_YYYYMMDD_road-islands-deploy.sql.gz`
+  (과거 기상 관측은 빠짐. 서버가 켜질 때 최근 24시간을 기상청에서 다시 받는다)
 - SSH 키 (없으면 `ssh-keygen -t ed25519`)
 
 ## 1. 서버 만들기 (Vultr 콘솔)
@@ -61,11 +62,11 @@ docker compose -f docker-compose.prod.yml ps
 ## 6. 데이터 넣기 (로컬 → 서버)
 로컬에서:
 ```bash
-scp ~/Documents/대학교/종프/jeju_YYYYMMDD_road-islands.sql.gz root@<서버IP>:/root/
+scp ~/Documents/대학교/종프/jeju_YYYYMMDD_road-islands-deploy.sql.gz root@<서버IP>:/root/
 ```
 서버에서 (`backend/deploy` 폴더):
 ```bash
-gunzip -c /root/jeju_YYYYMMDD_road-islands.sql.gz | docker compose -f docker-compose.prod.yml exec -T db psql -q -v ON_ERROR_STOP=1 -U jeju -d jeju
+gunzip -c /root/jeju_YYYYMMDD_road-islands-deploy.sql.gz | docker compose -f docker-compose.prod.yml exec -T db psql -q -v ON_ERROR_STOP=1 -U jeju -d jeju
 ```
 ```bash
 docker compose -f docker-compose.prod.yml restart server
@@ -76,7 +77,7 @@ docker compose -f docker-compose.prod.yml restart server
 curl https://jeju-risk.duckdns.org/api/health
 ```
 - 브라우저: `https://jeju-risk.duckdns.org/` (확인용 지도), `…/?at=2021-09-14T09:00` (호우 가산 예시)
-- 로그: `docker compose -f docker-compose.prod.yml logs -f server` → 15분마다 `weather: 최근 3시간 관측 …행 수집`
+- 로그: `docker compose -f docker-compose.prod.yml logs -f server` → 켜질 때 `weather: 최근 24시간 관측 …행 수집`, 이후 15분마다 `최근 3시간`
 
 ## 8. 프론트(Vercel) 연결 — 프론트 담당에게 전달
 Vercel 프로젝트 → Settings → Environment Variables:

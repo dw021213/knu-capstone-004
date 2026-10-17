@@ -63,6 +63,7 @@ func corsMiddleware() gin.HandlerFunc {
 }
 
 // startWeatherPoller 는 KMA_APIHUB_KEY 가 있으면 15분마다 최근 3시간 AWS 정시자료를 받아 weather_obs 에 넣는다.
+// 켜질 때는 최근 24시간을 먼저 받는다(12시간 누적 강수·24시간 평균 습도 판별에 필요, 이미 있는 시각은 덮어씀).
 // WEATHER_POLL=off 로 끌 수 있다.
 func startWeatherPoller(pool *pgxpool.Pool) {
 	key := os.Getenv("KMA_APIHUB_KEY")
@@ -71,7 +72,7 @@ func startWeatherPoller(pool *pgxpool.Pool) {
 		return
 	}
 	hub := weather.NewAPIHub(key)
-	poll := func() {
+	poll := func(hours int) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 		stations, err := weather.JejuStations(ctx, pool)
@@ -81,7 +82,7 @@ func startWeatherPoller(pool *pgxpool.Pool) {
 		}
 		now := time.Now().In(weather.Seoul).Truncate(time.Hour)
 		n := 0
-		for t := now.Add(-2 * time.Hour); !t.After(now); t = t.Add(time.Hour) {
+		for t := now.Add(-time.Duration(hours-1) * time.Hour); !t.After(now); t = t.Add(time.Hour) {
 			obs, err := hub.FetchHourly(ctx, t, stations)
 			if err != nil {
 				log.Printf("weather: %s 수집 실패: %v", t.Format("01-02 15:04"), err)
@@ -93,12 +94,12 @@ func startWeatherPoller(pool *pgxpool.Pool) {
 			}
 			n += len(obs)
 		}
-		log.Printf("weather: 최근 3시간 관측 %d행 수집 (~%s)", n, now.Format("01-02 15:04"))
+		log.Printf("weather: 최근 %d시간 관측 %d행 수집 (~%s)", hours, n, now.Format("01-02 15:04"))
 	}
 	go func() {
-		poll()
+		poll(24)
 		for range time.Tick(15 * time.Minute) {
-			poll()
+			poll(3)
 		}
 	}()
 }
