@@ -24,6 +24,8 @@ declare global {
         count?: number;
         label?: string;
         box: [number, number, number, number];
+        /** 실제 위치(묶음 무게중심). 알약을 비켜 놓았으면 x, y와 다르다 */
+        anchor: [number, number];
       }[];
     };
   }

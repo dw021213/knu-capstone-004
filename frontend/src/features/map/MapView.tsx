@@ -13,7 +13,7 @@ import { drawCells, makeHatchPattern, prepareCells } from './cellCanvas';
 import { BASEMAP } from './basemap';
 import { cellAt } from './hitTest';
 import { TAP_DELAY } from './gesture';
-import { drawMarkers, hitTest, type MarkerHit, type MarkerLayout } from './markerCanvas';
+import { drawMarkers, hitTest, pillFont, type MarkerHit, type MarkerLayout } from './markerCanvas';
 import { drawRoute, type MapRoute, type RouteHits } from './routeCanvas';
 import { tileUrl, visibleTiles } from './tiles';
 import { JEJU_BOUNDS } from './projection';
@@ -289,6 +289,9 @@ export function MapView({
     }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const font = cssVar(canvas, '--font');
+    // 배치가 알약 폭을 그릴 글꼴로 잰다
+    ctx.font = pillFont(font);
     const items = markers
       ? markers({
           width: size.w,
@@ -296,6 +299,7 @@ export function MapView({
           zoom: zoomLevel(settled),
           view: settled,
           project: (lng, lat) => lngLatToScreen(settled, lng, lat),
+          measure: (t) => ctx.measureText(t).width,
         })
       : [];
     const hits = drawMarkers(ctx, items, {
@@ -304,7 +308,7 @@ export function MapView({
       dpr,
       ink: cssVar(canvas, '--ink'),
       white: cssVar(canvas, '--white'),
-      font: cssVar(canvas, '--font'),
+      font,
       highlight,
     });
     hitsRef.current = { view: settled, hits };
@@ -352,6 +356,7 @@ export function MapView({
           const [x, y] = page([h.x, h.y]);
           const [x0, y0] = page([h.box[0], h.box[1]]);
           const [x1, y1] = page([h.box[2], h.box[3]]);
+          const anchor = page(h.anchor);
           return {
             kind: h.kind,
             group: h.group,
@@ -361,6 +366,7 @@ export function MapView({
             count: h.count,
             label: h.label,
             box: [x0, y0, x1, y1] as [number, number, number, number],
+            anchor,
           };
         });
       },

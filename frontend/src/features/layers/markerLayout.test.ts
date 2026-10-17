@@ -1,7 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { PoiLayer } from '../../data/types';
-import { CLUSTER_MAX_Z, CLUSTER_PX, buildMarkerLayout } from './markerLayout';
+import { PILL_MAX_SHIFT, pillText, placeMarkers } from '../map/markerCanvas';
+import {
+  CLUSTER_MAX_Z,
+  CLUSTER_PX,
+  LOW_ZOOM,
+  MAX_PILLS_LOW_ZOOM,
+  buildMarkerLayout,
+} from './markerLayout';
 
 const layer = (type: PoiLayer['type'], pts: [number, number][]): PoiLayer => ({
   type,
@@ -21,6 +28,9 @@ const ctx = (zoom: number, view = { k: 1, x: 0, y: 0 }) => ({
     lat * view.k + view.y,
   ],
 });
+
+const overlap = (a: number[], b: number[]) =>
+  a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
 describe('buildMarkerLayout', () => {
   const cctv = layer('cctv', [
@@ -78,5 +88,107 @@ describe('buildMarkerLayout', () => {
     expect(a.length).toBeGreaterThan(5);
     expect(sig({ k: 1, x: CLUSTER_PX / 3, y: 7 })).toEqual(a);
     expect(sig({ k: 1, x: -CLUSTER_PX / 2, y: -20 })).toEqual(a);
+  });
+});
+
+// ── 알약 자리: 실제 위치에서 멀리 밀리지 않고, 겹치지 않고, 낮은 줌에서 너무 많지 않게 ──
+
+/** 결정적 의사 난수(LCG) */
+function rng(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 2 ** 32;
+  };
+}
+
+/** 섬처럼 가운데가 빽빽한 점 n개. 중심 (cx, cy), 반폭 (rx, ry) */
+function blob(seed: number, n: number, cx: number, cy: number, rx: number, ry: number) {
+  const r = rng(seed);
+  return Array.from({ length: n }, (): [number, number] => {
+    const a = r() * Math.PI * 2;
+    const d = Math.sqrt(r()) * (r() < 0.5 ? 1 : r());
+    return [cx + Math.cos(a) * rx * d, cy + Math.sin(a) * ry * d];
+  });
+}
+
+// 글자 폭: 한글 12px, 나머지 7.5px(12px 굵은 글꼴 근사)
+const measureText = (t: string) => [...t].reduce((s, ch) => s + (/[가-힣]/.test(ch) ? 12 : 7.5), 0);
+
+describe('알약 배치(배치 → placeMarkers)', () => {
+  const three = (scale: number, cx: number, cy: number) => [
+    layer('cctv', blob(1, 1291, cx, cy, 560 * scale, 300 * scale)),
+    layer('convenience', blob(2, 1300, cx + 20 * scale, cy - 10 * scale, 540 * scale, 290 * scale)),
+    layer('lodging', blob(3, 1153, cx - 15 * scale, cy + 5 * scale, 580 * scale, 310 * scale)),
+  ];
+  const cases = [
+    { name: '1440 첫 화면(z10.9)', width: 1440, height: 900, zoom: 10.9, scale: 1 },
+    { name: '390 첫 화면(z9.2)', width: 390, height: 844, zoom: 9.2, scale: 0.3 },
+    { name: '줌 12(묶음 수 제한 없음)', width: 1440, height: 900, zoom: 12, scale: 2.2 },
+  ];
+  for (const c of cases) {
+    it(`${c.name}: 모든 알약 중심이 자기 묶음 무게중심에서 ${PILL_MAX_SHIFT}px 안, 알약끼리 겹침 0`, () => {
+      const layers = three(c.scale, c.width / 2, c.height / 2);
+      const pts = new Map(layers.flatMap((l) => l.items.map((p) => [p.id, p] as const)));
+      const items = buildMarkerLayout(layers)({
+        ...ctx(c.zoom),
+        width: c.width,
+        height: c.height,
+        measure: measureText,
+      });
+      const hits = placeMarkers(items, measureText);
+      const pills = hits.filter((h) => h.kind === 'cluster');
+      expect(pills.length).toBeGreaterThan(3);
+      for (const p of pills) {
+        // 묶음 무게중심 = 묶인 점들의 평균
+        const members = p.ids!.map((id) => pts.get(id)!);
+        expect(members).toHaveLength(p.count!);
+        const gx = members.reduce((s, m) => s + m.lng, 0) / members.length;
+        const gy = members.reduce((s, m) => s + m.lat, 0) / members.length;
+        expect(p.anchor![0]).toBeCloseTo(gx, 6);
+        expect(p.anchor![1]).toBeCloseTo(gy, 6);
+        expect(Math.hypot(p.x - gx, p.y - gy)).toBeLessThanOrEqual(PILL_MAX_SHIFT + 1e-9);
+      }
+      const bad: string[] = [];
+      for (let i = 0; i < pills.length; i++)
+        for (let j = i + 1; j < pills.length; j++)
+          if (overlap(pills[i].box, pills[j].box))
+            bad.push(`${pillText(pills[i])}/${pillText(pills[j])}`);
+      expect(bad).toEqual([]);
+    });
+  }
+
+  it(`z<${LOW_ZOOM}에서는 종류마다 알약이 ${MAX_PILLS_LOW_ZOOM}개를 넘지 않고, 합은 화면 안 시설 수와 같다`, () => {
+    const layers = three(1, 720, 450);
+    const items = buildMarkerLayout(layers)({
+      ...ctx(10.9),
+      width: 1440,
+      height: 900,
+      measure: measureText,
+    });
+    for (const l of layers) {
+      const mine = items.filter((i) => i.group === l.type);
+      expect(mine.filter((i) => i.kind === 'cluster').length).toBeLessThanOrEqual(
+        MAX_PILLS_LOW_ZOOM,
+      );
+      expect(mine.reduce((s, i) => s + (i.count ?? 1), 0)).toBe(l.items.length);
+    }
+  });
+
+  it('같은 자리에 겹친 다른 종류 알약 셋은 세로로 쌓는다(한 칸 안)', () => {
+    const at = (type: PoiLayer['type']) =>
+      layer(
+        type,
+        Array.from({ length: 5 }, (): [number, number] => [400, 300]),
+      );
+    const items = buildMarkerLayout([at('cctv'), at('convenience'), at('lodging')])({
+      ...ctx(12),
+      measure: measureText,
+    });
+    const pills = placeMarkers(items, measureText).filter((h) => h.kind === 'cluster');
+    expect(pills).toHaveLength(3);
+    for (const p of pills)
+      expect(Math.hypot(p.x - 400, p.y - 300)).toBeLessThanOrEqual(PILL_MAX_SHIFT);
+    expect(new Set(pills.map((p) => Math.round(p.y))).size).toBe(3);
   });
 });
