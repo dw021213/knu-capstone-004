@@ -37,7 +37,7 @@ ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
 
 ## 4. 코드 받기와 설정
 ```bash
-git clone -b feat/backend https://github.com/dw021213/knu-capstone-004.git && cd knu-capstone-004/backend/deploy
+git clone https://github.com/dw021213/knu-capstone-004.git && cd knu-capstone-004/backend/deploy
 ```
 ```bash
 cp .env.example .env && nano .env
@@ -91,7 +91,7 @@ Vercel 프로젝트 → Settings → Environment Variables:
 ## 운영
 | 할 일 | 명령 (`backend/deploy` 에서) |
 |---|---|
-| 코드 갱신 | `git pull && docker compose -f docker-compose.prod.yml up -d --build server` |
+| 코드 갱신 | main 머지 시 자동 (수동: `/root/deploy-backend.sh`) |
 | 기상 규칙만 바꿈 | `config/weather_rules.json` 은 이미지에 들어 있으므로 위와 같이 다시 빌드 |
 | 데이터 갱신 | 로컬에서 새 덤프 → 6번 반복 |
 | 빠진 기상 시간 채우기 | `docker compose -f docker-compose.prod.yml exec server etl weather-fetch -from 2026-10-17 -to 2026-10-18` |
@@ -105,9 +105,9 @@ Vercel 프로젝트 → Settings → Environment Variables:
 
 ## 자동 배포 (GitHub Actions)
 
-`feat/backend` 에 `backend/` 변경이 push 되면 `.github/workflows/backend-deploy.yml` 이 서버를 갱신한다
-(서버 `/root/deploy-backend.sh`: `git reset --hard origin/feat/backend` → `server` 재빌드 → health 확인, 기록은 `/root/deploy.log`).
-Actions 탭에서 **Run workflow** 로 수동 실행도 된다.
+**main** 에 `backend/` 변경이 합쳐지면(PR 머지) `.github/workflows/backend-deploy.yml` 이 서버를 갱신한다. 작업 브랜치 push 로는 배포하지 않는다
+(서버 `/root/deploy-backend.sh`: `git checkout -B main origin/main` → `server` 재빌드 → health 확인, 기록은 `/root/deploy.log`).
+Actions 탭에서 **Run workflow** 로 수동 실행도 된다 (어느 브랜치에서 눌러도 서버는 main 을 받는다).
 
 - 배포 전용 키(로컬 `~/.ssh/jeju_deploy_actions`, 암호 없음)는 서버 `authorized_keys` 에서
   `command="/root/deploy-backend.sh",no-pty,…` 로 묶여 있어 **배포 스크립트만** 실행된다.

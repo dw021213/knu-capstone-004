@@ -341,6 +341,8 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   docker compose(deploy/docker-compose.prod.yml) db+server+caddy, Let's Encrypt 인증서, ufw 22/80/443, SSH 키 전용(비밀번호 로그인 차단).
   배포 덤프 road-d8-deploy 복원, 기동 시 24시간 기상 백필(1,032행) 확인. 서버 코드 위치 /root/knu-capstone-004 (feat/backend).
   Vultr 무료 크레딧 $250 은 2026-11-17 만료 → 이후 카드 과금. 안 쓰면 Destroy. CORS_ORIGINS 는 아직 비어 있음(모두 허용).
+- 2026-10-18: 자동 배포(GitHub Actions `backend-deploy`) — **main 머지 시에만** 배포하도록 변경 (서버 스크립트도 origin/main 기준).
+  배포 전용 키는 서버에서 deploy-backend.sh 만 실행 가능. 시크릿 DEPLOY_SSH_KEY 등록됨. 지금 서버는 feat/backend 7bdd7f6 상태 → feat/backend→main PR 머지 후 main 기준으로 맞춰짐.
 
 ## ▶ 현재 상태 요약 (2026-10-13, 이어서 작업할 때 여기부터)
 - **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (push 완료, main 미병합). 옛 `종프/back` 은 백업

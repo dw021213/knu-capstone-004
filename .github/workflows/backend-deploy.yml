@@ -1,11 +1,12 @@
-# feat/backend 에 백엔드 변경이 push 되면 운영 서버(https://jeju-risk.duckdns.org)를 갱신한다.
+# main 에 백엔드 변경이 합쳐지면(PR 머지) 운영 서버(https://jeju-risk.duckdns.org)를 main 기준으로 갱신한다.
+# 작업 브랜치(feat/backend) push 로는 배포하지 않는다.
 # 서버 authorized_keys 에서 이 키는 /root/deploy-backend.sh 만 실행하도록 묶여 있다 (다른 명령 불가).
 # 필요한 시크릿: DEPLOY_SSH_KEY (배포 전용 개인키). 자세한 내용은 backend/deploy/DEPLOY.md "자동 배포".
 name: backend-deploy
 
 on:
   push:
-    branches: [feat/backend]
+    branches: [main]
     paths:
       - 'backend/**'
       - '.github/workflows/backend-deploy.yml'
