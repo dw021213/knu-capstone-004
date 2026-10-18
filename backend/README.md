@@ -2,7 +2,7 @@
 
 Go(Gin) + PostGIS + Uber H3(res 8, 3,651셀). 셀별 위험도를 계산해 API와 지도(`web/index.html`)로 제공한다.
 
-- 위험도 = 0.8 × 위해도(교통사고 도로 모델 백분위) + 0.2 × 고립도(시간대별 유동인구가 적을수록 높음) + 기상 가산(최대 0.3)
+- 위험도 = 교통사고 도로 모델 위험점수 + 기상 가산(호우 경보급일 때 +0.15). 유동인구는 2026-10-17 제외
 - 프론트 연동 API: [`docs/FRONTEND_API.md`](docs/FRONTEND_API.md)
 - 결정 사항·진행 기록: [`ROADMAP.md`](ROADMAP.md)
 
@@ -52,6 +52,7 @@ scripts/db-dump.sh
 | `road-risk <모델 폴더>` | 교통사고 도로 모델 점수 적재(해시 검증) → 위험도 재계산 |
 | `population <시간대별 유동인구 폴더>` | 8개 조건 × 24시간 유동인구 → 위험도 재계산 |
 | `weather-stations` / `weather-import <폴더>` / `weather-fetch` | 기상 지점, 과거 CSV 적재, API허브 수집 |
+| `poi <frontend/public/data/poi>` | CCTV·편의점·숙박·경찰서·응급실을 프론트와 같은 파일로 적재 → 셀별 시설 통계 |
 | `weather-test <heavy_rain …>` | 시연용 가짜 관측 |
 | `weather-eval -from -to` | 기간 동안 기준 초과 판별 |
 

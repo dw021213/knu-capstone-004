@@ -65,6 +65,11 @@ func main() {
 		must(runFacilities(ctx, pool))
 	case "stats":
 		must(runStats(ctx, pool))
+	case "poi":
+		if len(os.Args) < 3 {
+			log.Fatal("사용법: etl poi <frontend/public/data/poi 폴더>")
+		}
+		must(runPOI(ctx, pool, os.Args[2]))
 	case "dummy-risk":
 		must(runDummyRisk(ctx, pool))
 	case "ems":

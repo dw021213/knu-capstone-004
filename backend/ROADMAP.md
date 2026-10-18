@@ -267,6 +267,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 기준·가중치: `config/weather_rules.json` (요청마다 읽음 → 서버 재시작 없이 실험). **2일 연속 등 지속 조건 제거**, 그 시각 관측으로 판별
   - 호우 3h 60/90mm·12h 110/180mm(+0.10/+0.20), 강풍 10분평균 14/21m/s·산지 17/24(+0.05/+0.10), 대설 24h 신적설 5/20cm·산지 20/30(+0.10/+0.20),
     폭염 체감온도 33/35℃(+0.05/+0.10), 한파 기온 −12/−15℃(+0.05/+0.10), 건조 습도 35/25%(+0.03/+0.05). 합계 상한 0.3
+  - **(2026-10-14 v2, 영향도 비례로 교체)** 호우 0/0.15, 강풍 0/0.10, 대설 0.10/0.20, 폭염 0/0.07, 한파 0.11/0.11, 건조 0.03/0.03 — 근거는 `config/weather_rules.json` evidence
   - 체감온도: 기상청 여름철 식(Stull 습구온도). 순간풍속은 정시자료에 없어 미사용
 - 최종 = min(1, 기존 점수 + 가산), 등급은 가산 전 점수 분위수(`risk_score_quantiles`, etl combine 이 갱신)에 대어 `risk_pct()`·`risk_level()`(SQL 함수)로 다시 매김
 - 자료: **기상청 API허브** (`KMA_APIHUB_KEY` in `.env`, authKey 값만). 정시자료 `awsh.php`(TA·WS·RN_HR1·HM 등, 결측 −99), 지점정보 `stn_inf.php?inf=AWS`
@@ -314,6 +315,34 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   `etl road-risk`는 옛/새 metadata 키 둘 다 읽음. 고립도 0.2 재확인: 위해도 상위 10% 유지율 0.15→85%, 0.2→79%, 0.25→69%, 0.3→53% → 0.2 유지.
 - 2026-10-13: 팀 공유용 `README.md`, `scripts/db-dump.sh`·`db-restore.sh` 추가. 덤프 `종프/jeju_20261013_road-islands.sql.gz`(21MB),
   빈 새 DB 컨테이너에 복원해 행 수 일치 확인. 덤프는 레포 금지(.gitignore), 드라이브로 전달.
+- 2026-10-14: 보정 곡선 (`analysis/calibration.py`, 2021 교통사고 구급출동 4,208건, 셀-일 단위 — 원본에 신고 시각 없음).
+  기본점수 +0.1 → 사고율 ×1.81. 고립도는 사고 빈도와 반대(모든 위해도 층에서), 구급차 현장거리와는 같은 방향(평균 2.6→11.7km).
+  기상 점수 환산: 호우 경보급 +0.15(0.06~0.23, 현재 0.20), 강풍 주의보급 −0.19(유의), 나머지 CI가 0 포함. 가중치는 아직 안 바꿈.
+- 2026-10-14: 기상 가산을 영향도 비례(weather_rules_v2)로 교체 — 사고 배율을 점수로 환산(ln RR / 5.916), 음수 0, 경보급 ≥ 주의보급, 추정 불가 v1 유지.
+  고립도는 '한산할수록 위험' 유지(0.2). 범죄·재난 모델이 오면 모델별 발생 자료로 고립도 영향도를 재서 모델별 가중치로 바꿀 계획.
+- 2026-10-14: 2020 AWS(API허브 8,784시간) 수집, 2020+2021 보정 재분석(사고 8,461건). 호우 경보급 2021 ×2.37 → 2020 ×0.55(태풍 마이삭·하이선 날 이동 감소) → 합산 ×1.01.
+  합산에서 유의한 것: 강풍 주의보급 ×0.76(−), 폭염 주의보급 ×1.21(+0.03). 고립도는 두 해 모두 빈도와 반대, 현장거리와 같은 방향(2.5→9.4km).
+  구급출동 2020 교통사고 파일은 실제로 2011~2020 10년 치(모델 학습 2017~2019 주의). weather_rules 는 아직 v2(2021 기준) 유지.
+- 2026-10-15: **유동인구 기본 끔**(지도 체크 해제, ?population=on 으로 켬, meta default_population=false, 프론트는 hazard_* 로 칠함).
+  기상 규칙 v3: **호우 경보급 +0.18만** 가산(위해도 점수 기준 RR 2.44 → ln/4.835 = 0.185), 나머지 0(기준 초과는 표시만).
+- 2026-10-17: 기상 규칙 v4 — 호우 경보급 가산을 **단순 비교**로 다시 산정: 사고율 10.77 ÷ 5.12 = ×2.11 (1.31~3.40) → ln/4.835 = 0.154 → **+0.15**.
+  (셀 위험도·월 보정 시 ×2.44 → +0.18 이었으나 설명을 단순하게 하기로 결정)
+- 2026-10-17: main(프론트·시설 POI) 병합. 배포 준비: `Dockerfile`(server+etl, cgo), `deploy/`(docker-compose.prod.yml: db+server+caddy, Caddyfile, .env.example, DEPLOY.md).
+  로컬에서 운영 구성 전체(HTTPS 포함) 기동·덤프 복원·API 확인. 호스팅은 Vultr 서울 2GB 로 결정, 주소는 DuckDNS 무료 서브도메인.
+- 2026-10-17: 시설 POI 5종(CCTV 1,291·편의점 1,300·숙박 1,153·경찰 25·응급실 6)을 프론트 POI 파일에서 facility 로 적재(`etl poi`, migration 012: ext_id·detail·source, (type, ext_id) 고유) → 셀별 통계 6종.
+  `/api/grid` 에 base_hazard_percentile·base_hazard_level·road_source·facility_counts 추가, `/api/facilities` 에 detail·source·ext_id.
+  서버 기동 시 최근 24시간 기상 백필. `db-dump.sh --deploy`(weather_obs 내용 제외, 19MB). 운영은 실시간 기상만 쓰기로.
+- 2026-10-17: **유동인구 완전 제외 (`traffic_weather_v1`)**. 최종 = min(1, 모델 위험점수(hazard_score 백분위 평균/100) + 기상 가산).
+  API: risk_* = 가산 반영, base_* = 가산 전 (짝), hazard_* 는 risk_* 와 같은 값으로 호환용 유지. isolation·population·hourly·condition·hour 삭제.
+  risk_combined·유동인구 표는 DB 에 남아 있지만 API 가 안 씀(배포 덤프에서 내용 제외). 확인용 지도에서 유동인구 UI 삭제. frontend/ 는 건드리지 않음.
+- 2026-10-17: 교통사고 모델을 **깊이 8**(`jeju_h3_r8_road_d8_its20260914_ngii2025_v2`, 2020 검증 상위 20% 포착률로 선택)로 교체. 형식·격자·도로 입력 동일.
+  모델 점수 0.1당 사고율 ×1.63(깊이 6 ×1.62), 호우 경보급 가산 ln 2.10/4.893 = 0.152 → 0.15 유지.
+- 2026-10-17: **운영 배포 완료** — https://jeju-risk.duckdns.org (Vultr 서울 vc2-1c-2gb $10/월, Ubuntu 24.04, 158.247.200.215).
+  docker compose(deploy/docker-compose.prod.yml) db+server+caddy, Let's Encrypt 인증서, ufw 22/80/443, SSH 키 전용(비밀번호 로그인 차단).
+  배포 덤프 road-d8-deploy 복원, 기동 시 24시간 기상 백필(1,032행) 확인. 서버 코드 위치 /root/knu-capstone-004 (feat/backend).
+  Vultr 무료 크레딧 $250 은 2026-11-17 만료 → 이후 카드 과금. 안 쓰면 Destroy. CORS_ORIGINS 는 아직 비어 있음(모두 허용).
+- 2026-10-18: 자동 배포(GitHub Actions `backend-deploy`) — **main 머지 시에만** 배포하도록 변경 (서버 스크립트도 origin/main 기준).
+  배포 전용 키는 서버에서 deploy-backend.sh 만 실행 가능. 시크릿 DEPLOY_SSH_KEY 등록됨. 지금 서버는 feat/backend 7bdd7f6 상태 → feat/backend→main PR 머지 후 main 기준으로 맞춰짐.
 
 ## ▶ 현재 상태 요약 (2026-10-13, 이어서 작업할 때 여기부터)
 - **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (push 완료, main 미병합). 옛 `종프/back` 은 백업
@@ -321,7 +350,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   - 서버 코드나 새 지표 이름을 바꾸면 **서버 재시작 필요**(규칙 파일 숫자만 바꾸면 불필요)
 - **위험도 = combined_v2**: 0.8 × 교통사고(도로 전용 모델 백분위) + 0.2 × 고립도(2015-01 시간대별 유동인구, 하루 평균, 모든 시간대 공통 순위)
   + 기상 가산(최대 0.3, `config/weather_rules.json`, 가중치는 **현재값 유지 결정**). 등급은 분위수(`risk_score_quantiles`)로 재산정
-- **DB 데이터**(레포에 없는 원천): 도로 모델 `종프/교통사고ML_2026도로_우도추자도포함_백엔드전달`(2026-10-13 교체, 이전 `교통사고ML_도로전용_20260914_백엔드전달`은 보관), 유동인구 `~/Downloads/제주특별자치도_시간대별_…_20150131`,
+- **DB 데이터**(레포에 없는 원천): 도로 모델 `종프/교통사고ML_2026도로_깊이8_백엔드전달_20261017`(2026-10-17 교체, 이전 깊이 6 `교통사고ML_2026도로_우도추자도포함_백엔드전달`은 보관), 유동인구 `~/Downloads/제주특별자치도_시간대별_…_20150131`,
   2021 기상 `~/Downloads/2021기상정보/*.zip`(풀어서 `etl weather-import`), 구급출동 `~/Downloads/제주…구급출동 현황/`(개인정보, 레포 금지)
 - **프론트 문서**: `docs/FRONTEND_API.md` (API 4개: /api/risk/meta, /api/grid, /api/cells/{h3}, /api/facilities, 파라미터 at·condition·hour·weather)
 - **2021 기준 초과 주요 이벤트**: 호우 09-13~17(태풍 찬투, 경보급 19곳), 06-10~11, 07-31; 강풍 섬 지점 겨울 위주; 폭염 08-06~07 경보급;
