@@ -344,18 +344,22 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 2026-10-18: 자동 배포(GitHub Actions `backend-deploy`) — **main 머지 시에만** 배포하도록 변경 (서버 스크립트도 origin/main 기준).
   배포 전용 키는 서버에서 deploy-backend.sh 만 실행 가능. 시크릿 DEPLOY_SSH_KEY 등록됨. 지금 서버는 feat/backend 7bdd7f6 상태 → feat/backend→main PR 머지 후 main 기준으로 맞춰짐.
 
-## ▶ 현재 상태 요약 (2026-10-13, 이어서 작업할 때 여기부터)
-- **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (push 완료, main 미병합). 옛 `종프/back` 은 백업
-- **실행**: `docker compose up -d` → `go run ./cmd/server` (http://localhost:8080). `.env` 에 `KMA_APIHUB_KEY`(authKey 값만) 있으면 15분마다 기상 수집
-  - 서버 코드나 새 지표 이름을 바꾸면 **서버 재시작 필요**(규칙 파일 숫자만 바꾸면 불필요)
-- **위험도 = combined_v2**: 0.8 × 교통사고(도로 전용 모델 백분위) + 0.2 × 고립도(2015-01 시간대별 유동인구, 하루 평균, 모든 시간대 공통 순위)
-  + 기상 가산(최대 0.3, `config/weather_rules.json`, 가중치는 **현재값 유지 결정**). 등급은 분위수(`risk_score_quantiles`)로 재산정
-- **DB 데이터**(레포에 없는 원천): 도로 모델 `종프/교통사고ML_2026도로_깊이8_백엔드전달_20261017`(2026-10-17 교체, 이전 깊이 6 `교통사고ML_2026도로_우도추자도포함_백엔드전달`은 보관), 유동인구 `~/Downloads/제주특별자치도_시간대별_…_20150131`,
-  2021 기상 `~/Downloads/2021기상정보/*.zip`(풀어서 `etl weather-import`), 구급출동 `~/Downloads/제주…구급출동 현황/`(개인정보, 레포 금지)
-- **프론트 문서**: `docs/FRONTEND_API.md` (API 4개: /api/risk/meta, /api/grid, /api/cells/{h3}, /api/facilities, 파라미터 at·condition·hour·weather)
-- **2021 기준 초과 주요 이벤트**: 호우 09-13~17(태풍 찬투, 경보급 19곳), 06-10~11, 07-31; 강풍 섬 지점 겨울 위주; 폭염 08-06~07 경보급;
-  한파 01-07~09 산지 경보급; 건조 04-19~23(17곳). 지도: `/?at=2021-09-17T06:00` 처럼 열기
-- **남은 일/후보**: 재난·범죄 모델 수신 시 hazard 추가 + 고립도 가중치 재확인 / 대설용 ASOS 적설 / 공휴일 달력 / 프론트(D3) 실제 연동 / 배포(중간발표 10/19)
+## ▶ 현재 상태 요약 (2026-10-19, 이어서 작업할 때 여기부터)
+
+- **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (main 직접 push 금지, frontend/ 는 팀원 담당이라 건드리지 않음)
+- **위험도 `traffic_weather_v1`**: 최종 = min(1, 모델 위험점수 + 기상 가산). 유동인구(고립도)는 완전 제외(2021 사고에서 반대 방향)
+  - API: `risk_*` = 가산 반영(색), `base_*` = 가산 전, `hazard_*` = risk_* 와 같은 값(프론트 호환용, 나중에 삭제)
+  - 모델: 깊이 8 `jeju_h3_r8_road_d8_its20260914_ngii2025_v2` (원천 `종프/교통사고ML_2026도로_깊이8_백엔드전달_20261017`)
+  - 기상 규칙 v4: **호우 경보급만 +0.15** (2021 단순 비교 ×2.11, 모델 0.1점당 ×1.63 → 0.152). 나머지는 판별·API 제공만(가산 0)
+- **시설 POI**: fire_station 24, cctv 1,291, convenience 1,300, lodging 1,153, police 25, er 6 (`etl poi ../frontend/public/data/poi`)
+- **운영**: https://jeju-risk.duckdns.org — Vultr 서울 vc2-1c-2gb($10/월) 158.247.200.215, root SSH 키(로컬 `~/.ssh/id_ed25519`, passphrase 있음, 키체인)
+  - 서버 코드 `/root/knu-capstone-004`, `backend/deploy/docker-compose.prod.yml`(db+server+caddy), `.env` 서버에만
+  - 자동 배포: `.github/workflows/backend-deploy.yml` — **main 에 backend/ 머지 시에만**, 서버 `/root/deploy-backend.sh`(origin/main), 시크릿 DEPLOY_SSH_KEY(로컬 `~/.ssh/jeju_deploy_actions`, 서버에서 스크립트만 실행 가능)
+  - ⚠️ 서버는 지금 feat/backend `7bdd7f6` 상태. **feat/backend→main PR 머지 전에 Run workflow 누르면 옛 main 백엔드로 되돌아감**
+  - 데이터 변경 시: `scripts/db-dump.sh --deploy` → scp → DEPLOY.md 6번. Vultr 크레딧 $250 은 **2026-11-17 만료**
+- **문서**: 프론트용 `docs/FRONTEND_API.md`(맨 위 2026-10-17 변경 박스), 배포 `deploy/DEPLOY.md`, 분석 `analysis/calibration.py`
+- **남은 일**: PR(feat/backend→main) 머지 확인 / 프론트 api 모드 연결(VITE_DATA_MODE=api, VITE_API_BASE) / CORS_ORIGINS 를 팀 Vercel 주소로 제한 / 기상청 키 재발급 / ASOS 로 사고 시각 복원 후 시간 단위 재검증 / 프론트에 weather_alerts 표시 요청 / 백엔드 단위 테스트
+- **발표**: 백엔드 슬라이드 24~28쪽(사용자가 직접 정리). 대본은 2021년 자료만 사용한 것으로 통일, 가산 안 하는 기상 항목은 "API 로 제공(화면 표시는 프론트 연동 때)"로 표현
 
 ## 이후 확장 메모 (1차 이후)
 - 주행시간 정밀화: OSRM(Docker) + Geofabrik south-korea.osm.pbf(약 200MB)에서 제주만 잘라 셀 중심→최근접 119 실제 주행시간 계산. `geo.DriveMinutes` 호출부만 교체
