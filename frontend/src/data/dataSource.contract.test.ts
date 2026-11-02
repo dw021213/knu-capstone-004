@@ -12,10 +12,13 @@ import {
   API_BASE,
   FIXTURE_CELLS,
   FIXTURE_DATASET_ID,
+  BONUS_CELL,
+  BONUS_PERCENTILE,
   SNAPSHOT_BASE,
-  TRAP_RISK_PERCENTILE,
   TRAP_SCORE_ONE,
+  cctvJson,
   gridJson,
+  gridJsonWithBonus,
   handlers,
   seen,
   snapshotErJson,
@@ -88,9 +91,9 @@ describe.each([
     expect(Array.isArray(layer.items)).toBe(true);
   });
 
-  it('아직 없는 시설 파일은 pending과 빈 목록', async () => {
-    const layer = await make().getPoi('cctv');
-    expect(layer).toMatchObject({ type: 'cctv', status: 'pending', items: [] });
+  it('아직 없는 시설은 pending과 빈 목록', async () => {
+    const layer = await make().getPoi('lodging');
+    expect(layer).toMatchObject({ type: 'lodging', status: 'pending', items: [] });
   });
 
   it('아직 없는 코스 파일은 pending과 빈 목록', async () => {
@@ -98,18 +101,11 @@ describe.each([
     expect(courses).toMatchObject({ status: 'pending', items: [] });
   });
 
-  it('응급실은 스냅숏 er.json에서 받는다(백엔드에 응급실이 없음)', async () => {
+  it('응급실은 두 모드가 같은 항목을 준다', async () => {
     const er = await make().getEmergency();
     expect(er.status).toBe('ready');
     expect(er.source).toBe(snapshotErJson.source);
     expect(er.items).toEqual(snapshotErJson.items);
-  });
-
-  it('응급실 파일이 없으면 pending과 빈 목록', async () => {
-    server.use(
-      http.get(`${SNAPSHOT_BASE}/data/poi/er.json`, () => new HttpResponse(null, { status: 404 })),
-    );
-    expect(await make().getEmergency()).toEqual({ status: 'pending', source: '', items: [] });
   });
 });
 
@@ -218,6 +214,17 @@ describe('snapshot 구현', () => {
     expect(courses.items[0].coords[0]).toHaveLength(2);
   });
 
+  it('응급실 파일이 없으면 pending과 빈 목록', async () => {
+    server.use(
+      http.get(`${SNAPSHOT_BASE}/data/poi/er.json`, () => new HttpResponse(null, { status: 404 })),
+    );
+    expect(await makeSnapshot().getEmergency()).toEqual({
+      status: 'pending',
+      source: '',
+      items: [],
+    });
+  });
+
   it('점수 파일을 못 받으면 실패한다', async () => {
     server.use(
       http.get(`${SNAPSHOT_BASE}/data/scores.json`, () => new HttpResponse(null, { status: 500 })),
@@ -237,18 +244,13 @@ describe('api 구현', () => {
     });
   });
 
-  it('함정 셀: 유동인구를 켠 백분위가 있어도 읽지 않는다', async () => {
+  it('기상 가산이 붙으면 가산 뒤 백분위(risk_percentile)로 칠한다', async () => {
+    server.use(http.get(`${API_BASE}/api/grid`, () => HttpResponse.json(gridJsonWithBonus())));
     const { cells } = await makeApi().getScores();
-    expect(cells.get(TRAP_RISK_PERCENTILE)).toMatchObject({
-      percentile: null,
-      level: null,
-      status: 'no_data',
+    expect(cells.get(BONUS_CELL)).toMatchObject({
+      percentile: BONUS_PERCENTILE,
+      level: levelFromPercentile(BONUS_PERCENTILE),
     });
-  });
-
-  it('유동인구를 켠 값이 아니라 교통 모델 백분위로 등급을 매긴다', async () => {
-    const { cells } = await makeApi().getScores();
-    expect(cells.get('8830d02011fffff')).toMatchObject({ percentile: 3.6, level: 1 });
   });
 
   it('날씨를 켜고 부르며, at을 주면 요청에 싣는다', async () => {
@@ -286,18 +288,61 @@ describe('api 구현', () => {
     ]);
   });
 
-  it('스냅숏 파일을 못 받아도 격자는 그리고, 도로 있는 셀은 표준노드링크로 둔다', async () => {
+  it('스냅숏 파일을 못 받아도 격자와 도로 출처는 백엔드 값 그대로다', async () => {
     server.use(
       http.get(`${SNAPSHOT_BASE}/data/scores.json`, () => new HttpResponse(null, { status: 500 })),
     );
     const scores = await makeApi().getScores();
     expect(scores.datasetId).toBe('');
     expect(scores.cells.size).toBe(FIXTURE_CELLS.length);
-    expect(scores.cells.get('8830d10c49fffff')).toMatchObject({
-      roadSource: 'standard_link',
-      level: 5,
+    for (const [h3, , code] of FIXTURE_CELLS) {
+      expect(scores.cells.get(h3)?.roadSource).toBe(ROAD[code]);
+    }
+  });
+
+  it('CCTV 등 시설은 백엔드에서 받고 id 는 ext_id 를 쓴다', async () => {
+    const layer = await makeApi().getPoi('cctv');
+    const p = cctvJson.features[0].properties;
+    expect(layer).toEqual({
+      type: 'cctv',
+      status: 'ready',
+      source: p.source,
+      items: [
+        {
+          id: 'cctv-1',
+          type: 'cctv',
+          name: p.name,
+          lat: 33.471526,
+          lng: 126.9246,
+          detail: p.detail,
+        },
+      ],
     });
-    expect(scores.cells.get(TRAP_SCORE_ONE)?.roadSource).toBe('none');
+  });
+
+  it('응급실은 스냅숏 파일이 없어도 백엔드에서 받는다', async () => {
+    server.use(
+      http.get(`${SNAPSHOT_BASE}/data/poi/er.json`, () => new HttpResponse(null, { status: 404 })),
+    );
+    const er = await makeApi().getEmergency();
+    expect(er.status).toBe('ready');
+    expect(er.items).toEqual(snapshotErJson.items);
+  });
+
+  it('백엔드에 응급실이 없으면 pending과 빈 목록', async () => {
+    server.use(
+      http.get(`${API_BASE}/api/facilities`, () =>
+        HttpResponse.json({ type: 'FeatureCollection', features: [] }),
+      ),
+    );
+    expect(await makeApi().getEmergency()).toEqual({ status: 'pending', source: '', items: [] });
+  });
+
+  it('시설 요청이 실패하면 실패한다', async () => {
+    server.use(
+      http.get(`${API_BASE}/api/facilities`, () => new HttpResponse(null, { status: 500 })),
+    );
+    await expect(makeApi().getPoi('police')).rejects.toThrow();
   });
 
   it('격자 요청이 실패하면 실패한다', async () => {
