@@ -30,7 +30,7 @@ func main() {
 
 	r := gin.Default()
 	r.Use(corsMiddleware())
-	(&api.Handler{DB: pool, WeatherRulesPath: "config/weather_rules.json"}).Register(r.Group("/api"))
+	(&api.Handler{DB: pool, WeatherRulesPath: "config/weather_rules.json", SafetyRulesPath: "config/safety_rules.json"}).Register(r.Group("/api"))
 	startWeatherPoller(pool)
 	// 확인용 지도 페이지. 코드가 자주 바뀌어서 브라우저가 옛 페이지를 캐시로 쓰지 않게 한다.
 	r.GET("/", func(c *gin.Context) {

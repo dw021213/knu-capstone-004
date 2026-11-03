@@ -1,0 +1,58 @@
+{
+  "version": "safety_rules_v1",
+  "description": "인근 안전시설 지수 (0~1, 높을수록 도움받기 쉬움). 시설별 점수 = 만점 기준~0점 기준 사이 선형, 지수 = 가중 평균. 교통사고 위험도와 별개이며 ?safety=on 일 때만 최종 위험도에서 alpha × 지수를 뺀다.",
+  "weighting": "동일 가중 (시설 간 중요도를 비교할 근거가 없음)",
+  "alpha": 0.1,
+  "items": [
+    {
+      "key": "police",
+      "label": "경찰서(지구대·파출소)",
+      "facility": "police",
+      "metric": "nearest_dist_m",
+      "full_at": 1000,
+      "zero_at": 3000,
+      "weight": 0.2,
+      "evidence": "공식 거리 기준 없음. 셀 지름(약 1km) 안이면 만점, 3배 거리에서 0"
+    },
+    {
+      "key": "cctv",
+      "label": "CCTV",
+      "facility": "cctv",
+      "metric": "count_k1",
+      "full_at": 3,
+      "zero_at": 0,
+      "weight": 0.2,
+      "evidence": "공식 기준 없음. 셀과 인접 셀 안 개수, 3개 이상 만점. 자료가 일부(행정안전부 2020)라 과소 집계"
+    },
+    {
+      "key": "convenience",
+      "label": "편의점",
+      "facility": "convenience",
+      "metric": "nearest_dist_m",
+      "full_at": 500,
+      "zero_at": 1500,
+      "weight": 0.2,
+      "evidence": "공식 기준 없음. 도움 요청 가능한 24시간 장소로 봄. 셀 반경(약 0.5km) 안이면 만점"
+    },
+    {
+      "key": "fire_station",
+      "label": "119안전센터",
+      "facility": "fire_station",
+      "metric": "nearest_drive_min",
+      "full_at": 7,
+      "zero_at": 14,
+      "weight": 0.2,
+      "evidence": "소방 현장 도착 목표 7분(골든타임) 이내 만점, 2배에서 0. 추정 주행시간은 2021 실제 구급차 현장거리와 순위상관 0.54"
+    },
+    {
+      "key": "er",
+      "label": "응급실",
+      "facility": "er",
+      "metric": "nearest_drive_min",
+      "full_at": 10,
+      "zero_at": 30,
+      "weight": 0.2,
+      "evidence": "응급의료 취약지 기준(지역응급의료센터 30분 내 도달 불가)에서 0. 만점 10분은 임의"
+    }
+  ]
+}
