@@ -8,6 +8,10 @@
 - CORS 허용 (운영에서는 `CORS_ORIGINS` 에 프론트 주소를 넣는다)
 - 좌표는 GeoJSON 표준 **[경도, 위도]**
 
+> **2026-11-03 추가 — 인근 안전시설 지수 (기존 값 변화 없음)**
+> `/api/grid`·`/api/cells` 에 `safety_score`(0~1, 높을수록 경찰서·CCTV·편의점·119·응급실이 가까움), `safety_detail`(시설별 값·점수), `safety_cut` 추가.
+> 기본은 표시만 하고 위험도는 그대로다. `?safety=on` 을 붙일 때만 `risk_*` 에서 `0.1 × safety_score` 를 뺀다. 규칙은 `/api/risk/meta` 의 `safety`.
+>
 > **2026-10-17 변경 (`traffic_weather_v1`) — 프론트 반영 필요**
 > 1. **유동인구(고립도)를 완전히 뺐다.** 응답에서 `isolation`, `population`, `hourly`, `condition`·`hour` 관련 값이 없어졌다.
 >    `condition`, `hour` 쿼리는 무시된다. 시각은 `at` 하나로 정한다(기상 판별용).
@@ -114,6 +118,10 @@ H3 육각형 3,651개(추자도 포함)의 도형과 그 시각의 위험도를 
         "traffic_percentile": 51.58, "has_road": true, "road_source": "ITS_standard_nodelink",
         "facility_counts": { "cctv": 3, "convenience": 1 },
         "fire_station_dist_m": 1642, "fire_station_drive_min": 3.2, "fire_station_k1": 0,
+        "safety_score": 0.481, "safety_cut": 0,
+        "safety_detail": { "police": { "value": 6030.1, "score": 0 }, "cctv": { "value": 2, "score": 0.67 },
+                           "convenience": { "value": 760.2, "score": 0.74 }, "fire_station": { "value": 3.2, "score": 1 },
+                           "er": { "value": 68.2, "score": 0 } },
         "hazard_percentile": 66.56, "hazard_level": 3
       }
     }
@@ -135,7 +143,12 @@ H3 육각형 3,651개(추자도 포함)의 도형과 그 시각의 위험도를 
 | `road_source` | `ITS_standard_nodelink`(본섬 표준노드링크 2026-09-14) / `NGII_digital_map`(우도·추자도 수치지도 2025) / `no_mapped_road` | 출처 칩 |
 | `facility_counts` | 셀 안 시설 수 `{type: 개수}` (0 은 생략, 종류는 ④) | "주변 시설" |
 | `fire_station_*` | 가장 가까운 119 거리(m)·예상 주행시간(분, 근사)·인접 119 수 | 참고 |
+| `safety_score` | 인근 안전시설 지수 0~1 (높을수록 안전). 5종 동일 가중 평균 | "주변 안전시설" 게이지 |
+| `safety_detail` | 시설별 `{value, score}`. value 는 police·convenience 최근접 거리(m), cctv 셀+인접 개수, fire_station·er 예상 주행(분) | 상세 패널 |
+| `safety_cut` | 위험도에서 뺀 값 (`?safety=on` 아니면 0, 도로 없는 셀 null) | 참고 |
 | `hazard_percentile`, `hazard_level` | `risk_*` 와 같은 값 (예전 코드 호환용, 곧 삭제) | 쓰지 않기 |
+
+최상위 `safety`: `{on, alpha, status, rules_version}`. 시설별 기준(만점·0점 거리)은 `/api/risk/meta` 의 `safety.items`.
 
 최상위 `weather.status`: `ok` 관측 있음 / `no_data` 그 시각 관측 없음(가산 0, 안전하다는 뜻 아님) / `off` 가산 끔.
 

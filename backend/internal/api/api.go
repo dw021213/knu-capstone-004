@@ -20,6 +20,7 @@ import (
 type Handler struct {
 	DB               *pgxpool.Pool
 	WeatherRulesPath string // config/weather_rules.json (요청마다 읽어 수정 즉시 반영)
+	SafetyRulesPath  string // config/safety_rules.json (요청마다 읽음, 비우면 안전시설 지수 끔)
 }
 
 func (h *Handler) Register(r gin.IRouter) {
@@ -84,11 +85,12 @@ func (h *Handler) riskMeta(c *gin.Context) {
 		"computed_at":     computedAt,
 		"legend":          riskLegend,
 		"formula":         "최종 = min(1, 모델 위험점수 + 기상 가산). 모델 위험점수 = 위험 모델 백분위/100 (현재 교통사고 도로 모델 하나). 순위는 가산 전 모델 점수 분포에 대어 다시 매김",
-		"fields":          "risk_* = 기상 가산 반영(지도 색), base_* = 가산 전 모델 점수, weather_bonus = 가산점",
+		"fields":          "risk_* = 기상 가산 반영(지도 색, ?safety=on 이면 안전시설 감산도), base_* = 가산 전 모델 점수, weather_bonus = 가산점, safety_score = 인근 안전시설 지수(0~1, 높을수록 안전), safety_cut = 뺀 값",
 		"hazards":         hazards,
 		"hazards_planned": risk.Hazards,
 		"levels":          levels,
 		"weather":         h.weatherMeta(c),
+		"safety":          h.safetyMeta(),
 		"no_data":         "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_*·base_* 가 null. 안전으로 표시하지 않는다",
 		"notes": []string{
 			"risk_percentile 은 도로 격자끼리의 상대 순위이며 사고 확률이 아니다",
@@ -99,8 +101,8 @@ func (h *Handler) riskMeta(c *gin.Context) {
 	})
 }
 
-// 셀별 최종 위험도(모델 위험점수 + 기상 가산) + 시설·119 정보 (+ 백엔드 테스트용 더미 값). $1~$4 가 NULL 이면 전체.
-const gridSQL = `
+// 셀별 최종 위험도(모델 위험점수 + 기상 가산 [− 안전시설 감산]) + 시설·119 정보 (+ 백엔드 테스트용 더미 값). $1~$4 가 NULL 이면 전체.
+var gridSQL = `
 WITH hz AS (
   -- 모델 위험점수: 입력자료가 있는 위험 모델 백분위의 평균 (현재 교통사고 하나)
   SELECT h3_index, avg(percentile) / 100 AS score, array_agg(hazard ORDER BY hazard) AS used
@@ -119,11 +121,12 @@ WITH hz AS (
   SELECT DISTINCT ON (h3_index) h3_index, value
   FROM congestion
   ORDER BY h3_index, ts DESC
-)
+), ` + safetyCTE("$9") + `
 SELECT json_build_object(
   'type', 'FeatureCollection',
   'risk', json_build_object('version', $5::text, 'legend', $6::text),
   'weather', $8::jsonb,
+  'safety', $10::jsonb,
   'features', COALESCE(json_agg(json_build_object(
     'type', 'Feature',
     -- D3(d3-geo)는 바깥 고리가 시계 방향이어야 해서 CW 로 내보낸다. Leaflet 은 방향과 무관.
@@ -141,6 +144,9 @@ SELECT json_build_object(
       'weather_bonus', CASE WHEN hz.score IS NULL THEN NULL ELSE round(w.bonus::numeric, 3) END,
       'weather_alerts', COALESCE(w.alerts, '[]'::jsonb),
       'weather_stn', cw.stn,
+      'safety_score', round(sf.score::numeric, 3),
+      'safety_cut', CASE WHEN hz.score IS NULL THEN NULL ELSE round(sa.cut::numeric, 3) END,
+      'safety_detail', sf.detail,
       'traffic_percentile', round(ht.percentile::numeric, 2),
       'has_road', ht.available,
       'road_source', ht.detail->>'road_source',
@@ -164,20 +170,24 @@ LEFT JOIN ems e ON e.h3_index = c.h3_index
 LEFT JOIN cell_facility_stat s ON s.h3_index = c.h3_index AND s.type = 'fire_station'
 LEFT JOIN fac fc ON fc.h3_index = c.h3_index
 LEFT JOIN cell_weather_station cw ON cw.h3_index = c.h3_index
+LEFT JOIN sf ON sf.h3_index = c.h3_index
 -- 기상 가산: 셀의 지점 판별 결과($7: 지점번호 → {bonus, alerts, …})
 CROSS JOIN LATERAL (
   SELECT COALESCE(($7::jsonb -> cw.stn::text ->> 'bonus')::float8, 0) AS bonus,
          $7::jsonb -> cw.stn::text -> 'alerts' AS alerts
 ) w
+-- 안전시설 감산: alpha($9, ?safety=on 아니면 0) × 지수
+CROSS JOIN LATERAL (SELECT ($9::jsonb ->> 'alpha')::float8 * COALESCE(sf.score, 0) AS cut) sa
 CROSS JOIN LATERAL (SELECT 100 * hz.score AS pct) base
+CROSS JOIN LATERAL (SELECT GREATEST(0, LEAST(1, hz.score + w.bonus) - sa.cut) AS s) fin
 CROSS JOIN LATERAL (
-  SELECT LEAST(1, hz.score + w.bonus) AS s,
-         CASE WHEN hz.score IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_pct('hazard', LEAST(1, hz.score + w.bonus)) ELSE base.pct END AS pct,
-         CASE WHEN hz.score IS NULL THEN NULL WHEN w.bonus > 0 THEN risk_level(risk_pct('hazard', LEAST(1, hz.score + w.bonus))) ELSE risk_level(base.pct) END AS lvl
-) adj
+  SELECT fin.s,
+         CASE WHEN hz.score IS NULL THEN NULL WHEN fin.s = hz.score THEN base.pct ELSE risk_pct('hazard', fin.s) END AS pct
+) adj0
+CROSS JOIN LATERAL (SELECT adj0.s, adj0.pct, risk_level(adj0.pct) AS lvl) adj
 WHERE $1::float8 IS NULL OR c.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)`
 
-// GET /api/grid?at=2026-10-17T14:00&weather=on&bbox=minLng,minLat,maxLng,maxLat
+// GET /api/grid?at=2026-10-17T14:00&weather=on&safety=on&bbox=minLng,minLat,maxLng,maxLat
 func (h *Handler) grid(c *gin.Context) {
 	at, _, ok := atOf(c)
 	if !ok {
@@ -189,7 +199,13 @@ func (h *Handler) grid(c *gin.Context) {
 		return
 	}
 	info, _ := json.Marshal(wxInfo)
-	args := []any{nil, nil, nil, nil, Version, riskLegend, string(wx), string(info)}
+	sp, spInfo, err := h.safetyFor(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "안전시설 규칙: " + err.Error()})
+		return
+	}
+	sinfo, _ := json.Marshal(spInfo)
+	args := []any{nil, nil, nil, nil, Version, riskLegend, string(wx), string(info), string(sp), string(sinfo)}
 	if s := c.Query("bbox"); s != "" {
 		parts := strings.Split(s, ",")
 		if len(parts) != 4 {
@@ -227,21 +243,28 @@ func (h *Handler) facilities(c *gin.Context) {
 	h.geojson(c, facilitiesSQL, c.Query("type"))
 }
 
-const cellSQL = `
+var cellSQL = `
+WITH ` + safetyCTE("$5") + `
 SELECT json_build_object(
   'h3', c.h3_index,
   'center', json_build_array(ST_X(c.center), ST_Y(c.center)),
   'risk', (SELECT json_build_object(
-             'score', LEAST(1, hz.score + w.bonus),
-             'percentile', CASE WHEN w.bonus > 0 THEN risk_pct('hazard', LEAST(1, hz.score + w.bonus)) ELSE 100 * hz.score END,
-             'level', risk_level(CASE WHEN w.bonus > 0 THEN risk_pct('hazard', LEAST(1, hz.score + w.bonus)) ELSE 100 * hz.score END),
+             'score', fin.s,
+             'percentile', fin.pct,
+             'level', risk_level(fin.pct),
              'base_score', hz.score, 'base_percentile', 100 * hz.score, 'base_level', risk_level(100 * hz.score),
-             'weather_bonus', w.bonus, 'hazards_used', hz.used,
+             'weather_bonus', w.bonus, 'safety_cut', sa.cut, 'hazards_used', hz.used,
              'version', $2::text)
            FROM (SELECT avg(percentile) / 100 AS score, array_agg(hazard ORDER BY hazard) AS used
                  FROM hazard_score WHERE h3_index = c.h3_index AND available AND percentile IS NOT NULL
                  HAVING count(*) > 0) hz,
-                LATERAL (SELECT COALESCE(($3::jsonb -> (SELECT stn::text FROM cell_weather_station WHERE h3_index = $1) ->> 'bonus')::float8, 0) AS bonus) w),
+                LATERAL (SELECT COALESCE(($3::jsonb -> (SELECT stn::text FROM cell_weather_station WHERE h3_index = $1) ->> 'bonus')::float8, 0) AS bonus) w,
+                LATERAL (SELECT ($5::jsonb ->> 'alpha')::float8 * COALESCE((SELECT score FROM sf WHERE h3_index = $1), 0) AS cut) sa,
+                LATERAL (SELECT x.s, CASE WHEN x.s = hz.score THEN 100 * hz.score ELSE risk_pct('hazard', x.s) END AS pct
+                         FROM (SELECT GREATEST(0, LEAST(1, hz.score + w.bonus) - sa.cut) AS s) x) fin),
+  -- 인근 안전시설 지수 (0~1, 높을수록 안전)
+  'safety', (SELECT jsonb_build_object('score', round(sf.score::numeric, 3), 'detail', sf.detail) || $6::jsonb
+             FROM sf WHERE sf.h3_index = c.h3_index),
   -- 그 시각 셀의 기상 판별 (가장 가까운 AWS 지점)
   'weather', (SELECT jsonb_build_object('stn', cw.stn, 'dist_m', round(cw.dist_m::numeric)) || $4::jsonb
                      || COALESCE($3::jsonb -> cw.stn::text, '{}'::jsonb)
@@ -265,7 +288,7 @@ SELECT json_build_object(
 )
 FROM h3_cell c WHERE c.h3_index = $1`
 
-// GET /api/cells/:h3?at=&weather=
+// GET /api/cells/:h3?at=&weather=&safety=
 func (h *Handler) cell(c *gin.Context) {
 	at, _, ok := atOf(c)
 	if !ok {
@@ -277,8 +300,14 @@ func (h *Handler) cell(c *gin.Context) {
 		return
 	}
 	info, _ := json.Marshal(wxInfo)
+	sp, spInfo, err := h.safetyFor(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "안전시설 규칙: " + err.Error()})
+		return
+	}
+	sinfo, _ := json.Marshal(spInfo)
 	var raw []byte
-	err = h.DB.QueryRow(c, cellSQL, c.Param("h3"), Version, string(wx), string(info)).Scan(&raw)
+	err = h.DB.QueryRow(c, cellSQL, c.Param("h3"), Version, string(wx), string(info), string(sp), string(sinfo)).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "격자에 없는 셀"})
 		return
