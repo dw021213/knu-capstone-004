@@ -25,6 +25,14 @@
     .controls .slot { margin: 6px 0 4px 18px; }
     .controls select, .controls button { font: inherit; }
     .controls input[type=range] { width: 160px; vertical-align: middle; }
+    .cmp { margin: 4px 0 4px 18px; max-width: 300px; }
+    .cmp .row { margin: 2px 0; }
+    .cmp table { border-collapse: collapse; margin: 4px 0; }
+    .cmp td { padding: 1px 4px 1px 0; white-space: nowrap; }
+    .cmp input[type=number] { width: 58px; font: inherit; }
+    .cmp .sum { margin-top: 6px; border-top: 1px solid #eee; padding-top: 4px; }
+    .cmp .sum td { text-align: right; }
+    .cmp .sum td:first-child { text-align: left; color: #666; }
   </style>
 </head>
 <body>
@@ -74,8 +82,8 @@ async function getJSON(url) {
   return res.json();
 }
 
-// 표시 모드: combined = 위험도(교통사고 도로 모델 + 기상 가산), dummy = 백엔드 테스트용 더미
-const state = { mode: 'combined', weather: true, meta: null, hour: null, date: null, wx: null };
+// 표시 모드: combined = 위험도(교통사고 도로 모델 + 기상 가산), compare = 시설 가산 기준 비교(실험), dummy = 백엔드 테스트용 더미
+const state = { mode: 'combined', weather: true, meta: null, hour: null, date: null, wx: null, fall: null, features: [], cmp: null, cmpRes: new Map() };
 const pad2 = n => String(n).padStart(2, '0');
 // at(시각, KST) + 기상 가산 여부
 const slotQuery = () => `?at=${state.date}T${pad2(state.hour)}:00&weather=${state.weather ? 'on' : 'off'}`;
@@ -87,6 +95,86 @@ const NO_DATA_COLOR = '#bdbdbd';
 const cellValue = p => state.mode === 'combined'
   ? (p.risk_percentile == null ? null : p.risk_percentile / 100)
   : p.dummy_score;
+
+// ── 시설 가산 비교 (실험) ─────────────────────────────────────────────
+// API 값은 바꾸지 않고, /api/grid 의 모델 점수와 safety_detail(시설별 거리·주행시간·개수)로 브라우저에서 다시 계산한다.
+//   시설 점수 = clamp((0점 기준 − 값) / (0점 기준 − 만점 기준), 0, 1)   (config/safety_rules.json 과 같은 식)
+//   지수 F = 켠 시설 점수의 평균,  가산 = α × (1 − F) [멀수록]  또는  α × F [가까울수록]
+//   가산 후 = min(1, 모델 점수 + 가산). 기상 가산은 넣지 않는다(모델 점수끼리 비교).
+const UNIT = { nearest_dist_m: 'm', nearest_drive_min: '분', count_k1: '개', count_in_cell: '개' };
+const levelOf = p => p == null ? null : p >= 90 ? 5 : p >= 70 ? 4 : p >= 30 ? 3 : p >= 10 ? 2 : 1;
+const lin = (v, full, zero) => v == null ? 0 : Math.max(0, Math.min(1, (zero - v) / (zero - full)));
+const DIFF_COLORS = { '-2': '#2166ac', '-1': '#92c5de', '0': '#f2f2f2', '1': '#f4a582', '2': '#b2182b' };
+
+function defaultCmpItems() {
+  return Object.fromEntries(state.meta.safety.items.map(it => [it.key, { on: true, full: it.full_at, zero: it.zero_at }]));
+}
+
+function computeCompare() {
+  const c = state.cmp, items = state.meta.safety.items, rows = [];
+  for (const f of state.features) {
+    const p = f.properties;
+    const base = c.model === 'traffic' ? p.base_score : (p.fall_percentile == null ? null : p.fall_percentile / 100);
+    if (base == null) continue;
+    const parts = []; let sum = 0, n = 0;
+    for (const it of items) {
+      const o = c.items[it.key];
+      if (!o.on) continue;
+      const v = p.safety_detail?.[it.key]?.value;
+      const sc = lin(v, o.full, o.zero);
+      parts.push({ it, v, sc }); sum += sc; n++;
+    }
+    const F = n ? sum / n : 0;
+    const bonus = c.alpha * (c.dir === 'far' ? 1 - F : F);
+    rows.push({ h3: p.h3, base, F, bonus, s: Math.min(1, base + bonus), parts, n });
+  }
+  if (c.rank === 'rerank') {
+    // 가산 후 점수로 셀 간 순위를 다시 매김 → 등급별 셀 비율(10/20/40/20/10%)은 그대로. 동점은 원래 점수 순
+    const o = [...rows].sort((a, b) => a.s - b.s || a.base - b.base);
+    o.forEach((r, i) => { r.pct = 100 * i / (o.length - 1); });
+  } else {
+    rows.forEach(r => { r.pct = 100 * r.s; }); // 지금 API 방식: 점수(0~1)를 그대로 백분위로
+  }
+  rows.forEach(r => { r.lv0 = levelOf(100 * r.base); r.lv1 = levelOf(r.pct); });
+  state.cmpRes = new Map(rows.map(r => [r.h3, r]));
+  return rows;
+}
+
+function compareSummary(rows) {
+  const cnt = k => [1, 2, 3, 4, 5].map(l => rows.filter(r => r[k] === l).length);
+  const c0 = cnt('lv0'), c1 = cnt('lv1');
+  const up = rows.filter(r => r.lv1 > r.lv0).length, down = rows.filter(r => r.lv1 < r.lv0).length;
+  const top0 = rows.filter(r => r.lv0 === 5), keep = top0.filter(r => r.lv1 === 5).length;
+  const mean = rows.reduce((a, r) => a + r.bonus, 0) / (rows.length || 1);
+  const maxed = rows.filter(r => r.n && r.bonus >= state.cmp.alpha - 1e-9).length;
+  const fall = state.fall;
+  const fallNote = state.cmp.model !== 'fall' ? '' : !fall || fall.status !== 'ok'
+    ? `<div style="color:#c00">이 날짜 이전 넘어짐 예측 없음</div>`
+    : `<div class="muted">넘어짐 예측 ${fall.prediction_date}${fall.stale ? ' (다른 날 예측)' : ''} · ${fall.data_quality}</div>`;
+  return `${fallNote}<table>
+    <tr><td>등급</td>${[1, 2, 3, 4, 5].map(l => `<td><b>${l}</b></td>`).join('')}</tr>
+    <tr><td>가산 전</td>${c0.map(v => `<td>${v}</td>`).join('')}</tr>
+    <tr><td>가산 후</td>${c1.map((v, i) => `<td${v !== c0[i] ? ' style="font-weight:bold"' : ''}>${v}</td>`).join('')}</tr>
+  </table>
+  <div>등급 바뀐 셀 <b>${up + down}</b> / ${rows.length} (${(100 * (up + down) / (rows.length || 1)).toFixed(1)}%) · ↑${up} ↓${down}</div>
+  <div>원래 5등급 유지 <b>${top0.length ? Math.round(100 * keep / top0.length) : '-'}%</b> (${keep}/${top0.length})</div>
+  <div>평균 가산 ${mean.toFixed(3)} · 최대 가산(α) 받은 셀 ${maxed}</div>`;
+}
+
+function comparePopup(h3) {
+  const r = state.cmpRes.get(h3);
+  if (!r) return `<div class="popup"><b>H3 ${h3}</b><br>${state.cmp.model === 'traffic' ? '도로 자료 없음' : '넘어짐 예측 없음'} — 비교 제외</div>`;
+  const unit = it => UNIT[it.metric] ?? '';
+  const rows = r.parts.map(({ it, v, sc }) =>
+    `<tr><td>${it.label}</td><td>${v == null ? '-' : it.metric === 'nearest_dist_m' ? fmtDist(Math.round(v)) : v + unit(it)}</td><td>점수 ${sc.toFixed(2)}</td></tr>`).join('');
+  const dir = state.cmp.dir === 'far' ? '1 − 지수' : '지수';
+  return `<div class="popup"><b>H3 ${h3}</b> <span class="muted">${state.cmp.model === 'traffic' ? '교통사고' : '넘어짐·추락'}</span><table>
+    <tr><td>가산 전</td><td colspan="2">${swatch(r.base)}${LEVEL_NAME(r.lv0)} · 점수 ${r.base.toFixed(3)}</td></tr>
+    <tr><td>가산 후</td><td colspan="2">${swatch(r.pct / 100)}<b>${LEVEL_NAME(r.lv1)}</b> · 백분위 ${r.pct.toFixed(1)}</td></tr>
+    <tr><td>가산</td><td colspan="2">${state.cmp.alpha.toFixed(2)} × (${dir}) = <b>+${r.bonus.toFixed(3)}</b> <span class="muted">(지수 ${r.F.toFixed(2)})</span></td></tr>
+    ${rows}
+  </table><div class="muted">실험 화면 · API 값과 다를 수 있음</div></div>`;
+}
 
 const LEVEL_NAME = l => ({ 5: '매우 높음', 4: '높음', 3: '보통', 2: '낮음', 1: '매우 낮음' })[l] ?? '-';
 const swatch = v => `<i style="display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-1px;margin-right:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2);background:${v == null ? NO_DATA_COLOR : scoreColor(v)}"></i>`;
@@ -179,9 +267,23 @@ async function main() {
     getJSON('/api/facilities?type=fire_station'),
   ]);
   state.wx = grid.weather;
+  state.fall = grid.fall;
+  state.features = grid.features;
+  state.cmp = { model: 'traffic', dir: 'far', alpha: 0.1, rank: 'rerank', view: 'diff', items: defaultCmpItems() };
 
-  const smooth = () => map.getZoom() <= BLUR_MAX_ZOOM;
+  // 비교 모드는 바뀐 셀이 번지지 않게 블러를 끈다
+  const smooth = () => state.mode !== 'compare' && map.getZoom() <= BLUR_MAX_ZOOM;
   const styleOf = f => {
+    if (state.mode === 'compare') {
+      const r = state.cmpRes.get(f.properties.h3), v = state.cmp.view;
+      const fill = !r ? NO_DATA_COLOR
+        : v === 'diff' ? DIFF_COLORS[String(Math.max(-2, Math.min(2, r.lv1 - r.lv0)))]
+        : v === 'bonus' ? scoreColor(state.cmp.alpha ? r.bonus / state.cmp.alpha : 0)
+        : scoreColor(r.pct / 100);
+      // 등급 변화 보기에서는 그대로인 셀을 옅게 해서 바뀐 셀이 눈에 띄게 한다
+      const op = !r ? 0.15 : v === 'diff' && r.lv1 === r.lv0 ? 0.25 : 0.85;
+      return { color: '#555', weight: map.getZoom() <= BLUR_MAX_ZOOM ? 0.1 : 0.3, fillColor: fill, fillOpacity: op };
+    }
     const v = cellValue(f.properties);
     return {
       color: '#555', weight: smooth() ? 0 : 0.3,
@@ -196,7 +298,10 @@ async function main() {
     onEachFeature: (f, layer) => {
       layer.on('click', async e => {
         L.popup().setLatLng(e.latlng).setContent('불러오는 중…').openOn(map);
-        try { L.popup().setLatLng(e.latlng).setContent(await cellPopup(f.properties.h3)).openOn(map); }
+        try {
+          const html = state.mode === 'compare' ? comparePopup(f.properties.h3) : await cellPopup(f.properties.h3);
+          L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
+        }
         catch (err) { L.popup().setLatLng(e.latlng).setContent(String(err)).openOn(map); }
       });
     },
@@ -234,6 +339,19 @@ async function main() {
     const div = legend.getContainer();
     const bar = `<div class="scale"><div class="bar" style="background:${GRADIENT_CSS}"></div><div class="ticks">`;
     const fire = `<div style="margin-top:6px"><i style="background:#c00;border-radius:50%"></i>119안전센터</div>`;
+    if (state.mode === 'compare') {
+      const c = state.cmp;
+      const body = c.view === 'diff'
+        ? [['2', '2단계 이상 ↑'], ['1', '1단계 ↑'], ['0', '그대로'], ['-1', '1단계 ↓'], ['-2', '2단계 이상 ↓']]
+            .map(([k, t]) => `<div><i style="background:${DIFF_COLORS[k]}"></i>${t}</div>`).join('')
+        : bar + (c.view === 'bonus' ? [`+${c.alpha.toFixed(2)} (최대)`, '', '', '', '+0'] : ['매우 높음', '높음', '보통', '낮음', '매우 낮음'])
+            .map(t => `<div>${t}</div>`).join('') + `</div></div>`;
+      div.innerHTML = `<h4>시설 가산 비교 · ${{ diff: '등급 변화', result: '가산 후 위험도', bonus: '가산 크기' }[c.view]}</h4>` + body +
+        `<div><i style="background:${NO_DATA_COLOR}"></i>${c.model === 'traffic' ? '도로 자료 없음' : '예측 없음'} (비교 제외)</div>` +
+        `<div class="muted" style="margin-top:6px">${c.model === 'traffic' ? '교통사고 도로 모델' : '넘어짐·추락 모델'} · 기상 가산 제외<br>` +
+        `${c.dir === 'far' ? '시설에서 멀수록' : '시설에 가까울수록'} +α×${c.dir === 'far' ? '(1−지수)' : '지수'} · ${c.rank === 'rerank' ? '순위 다시 매김' : '점수 그대로'}<br>실험 화면 (API 응답은 그대로)</div>`;
+      return;
+    }
     if (state.mode === 'combined') {
       const traffic = meta.hazards.find(h => h.hazard === 'traffic');
       div.innerHTML = `<h4>${meta.legend}</h4>` + bar +
@@ -260,6 +378,17 @@ async function main() {
         <input type="date" id="date"> <button type="button" id="now" title="현재 한국 시각 기준">지금</button><br>
         <input type="range" id="hour" min="0" max="23" step="1"> <b id="hour-label"></b>
       </div>
+      <label><input type="radio" name="mode" value="compare"> 시설 가산 비교 (실험)</label>
+      <div class="cmp" id="cmp" hidden>
+        <div class="row">모델 <select id="cmp-model"><option value="traffic">교통사고</option><option value="fall">넘어짐·추락</option></select>
+          보기 <select id="cmp-view"><option value="diff">등급 변화</option><option value="result">가산 후 위험도</option><option value="bonus">가산 크기</option></select></div>
+        <div class="row">방향 <select id="cmp-dir"><option value="far">멀수록 가산</option><option value="near">가까울수록 가산</option></select>
+          등급 <select id="cmp-rank"><option value="rerank">순위 다시 매김</option><option value="abs">점수 그대로</option></select></div>
+        <div class="row">α <input type="range" id="cmp-alpha" min="0" max="0.3" step="0.01"> <b id="cmp-alpha-label"></b></div>
+        <table id="cmp-items"></table>
+        <button type="button" id="cmp-reset">현재 기준(safety_rules.json)으로</button>
+        <div class="sum" id="cmp-sum"></div>
+      </div>
       <label><input type="radio" name="mode" value="dummy"> 더미 (테스트)</label>`;
     L.DomEvent.disableClickPropagation(div);
     return div;
@@ -273,8 +402,11 @@ async function main() {
     hourIn.value = state.hour;
     dateIn.value = state.date;
     hourLabel.textContent = `${state.hour}시`;
-    const off = state.mode !== 'combined';
-    dateIn.disabled = hourIn.disabled = wxBox.disabled = document.getElementById('now').disabled = off;
+    // 비교 모드도 날짜는 쓴다(넘어짐 예측 날짜). 기상 가산은 위험도 모드에서만
+    const off = state.mode === 'dummy';
+    dateIn.disabled = hourIn.disabled = document.getElementById('now').disabled = off;
+    wxBox.disabled = state.mode !== 'combined';
+    document.getElementById('cmp').hidden = state.mode !== 'compare';
   };
   // 지금 보는 시각·설정을 주소에 남겨 새로고침·공유해도 같은 화면이 나오게 한다
   function syncURL() {
@@ -282,7 +414,11 @@ async function main() {
     if (!state.weather) q.set('weather', 'off');
     history.replaceState(null, '', '?' + q.toString());
   }
-  const redraw = () => { map.closePopup(); gridLayer.setStyle(styleOf); renderLegend(); syncSlotUI(); syncURL(); };
+  const redraw = () => {
+    map.closePopup();
+    if (state.mode === 'compare') document.getElementById('cmp-sum').innerHTML = compareSummary(computeCompare());
+    applyZoomStyle(); renderLegend(); syncSlotUI(); syncURL();
+  };
   // 날짜·시각이 바뀌면 그 시각의 격자(기상 가산)를 다시 받는다 (요청이 겹치면 마지막 것만 반영)
   let seq = 0;
   async function reloadSlot() {
@@ -292,6 +428,9 @@ async function main() {
     if (my !== seq) return;
     map.closePopup();
     state.wx = data.weather;
+    state.fall = data.fall;
+    state.features = data.features;
+    if (state.mode === 'compare') document.getElementById('cmp-sum').innerHTML = compareSummary(computeCompare());
     syncURL();
     gridLayer.clearLayers();
     gridLayer.addData(data);
@@ -315,6 +454,38 @@ async function main() {
     state.date = todayKST();
     reloadSlot();
   });
+  // 시설 가산 비교 컨트롤
+  const cmpEl = id => document.getElementById('cmp-' + id);
+  function renderCmpItems() {
+    cmpEl('items').innerHTML = `<tr class="muted"><td></td><td>만점</td><td>0점</td><td></td></tr>` +
+      state.meta.safety.items.map(it => {
+        const o = state.cmp.items[it.key];
+        return `<tr><td><label><input type="checkbox" data-k="${it.key}" data-f="on"${o.on ? ' checked' : ''}> ${it.label.replace(/\(.*\)/, '')}</label></td>
+          <td><input type="number" data-k="${it.key}" data-f="full" value="${o.full}"></td>
+          <td><input type="number" data-k="${it.key}" data-f="zero" value="${o.zero}"></td>
+          <td class="muted">${UNIT[it.metric] ?? ''}</td></tr>`;
+      }).join('');
+  }
+  function syncCmpUI() {
+    const c = state.cmp;
+    cmpEl('model').value = c.model; cmpEl('view').value = c.view; cmpEl('dir').value = c.dir; cmpEl('rank').value = c.rank;
+    cmpEl('alpha').value = c.alpha; cmpEl('alpha-label').textContent = c.alpha.toFixed(2);
+  }
+  for (const k of ['model', 'view', 'dir', 'rank']) cmpEl(k).addEventListener('change', e => { state.cmp[k] = e.target.value; redraw(); });
+  cmpEl('alpha').addEventListener('input', e => { state.cmp.alpha = +e.target.value; cmpEl('alpha-label').textContent = state.cmp.alpha.toFixed(2); redraw(); });
+  cmpEl('items').addEventListener('change', e => {
+    const { k, f } = e.target.dataset;
+    if (!k) return;
+    const o = state.cmp.items[k];
+    if (f === 'on') o.on = e.target.checked;
+    else if (e.target.value !== '' && Number.isFinite(+e.target.value)) o[f] = +e.target.value;
+    if (o.full === o.zero) { o[f] += f === 'full' ? -1 : 1; e.target.value = o[f]; } // 0 으로 나누기 방지
+    redraw();
+  });
+  cmpEl('reset').addEventListener('click', () => { state.cmp.items = defaultCmpItems(); renderCmpItems(); redraw(); });
+  renderCmpItems();
+  syncCmpUI();
+
   wxBox.checked = state.weather;
   syncSlotUI();
   syncURL();
