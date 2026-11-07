@@ -354,6 +354,13 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   API: `safety_score`·`safety_detail`·`safety_cut` 항상 포함, `?safety=on` 일 때만 최종 = max(0, 모델+기상 − 0.1×지수). 기본 off → 기존 값·프론트 영향 없음.
   119 추정 주행시간 검증: 2021 전체 구급출동 현장거리(실제 이동거리) 중앙값과 순위상관 0.54 (추정 0~7분 셀 3.4km, 7~14분 5.5km, 14분+ 9.1km).
   주의: on 이면 5등급 225→25셀 (위험 상위 셀이 대부분 시설 많은 시내라 0.1 감산으로 대부분 4등급으로 내려감) → alpha 는 결정 필요.
+- 2026-11-08: **넘어짐·추락 모델 연결** (모델 전달본 `종프/jeju-risk-backend-v1`, `fall_env52_d6_t200_seed42_v1`, 전체 3,651셀, 입도객·공휴일로 날짜마다 바뀜).
+  `migrations/013_fall_risk.sql`(fall_run·fall_score, 예측 날짜별) — 서버 기동 시에도 IF NOT EXISTS 로 실행(embed)해 운영 DB 에 자동 생성.
+  `etl fall <output/fall.json>`: schema·3,651행·고유 h3·격자 일치·display_eligible↔백분위 검사, 같은 날짜 교체.
+  API: `/api/grid` fall_score·fall_percentile·fall_level + 최상위 fall{prediction_date, stale, data_quality}, `/api/cells` fall, meta fall. at 날짜(KST) 예측, 없으면 직전 + stale.
+  교통사고 risk_* 와 섞지 않음(전달본 안내: 두 모델 평균 금지) — 확인: base_percentile 2,249셀 변화 0. 적재한 예측은 2026-11-04 하루(partial_arrivals: 10-28 입도객 합계 불일치).
+  남은 일: 매일 예측(Python 3.11 + CatBoost 서버 설치, 입도객 CSV 수동 수급 — 로그인 필요) / 운영 DB 에 적재 / 프론트 지도 층.
+  같은 전달본의 교통 모델은 10-13 깊이6(우도·추자 포함)과 값이 같음(최대 차 5e-13) → 운영 깊이8 과 순위상관 0.954, 5등급 225 중 187 겹침. 모델 담당 확인 전까지 깊이8 유지.
 
 ## ▶ 현재 상태 요약 (2026-10-19, 이어서 작업할 때 여기부터)
 

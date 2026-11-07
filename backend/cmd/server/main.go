@@ -18,6 +18,7 @@ import (
 	"jejurisk/internal/db"
 	"jejurisk/internal/envfile"
 	"jejurisk/internal/weather"
+	"jejurisk/migrations"
 )
 
 func main() {
@@ -27,6 +28,11 @@ func main() {
 		log.Fatal(err)
 	}
 	defer pool.Close()
+
+	// 넘어짐·추락 테이블 (013). 없으면 만든다 — 이미 있으면 아무것도 바꾸지 않음
+	if _, err := pool.Exec(context.Background(), migrations.FallRisk); err != nil {
+		log.Fatalf("fall 스키마: %v", err)
+	}
 
 	r := gin.Default()
 	r.Use(corsMiddleware())

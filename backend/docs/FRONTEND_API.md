@@ -8,6 +8,12 @@
 - CORS 허용 (운영에서는 `CORS_ORIGINS` 에 프론트 주소를 넣는다)
 - 좌표는 GeoJSON 표준 **[경도, 위도]**
 
+> **2026-11-08 추가 — 넘어짐·추락 위험도 (기존 값 변화 없음)**
+> `/api/grid` 에 `fall_score`·`fall_percentile`·`fall_level`, 최상위 `fall` 추가. `/api/cells` 에 `fall` 객체 추가.
+> 교통사고(`risk_*`)와 **별개 지도 층**이다. 두 백분위를 평균내거나 섞지 말 것(교통은 도로 2,249셀, 넘어짐은 전체 3,651셀 기준).
+> 입도객 수에 따라 **날짜마다 바뀐다**: `at` 날짜의 예측을 쓰고, 없으면 그 전 최근 예측을 쓰며 `fall.stale=true`.
+> `fall.data_quality` 가 `partial_arrivals` 면 입도객 원자료 일부 결측 → 화면에 "입도객 자료 일부 누락" 같은 표시를 숨기지 말 것.
+>
 > **2026-11-03 추가 — 인근 안전시설 지수 (기존 값 변화 없음)**
 > `/api/grid`·`/api/cells` 에 `safety_score`(0~1, 높을수록 경찰서·CCTV·편의점·119·응급실이 가까움), `safety_detail`(시설별 값·점수), `safety_cut` 추가.
 > 기본은 표시만 하고 위험도는 그대로다. `?safety=on` 을 붙일 때만 `risk_*` 에서 `0.1 × safety_score` 를 뺀다. 규칙은 `/api/risk/meta` 의 `safety`.
@@ -146,7 +152,12 @@ H3 육각형 3,651개(추자도 포함)의 도형과 그 시각의 위험도를 
 | `safety_score` | 인근 안전시설 지수 0~1 (높을수록 안전). 5종 동일 가중 평균 | "주변 안전시설" 게이지 |
 | `safety_detail` | 시설별 `{value, score}`. value 는 police·convenience 최근접 거리(m), cctv 셀+인접 개수, fire_station·er 예상 주행(분) | 상세 패널 |
 | `safety_cut` | 위험도에서 뺀 값 (`?safety=on` 아니면 0, 도로 없는 셀 null) | 참고 |
+| `fall_score` | 넘어짐·추락 모델 원점수 (확률 아님) | 참고 |
+| `fall_percentile`, `fall_level` | 넘어짐·추락 순위(0~100, 전체 3,651셀)·등급(1~5, 경계 같음). 예측이 없으면 null | "넘어짐" 지도 층 색 |
 | `hazard_percentile`, `hazard_level` | `risk_*` 와 같은 값 (예전 코드 호환용, 곧 삭제) | 쓰지 않기 |
+
+최상위 `fall`: `{status, requested_date, prediction_date, stale, data_quality, model_id, run_id, generated_at}`.
+`status` 가 `none` 이면 그 날짜 이전 예측이 하나도 없음(전부 null, 안전하다는 뜻 아님). `stale=true` 면 다른 날 예측이라 날짜를 함께 표시.
 
 최상위 `safety`: `{on, alpha, status, rules_version}`. 시설별 기준(만점·0점 거리)은 `/api/risk/meta` 의 `safety.items`.
 
@@ -175,6 +186,7 @@ H3 육각형 3,651개(추자도 포함)의 도형과 그 시각의 위험도를 
 ```
 
 - 도로 자료 없는 셀은 `risk` 가 `null`.
+- `fall`: `{score, percentile, level, rank, display_eligible, quality}` + 최상위 `fall` 과 같은 날짜·품질 정보. 예측이 없으면 `null`.
 - `facilities` 는 종류별 셀 안 개수·인접 포함 개수·가장 가까운 거리(m).
 - `weather.metrics` 는 판별에 쓴 지표 (3·12시간 누적 강수 등).
 
