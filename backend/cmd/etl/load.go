@@ -143,7 +143,7 @@ func runStats(ctx context.Context, pool *pgxpool.Pool) error {
 		return fmt.Errorf("stats 계산: %w", err)
 	}
 	log.Printf("stats: 셀 %d개 × 시설 유형 %d개", len(cells), len(types))
-	return nil
+	return runDriveApply(ctx, pool) // 도로 기준 주행시간 CSV 가 있으면 직선 근사를 덮어씀
 }
 
 // runDummyRisk 는 모델 완성 전까지 쓸 임의 위험도를 넣는다.

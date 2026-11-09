@@ -196,7 +196,8 @@ async function cellPopup(h3) {
   const d = await getJSON('/api/cells/' + h3 + slotQuery());
   const fs = d.facilities.fire_station || {};
   const fireRows = `
-    <tr><td>119 도착</td><td>약 ${fs.nearest_drive_min ?? '-'}분 <span class="muted">(직선 ${fmtDist(fs.nearest_dist_m)})</span></td></tr>
+    <tr><td>119 도착</td><td>약 ${fs.nearest_drive_min ?? '-'}분 <span class="muted">(${fs.drive_source === 'osrm'
+      ? `${fs.nearest_name ?? ''} · 도로 ${fmtDist(fs.nearest_road_m)}` : `직선 ${fmtDist(fs.nearest_dist_m)} 근사`})</span></td></tr>
     <tr><td>셀 내 119</td><td>${fs.count_in_cell ?? 0}곳 (인접 포함 ${fs.count_k1 ?? 0}곳)</td></tr>`;
 
   if (state.mode === 'combined') {

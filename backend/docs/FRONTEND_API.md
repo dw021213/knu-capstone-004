@@ -148,7 +148,7 @@ H3 육각형 3,651개(추자도 포함)의 도형과 그 시각의 위험도를 
 | `has_road` | 도로 자료가 있는지 | `false` 면 "도로 자료 없음" |
 | `road_source` | `ITS_standard_nodelink`(본섬 표준노드링크 2026-09-14) / `NGII_digital_map`(우도·추자도 수치지도 2025) / `no_mapped_road` | 출처 칩 |
 | `facility_counts` | 셀 안 시설 수 `{type: 개수}` (0 은 생략, 종류는 ④) | "주변 시설" |
-| `fire_station_*` | 가장 가까운 119 거리(m)·예상 주행시간(분, 근사)·인접 119 수 | 참고 |
+| `fire_station_*` | 가장 가까운 119 직선거리(m)·예상 주행시간(분, 2026-11-09부터 실제 도로 기준)·인접 119 수 | 참고 |
 | `safety_score` | 인근 안전시설 지수 0~1 (높을수록 안전). 5종 동일 가중 평균 | "주변 안전시설" 게이지 |
 | `safety_detail` | 시설별 `{value, score}`. value 는 police·convenience 최근접 거리(m), cctv 셀+인접 개수, fire_station·er 예상 주행(분) | 상세 패널 |
 | `safety_cut` | 위험도에서 뺀 값 (`?safety=on` 아니면 0, 도로 없는 셀 null) | 참고 |
@@ -181,13 +181,15 @@ H3 육각형 3,651개(추자도 포함)의 도형과 그 시각의 위험도를 
                             "dataset_id": "…", "snapshot_date": "2026-09-14",
                             "detail": { "road_source": "ITS_standard_nodelink", "road_snapshot_date": "2026-09-14" } } },
   "facilities": { "cctv": { "count_in_cell": 3, "count_k1": 9, "nearest_dist_m": 120, "nearest_drive_min": 0.2 },
-                  "fire_station": { "count_in_cell": 0, "count_k1": 1, "nearest_dist_m": 840, "nearest_drive_min": 1.6 } }
+                  "fire_station": { "count_in_cell": 0, "count_k1": 1, "nearest_dist_m": 840, "nearest_drive_min": 2.1,
+                                    "nearest_road_m": 1120, "nearest_name": "OO119안전센터", "drive_source": "osrm" } }
 }
 ```
 
 - 도로 자료 없는 셀은 `risk` 가 `null`.
 - `fall`: `{score, percentile, level, rank, display_eligible, quality}` + 최상위 `fall` 과 같은 날짜·품질 정보. 예측이 없으면 `null`.
 - `facilities` 는 종류별 셀 안 개수·인접 포함 개수·가장 가까운 거리(m).
+- `nearest_drive_min` 은 실제 도로 기준(OSRM, 막힘 없는 상태, 도로가 300m 넘게 멀면 걷는 시간 추가). `drive_source` 가 `osrm` 이면 `nearest_road_m`(도로 거리)·`nearest_name`(가장 빨리 닿는 시설)이 있고, `straight` 면 직선×1.3÷40km/h 근사(추자도·한라산 고지대 등 도로로 닿지 않는 셀, CCTV·숙박).
 - `weather.metrics` 는 판별에 쓴 지표 (3·12시간 누적 강수 등).
 
 ---

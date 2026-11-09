@@ -33,6 +33,10 @@ func main() {
 	if _, err := pool.Exec(context.Background(), migrations.FallRisk); err != nil {
 		log.Fatalf("fall 스키마: %v", err)
 	}
+	// 도로 기준 주행시간 열 (014)
+	if _, err := pool.Exec(context.Background(), migrations.DriveTimeOSRM); err != nil {
+		log.Fatalf("drive-time 스키마: %v", err)
+	}
 
 	r := gin.Default()
 	r.Use(corsMiddleware())

@@ -16,6 +16,8 @@ COPY --from=build /out/ /app/bin/
 # 서버가 작업 폴더 기준으로 읽는 파일
 COPY config ./config
 COPY web ./web
+# etl drive-apply 가 읽는 도로 기준 주행시간(OSRM 결과)
+COPY data/processed/drive_time_osrm.csv ./data/processed/
 ENV PATH=/app/bin:$PATH TZ=Asia/Seoul GIN_MODE=release
 USER app
 EXPOSE 8080

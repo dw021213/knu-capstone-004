@@ -3,7 +3,9 @@
 //	go run ./cmd/etl geocode      주소 → 좌표 (data/processed/*.csv 생성, 기존 좌표는 유지)
 //	go run ./cmd/etl grid         H3 res8 격자 (모델과 같은 3,651개 셀 목록 → 도형 계산)
 //	go run ./cmd/etl facilities   좌표 CSV → facility
-//	go run ./cmd/etl stats        격자별 시설 집계
+//	go run ./cmd/etl stats        격자별 시설 집계 (끝에 drive-apply)
+//	go run ./cmd/etl drive-time [OSRM 주소]  실제 도로 주행시간(로컬 OSRM) → data/processed/drive_time_osrm.csv + DB
+//	go run ./cmd/etl drive-apply  위 CSV → cell_facility_stat (OSRM 없이, 운영 서버용)
 //	go run ./cmd/etl dummy-risk   임의 위험도 (최신 혼잡도가 있으면 반영)
 //	go run ./cmd/etl congestion-test [clear]  테스트 혼잡도 생성(또는 삭제) 후 위험도 재계산
 //	go run ./cmd/etl ems <구급출동 CSV>      셀별 구급출동 건수 적재 후 위험도 재계산
@@ -43,7 +45,7 @@ const (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "사용법: etl <geocode|grid|facilities|stats|dummy-risk|congestion-test [clear]|ems <csv>|road-risk <dir>|fall <json>|population <dir>|combine|weather-*|all>")
+		fmt.Fprintln(os.Stderr, "사용법: etl <geocode|grid|facilities|stats|drive-time [osrm]|drive-apply|dummy-risk|congestion-test [clear]|ems <csv>|road-risk <dir>|fall <json>|population <dir>|combine|weather-*|all>")
 		os.Exit(2)
 	}
 	envfile.Load(".env")
@@ -66,6 +68,14 @@ func main() {
 		must(runFacilities(ctx, pool))
 	case "stats":
 		must(runStats(ctx, pool))
+	case "drive-time":
+		osrm := ""
+		if len(os.Args) > 2 {
+			osrm = os.Args[2]
+		}
+		must(runDriveTime(ctx, pool, osrm))
+	case "drive-apply":
+		must(runDriveApply(ctx, pool))
 	case "poi":
 		if len(os.Args) < 3 {
 			log.Fatal("사용법: etl poi <frontend/public/data/poi 폴더>")

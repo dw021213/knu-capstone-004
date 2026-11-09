@@ -8,3 +8,8 @@ import _ "embed"
 //
 //go:embed 013_fall_risk.sql
 var FallRisk string
+
+// DriveTimeOSRM 은 014_drive_time_osrm.sql. cell_facility_stat 에 도로 거리·최근접 시설 이름·계산 방식 열을 더한다(IF NOT EXISTS).
+//
+//go:embed 014_drive_time_osrm.sql
+var DriveTimeOSRM string

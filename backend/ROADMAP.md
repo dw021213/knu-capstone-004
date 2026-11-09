@@ -367,6 +367,17 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   (α0.1 교통 65.9→65.6%, 넘어짐 83.4→82.4%) → "사고가 잘 난다"가 아니라 "도움이 늦다"로 설명해야 함. 시설별 기준을 바꿔도 포착률 차이 0.4%p 이내.
   근거 있는 기준은 119 7분(현장 도착, 편도)·응급실 30분(취약지)뿐. 경찰서는 셀 77% 가 3km 밖이라 변별력 낮음, CCTV 는 셀 57% 가 0개.
 
+- 2026-11-09: **119·응급실 등 주행시간을 실제 도로 기준(OSRM)으로 교체.** 직선×1.3÷40km/h 근사 → OSM 제주 도로망(Geofabrik 2026-11, car 프로필, 막힘 없는 상태).
+  OSRM 은 로컬에서만(`scripts/osrm-jeju.sh`, Docker v5.27.1 MLD) → `etl drive-time` 이 셀 중심 3,651 → 시설(119·응급실·경찰서·편의점) table API 로 최단시간 시설을 골라
+  `data/processed/drive_time_osrm.csv`(레포, 공공자료 파생) 작성 → `etl drive-apply` 가 cell_facility_stat 에 반영(`stats` 끝에서도 자동, 운영은 `docker compose exec server etl drive-apply`).
+  migration 014(서버 기동 시 실행): nearest_road_m·nearest_snap_m·nearest_name·drive_source(osrm|straight). `/api/cells` facilities 에 같은 필드, 지도 팝업에 "OO119 · 도로 x km".
+  규칙: 셀 중심→도로 300m 까지는 0, 넘는 만큼 걷기 4km/h 추가(시설 쪽 snap 제외). snap 3km 초과 = 도로로 닿지 않음 → 직선 근사 유지:
+  153셀(추자도 89 — 본섬 도로망과 안 이어져 OSRM 이 51km 떨어진 본섬 도로에 붙임, 한라산 고지대 55, 가파·마라 등 9). 우도·가파도는 OSM 여객선 항로 시간 포함(대기 제외).
+  516로는 정상 경로이나 한라산 구간이 30~40km/h 라 제주시청→서귀포는 번영로·남조로(49.5km 55분)가 516로(38.8km 57분)보다 빠르게 나옴.
+  결과: 119 7분 이내 셀 31.3→29.0%, 14분 이상 33.6→36.1%, 응급실 30분 이상 52.4→44.3%(직선 근사가 시외 국도 속도를 과소평가). 119 직선 근사와 상관 0.69.
+  가산 영향(119·응급실만, 멀수록, 재순위): 포착@20 교통 α0.1 65.5→65.8%, 넘어짐 82.0→82.2% — 결론 그대로. 2021 구급 원자료는 삭제돼 있어 현장거리 재검증은 못 함.
+  남은 일: 운영 반영(배포 후 drive-apply 또는 새 덤프), 시설 목록 바뀌면 drive-time 다시(drive-apply 가 이름 불일치 시 경고하고 그 유형은 직선 유지).
+
 ## ▶ 현재 상태 요약 (2026-10-19, 이어서 작업할 때 여기부터)
 
 - **작업 위치**: `~/Documents/대학교/종프/knu-capstone-004/backend`, 브랜치 `feat/backend` (main 직접 push 금지, frontend/ 는 팀원 담당이라 건드리지 않음)
@@ -385,7 +396,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - **발표**: 백엔드 슬라이드 24~28쪽(사용자가 직접 정리). 대본은 2021년 자료만 사용한 것으로 통일, 가산 안 하는 기상 항목은 "API 로 제공(화면 표시는 프론트 연동 때)"로 표현
 
 ## 이후 확장 메모 (1차 이후)
-- 주행시간 정밀화: OSRM(Docker) + Geofabrik south-korea.osm.pbf(약 200MB)에서 제주만 잘라 셀 중심→최근접 119 실제 주행시간 계산. `geo.DriveMinutes` 호출부만 교체
+- ~~주행시간 정밀화: OSRM~~ → 2026-11-09 완료(진행 로그). 남은 정밀화: 시간대별 막힘(OSRM 은 자유 흐름)
 - 시설 추가: `facility.type`만 바꿔 `etl facilities` 재사용 (CSV 스키마 통일: type,name,address,lat,lng)
 - 실시간 수집: `internal/collector/` + `robfig/cron/v3`. 기상청 단기예보는 5km 격자(nx,ny) → `h3_cell`에 nx,ny 매핑 컬럼 추가
 - 모델 연동: 모델이 `risk_score`에 `source='model'`로 INSERT만 하면 API/지도는 그대로 동작

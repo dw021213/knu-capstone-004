@@ -294,7 +294,10 @@ SELECT json_build_object(
   'facilities', (SELECT COALESCE(json_object_agg(type, json_build_object(
                    'count_in_cell', count_in_cell, 'count_k1', count_k1,
                    'nearest_dist_m', round(nearest_dist_m::numeric),
-                   'nearest_drive_min', round(nearest_drive_min::numeric, 1))), '{}'::json)
+                   'nearest_drive_min', round(nearest_drive_min::numeric, 1),
+                   'nearest_road_m', round(nearest_road_m::numeric),
+                   'nearest_name', nearest_name,
+                   'drive_source', drive_source)), '{}'::json)
                  FROM cell_facility_stat WHERE h3_index = c.h3_index),
   'dummy', (SELECT json_build_object('score', score, 'level', level, 'ts', ts, 'source', source)
             FROM risk_score WHERE h3_index = c.h3_index ORDER BY ts DESC LIMIT 1),
