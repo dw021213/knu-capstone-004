@@ -376,7 +376,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   516로는 정상 경로이나 한라산 구간이 30~40km/h 라 제주시청→서귀포는 번영로·남조로(49.5km 55분)가 516로(38.8km 57분)보다 빠르게 나옴.
   결과: 119 7분 이내 셀 31.3→29.0%, 14분 이상 33.6→36.1%, 응급실 30분 이상 52.4→44.3%(직선 근사가 시외 국도 속도를 과소평가). 119 직선 근사와 상관 0.69.
   가산 영향(119·응급실만, 멀수록, 재순위): 포착@20 교통 α0.1 65.5→65.8%, 넘어짐 82.0→82.2% — 결론 그대로. 2021 구급 원자료는 삭제돼 있어 현장거리 재검증은 못 함.
-  남은 일: 운영 반영(배포 후 drive-apply 또는 새 덤프), 시설 목록 바뀌면 drive-time 다시(drive-apply 가 이름 불일치 시 경고하고 그 유형은 직선 유지).
+  운영 반영 완료(2026-11-09, 서버 feat/backend e24e981 + drive-apply, 3,498셀 osrm). 남은 일: 시설 목록 바뀌면 drive-time 다시(drive-apply 가 이름 불일치 시 경고하고 그 유형은 직선 유지).
 
 ## ▶ 현재 상태 요약 (2026-10-19, 이어서 작업할 때 여기부터)
 
@@ -389,7 +389,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - **운영**: https://jeju-risk.duckdns.org — Vultr 서울 vc2-1c-2gb($10/월) 158.247.200.215, root SSH 키(로컬 `~/.ssh/id_ed25519`, passphrase 있음, 키체인)
   - 서버 코드 `/root/knu-capstone-004`, `backend/deploy/docker-compose.prod.yml`(db+server+caddy), `.env` 서버에만
   - 자동 배포: `.github/workflows/backend-deploy.yml` — **main 에 backend/ 머지 시에만**, 서버 `/root/deploy-backend.sh`(origin/main), 시크릿 DEPLOY_SSH_KEY(로컬 `~/.ssh/jeju_deploy_actions`, 서버에서 스크립트만 실행 가능)
-  - ⚠️ 서버는 지금 feat/backend `7bdd7f6` 상태. **feat/backend→main PR 머지 전에 Run workflow 누르면 옛 main 백엔드로 되돌아감**
+  - ⚠️ 서버는 지금 feat/backend `e24e981` 상태(2026-11-09 SSH 수동 배포 + `etl drive-apply`). **feat/backend→main PR 머지 전에 Run workflow 누르면 main(5b0f6cc)으로 되돌아감** — 되돌아가도 DB 의 도로 주행시간은 남지만 fall 테이블·도로 필드 API 는 사라짐
   - 데이터 변경 시: `scripts/db-dump.sh --deploy` → scp → DEPLOY.md 6번. Vultr 크레딧 $250 은 **2026-11-17 만료**
 - **문서**: 프론트용 `docs/FRONTEND_API.md`(맨 위 2026-10-17 변경 박스), 배포 `deploy/DEPLOY.md`, 분석 `analysis/calibration.py`
 - **남은 일**: PR(feat/backend→main) 머지 확인 / 프론트 api 모드 연결(VITE_DATA_MODE=api, VITE_API_BASE) / CORS_ORIGINS 를 팀 Vercel 주소로 제한 / 기상청 키 재발급 / ASOS 로 사고 시각 복원 후 시간 단위 재검증 / 프론트에 weather_alerts 표시 요청 / 백엔드 단위 테스트
