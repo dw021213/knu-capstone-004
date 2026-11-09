@@ -8,6 +8,10 @@
 - CORS 허용 (운영에서는 `CORS_ORIGINS` 에 프론트 주소를 넣는다)
 - 좌표는 GeoJSON 표준 **[경도, 위도]**
 
+> **2026-11-09 변경 — 안전시설 지수에서 CCTV 제외, 주행시간 실제 도로 기준**
+> `safety_score` 는 경찰서·편의점·119·응급실 **4종**(각 0.25) 평균, `safety_detail` 에 `cctv` 키가 없다(CCTV 자료 지역별 누락이 커서). CCTV 마커(`/api/facilities?type=cctv`)는 그대로.
+> 119·응급실 `nearest_drive_min`·`fire_station_drive_min` 은 실제 도로(OSRM) 기준. `/api/cells` facilities 에 `nearest_road_m`·`nearest_name`·`drive_source` 추가.
+
 > **2026-11-08 추가 — 넘어짐·추락 위험도 (기존 값 변화 없음)**
 > `/api/grid` 에 `fall_score`·`fall_percentile`·`fall_level`, 최상위 `fall` 추가. `/api/cells` 에 `fall` 객체 추가.
 > 교통사고(`risk_*`)와 **별개 지도 층**이다. 두 백분위를 평균내거나 섞지 말 것(교통은 도로 2,249셀, 넘어짐은 전체 3,651셀 기준).
@@ -125,7 +129,7 @@ H3 육각형 3,651개(추자도 포함)의 도형과 그 시각의 위험도를 
         "facility_counts": { "cctv": 3, "convenience": 1 },
         "fire_station_dist_m": 1642, "fire_station_drive_min": 3.2, "fire_station_k1": 0,
         "safety_score": 0.481, "safety_cut": 0,
-        "safety_detail": { "police": { "value": 6030.1, "score": 0 }, "cctv": { "value": 2, "score": 0.67 },
+        "safety_detail": { "police": { "value": 6030.1, "score": 0 },
                            "convenience": { "value": 760.2, "score": 0.74 }, "fire_station": { "value": 3.2, "score": 1 },
                            "er": { "value": 68.2, "score": 0 } },
         "hazard_percentile": 66.56, "hazard_level": 3
@@ -149,8 +153,8 @@ H3 육각형 3,651개(추자도 포함)의 도형과 그 시각의 위험도를 
 | `road_source` | `ITS_standard_nodelink`(본섬 표준노드링크 2026-09-14) / `NGII_digital_map`(우도·추자도 수치지도 2025) / `no_mapped_road` | 출처 칩 |
 | `facility_counts` | 셀 안 시설 수 `{type: 개수}` (0 은 생략, 종류는 ④) | "주변 시설" |
 | `fire_station_*` | 가장 가까운 119 직선거리(m)·예상 주행시간(분, 2026-11-09부터 실제 도로 기준)·인접 119 수 | 참고 |
-| `safety_score` | 인근 안전시설 지수 0~1 (높을수록 안전). 5종 동일 가중 평균 | "주변 안전시설" 게이지 |
-| `safety_detail` | 시설별 `{value, score}`. value 는 police·convenience 최근접 거리(m), cctv 셀+인접 개수, fire_station·er 예상 주행(분) | 상세 패널 |
+| `safety_score` | 인근 안전시설 지수 0~1 (높을수록 안전). 경찰서·편의점·119·응급실 4종 동일 가중 평균 (2026-11-09 CCTV 제외, safety_rules_v2) | "주변 안전시설" 게이지 |
+| `safety_detail` | 시설별 `{value, score}`. value 는 police·convenience 최근접 거리(m), fire_station·er 예상 주행(분, 실제 도로) | 상세 패널 |
 | `safety_cut` | 위험도에서 뺀 값 (`?safety=on` 아니면 0, 도로 없는 셀 null) | 참고 |
 | `fall_score` | 넘어짐·추락 모델 원점수 (확률 아님) | 참고 |
 | `fall_percentile`, `fall_level` | 넘어짐·추락 순위(0~100, 전체 3,651셀)·등급(1~5, 경계 같음). 예측이 없으면 null | "넘어짐" 지도 층 색 |
