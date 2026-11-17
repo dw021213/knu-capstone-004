@@ -92,6 +92,7 @@ func (h *Handler) riskMeta(c *gin.Context) {
 		"weather":         h.weatherMeta(c),
 		"safety":          h.safetyMeta(),
 		"fall":            h.fallMeta(c),
+		"v4":              h.v4Meta(c),
 		"no_data":         "위험 모델 입력자료가 없는 셀(예: 도로 자료 없는 셀)은 risk_*·base_* 가 null. 안전으로 표시하지 않는다",
 		"notes": []string{
 			"risk_percentile 은 도로 격자끼리의 상대 순위이며 사고 확률이 아니다",
@@ -129,6 +130,7 @@ SELECT json_build_object(
   'weather', $8::jsonb,
   'safety', $10::jsonb,
   'fall', $12::jsonb,
+  'v4', $14::jsonb,
   'features', COALESCE(json_agg(json_build_object(
     'type', 'Feature',
     -- D3(d3-geo)는 바깥 고리가 시계 방향이어야 해서 CW 로 내보낸다. Leaflet 은 방향과 무관.
@@ -153,6 +155,16 @@ SELECT json_build_object(
       'fall_percentile', round(fs.percentile::numeric, 2),
       'fall_level', risk_level(fs.percentile),
       'traffic_percentile', round(ht.percentile::numeric, 2),
+      -- 교통·넘어짐 보정 확률 v4 ($13 예측 날짜). 기존 risk_*·fall_* 백분위와 별개, 기상 배율 반영
+      'p_traffic', p4.t1,
+      'p_fall', p4.f1,
+      'p_combined', COALESCE(p4.t1, 0) + p4.f1,
+      'p_traffic_base', p4.t0,
+      'p_fall_base', p4.f0,
+      'p_combined_base', p4.c0,
+      'p_scope', p4.scope,
+      'p_fall_quality', p4.fall_quality,
+      'p_weather_rr', CASE WHEN p4.scope IS NULL THEN NULL ELSE json_build_object('traffic', p4.rt, 'fall', p4.rf) END,
       'has_road', ht.available,
       'road_source', ht.detail->>'road_source',
       'facility_counts', COALESCE(fc.counts, '{}'::json),
@@ -178,6 +190,7 @@ LEFT JOIN cell_weather_station cw ON cw.h3_index = c.h3_index
 LEFT JOIN sf ON sf.h3_index = c.h3_index
 -- 넘어짐·추락: $11 예측 날짜 (교통사고 위험도와 섞지 않음)
 LEFT JOIN fall_score fs ON fs.h3_index = c.h3_index AND fs.prediction_date = $11::date
+` + v4SQL("c.h3_index", "cw.stn", "$7", "$13") + `
 -- 기상 가산: 셀의 지점 판별 결과($7: 지점번호 → {bonus, alerts, …})
 CROSS JOIN LATERAL (
   SELECT COALESCE(($7::jsonb -> cw.stn::text ->> 'bonus')::float8, 0) AS bonus,
@@ -218,7 +231,13 @@ func (h *Handler) grid(c *gin.Context) {
 		return
 	}
 	finfo, _ := json.Marshal(fInfo)
-	args := []any{nil, nil, nil, nil, Version, riskLegend, string(wx), string(info), string(sp), string(sinfo), fd, string(finfo)}
+	vd, vInfo, err := h.v4For(c, at)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "v4 확률: " + err.Error()})
+		return
+	}
+	vinfo, _ := json.Marshal(vInfo)
+	args := []any{nil, nil, nil, nil, Version, riskLegend, string(wx), string(info), string(sp), string(sinfo), fd, string(finfo), vd, string(vinfo)}
 	if s := c.Query("bbox"); s != "" {
 		parts := strings.Split(s, ",")
 		if len(parts) != 4 {
@@ -282,6 +301,12 @@ SELECT json_build_object(
   'fall', (SELECT jsonb_build_object('score', fs.score, 'percentile', fs.percentile, 'level', risk_level(fs.percentile),
                                      'rank', fs.rank, 'display_eligible', fs.display_eligible, 'quality', fs.quality) || $8::jsonb
            FROM fall_score fs WHERE fs.h3_index = c.h3_index AND fs.prediction_date = $7::date),
+  -- 교통·넘어짐 보정 확률 v4 ($9 예측 날짜, $10 요약). 기상 배율 반영 전(base)·후
+  'v4', CASE WHEN p4.scope IS NULL THEN NULL ELSE jsonb_build_object(
+           'traffic', p4.t1, 'fall', p4.f1, 'combined', COALESCE(p4.t1, 0) + p4.f1,
+           'traffic_base', p4.t0, 'fall_base', p4.f0, 'combined_base', p4.c0,
+           'scope', p4.scope, 'traffic_quality', p4.traffic_quality, 'fall_quality', p4.fall_quality,
+           'weather_rr', jsonb_build_object('traffic', p4.rt, 'fall', p4.rf)) || $10::jsonb END,
   -- 그 시각 셀의 기상 판별 (가장 가까운 AWS 지점)
   'weather', (SELECT jsonb_build_object('stn', cw.stn, 'dist_m', round(cw.dist_m::numeric)) || $4::jsonb
                      || COALESCE($3::jsonb -> cw.stn::text, '{}'::jsonb)
@@ -306,7 +331,10 @@ SELECT json_build_object(
   'congestion', (SELECT json_build_object('value', round(value::numeric, 2), 'ts', ts, 'source', source)
                  FROM congestion WHERE h3_index = c.h3_index ORDER BY ts DESC LIMIT 1)
 )
-FROM h3_cell c WHERE c.h3_index = $1`
+FROM h3_cell c
+LEFT JOIN cell_weather_station cw0 ON cw0.h3_index = c.h3_index
+` + v4SQL("c.h3_index", "cw0.stn", "$3", "$9") + `
+WHERE c.h3_index = $1`
 
 // GET /api/cells/:h3?at=&weather=&safety=
 func (h *Handler) cell(c *gin.Context) {
@@ -332,8 +360,14 @@ func (h *Handler) cell(c *gin.Context) {
 		return
 	}
 	finfo, _ := json.Marshal(fInfo)
+	vd, vInfo, err := h.v4For(c, at)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "v4 확률: " + err.Error()})
+		return
+	}
+	vinfo, _ := json.Marshal(vInfo)
 	var raw []byte
-	err = h.DB.QueryRow(c, cellSQL, c.Param("h3"), Version, string(wx), string(info), string(sp), string(sinfo), fd, string(finfo)).Scan(&raw)
+	err = h.DB.QueryRow(c, cellSQL, c.Param("h3"), Version, string(wx), string(info), string(sp), string(sinfo), fd, string(finfo), vd, string(vinfo)).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "격자에 없는 셀"})
 		return

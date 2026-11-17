@@ -13,3 +13,8 @@ var FallRisk string
 //
 //go:embed 014_drive_time_osrm.sql
 var DriveTimeOSRM string
+
+// RiskV4 는 015_risk_v4.sql. 교통·넘어짐 보정 확률 v4 를 날짜별로 담는다(IF NOT EXISTS).
+//
+//go:embed 015_risk_v4.sql
+var RiskV4 string

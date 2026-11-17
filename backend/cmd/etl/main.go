@@ -11,6 +11,7 @@
 //	go run ./cmd/etl ems <구급출동 CSV>      셀별 구급출동 건수 적재 후 위험도 재계산
 //	go run ./cmd/etl road-risk <도로전용 ML 폴더>  도로 전용 교통사고 모델 점수 적재(검증) → combine
 //	go run ./cmd/etl fall <output/fall.json>      넘어짐·추락 모델 하루치 적재 (같은 날짜는 교체, 교통사고와 별도)
+//	go run ./cmd/etl risk-v4 <output/risks.json>  교통·넘어짐 보정 확률 v4 하루치 적재 (같은 날짜는 교체)
 //	go run ./cmd/etl population <유동인구 폴더>   250m 유동인구 → 셀별 합계 → combine
 //	go run ./cmd/etl combine                     최종 위험도 = 0.8×위해도 + 0.2×고립도 (internal/risk)
 //	go run ./cmd/etl weather-stations            제주 AWS 지점 + 셀↔지점 연결 (API허브)
@@ -45,7 +46,7 @@ const (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "사용법: etl <geocode|grid|facilities|stats|drive-time [osrm]|drive-apply|dummy-risk|congestion-test [clear]|ems <csv>|road-risk <dir>|fall <json>|population <dir>|combine|weather-*|all>")
+		fmt.Fprintln(os.Stderr, "사용법: etl <geocode|grid|facilities|stats|drive-time [osrm]|drive-apply|dummy-risk|congestion-test [clear]|ems <csv>|road-risk <dir>|fall <json>|risk-v4 <json>|population <dir>|combine|weather-*|all>")
 		os.Exit(2)
 	}
 	envfile.Load(".env")
@@ -98,6 +99,11 @@ func main() {
 			log.Fatal("사용법: etl fall <jeju-risk-backend-v1/output/fall.json>")
 		}
 		must(runFall(ctx, pool, os.Args[2]))
+	case "risk-v4":
+		if len(os.Args) < 3 {
+			log.Fatal("사용법: etl risk-v4 <jeju-risk-backend-v4/output/risks.json>")
+		}
+		must(runRiskV4(ctx, pool, os.Args[2]))
 	case "population":
 		if len(os.Args) < 3 {
 			log.Fatal("사용법: etl population <…_250그리드단위_유동인구현황_… 폴더>")

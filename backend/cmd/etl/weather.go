@@ -243,7 +243,7 @@ func runWeatherImport(ctx context.Context, pool *pgxpool.Pool, path string) erro
 //	go run ./cmd/etl weather-test clear
 func runWeatherTest(ctx context.Context, pool *pgxpool.Pool, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("사용법: etl weather-test <heavy_rain|strong_wind|heat|cold|dry|clear> [-stn mountain|all|지점번호,…]")
+		return fmt.Errorf("사용법: etl weather-test <heavy_rain|strong_wind|heat|cold|dry|freeze|clear> [-stn mountain|all|지점번호,…]")
 	}
 	scenario := args[0]
 	if scenario == "clear" {
@@ -273,8 +273,12 @@ func runWeatherTest(ctx context.Context, pool *pgxpool.Pool, args []string) erro
 	f := func(v float64) *float64 { return &v }
 	now := time.Now().In(weather.Seoul).Truncate(time.Hour)
 	var obs []weather.Obs
+	hours := 3 // 최근 3시간 (호우 3시간 누적용)
+	if scenario == "freeze" {
+		hours = 12 // 최근 24시간 최저기온은 12시간 이상 관측이 있어야 판별
+	}
 	for _, stn := range ids {
-		for h := 0; h < 3; h++ { // 최근 3시간 (호우 3시간 누적용)
+		for h := 0; h < hours; h++ {
 			o := weather.Obs{Stn: stn, TS: now.Add(-time.Duration(h) * time.Hour), Source: "test",
 				TA: f(18), WS: f(3), RN1h: f(0), HM: f(70)}
 			switch scenario {
@@ -288,6 +292,8 @@ func runWeatherTest(ctx context.Context, pool *pgxpool.Pool, args []string) erro
 				o.TA = f(-13) // 주의보급
 			case "dry":
 				o.HM = f(30) // 주의보급
+			case "freeze":
+				o.TA = f(-3) // 최근 24시간 최저 −3℃ → 결빙 경보급
 			default:
 				return fmt.Errorf("알 수 없는 시나리오 %q", scenario)
 			}
@@ -297,8 +303,8 @@ func runWeatherTest(ctx context.Context, pool *pgxpool.Pool, args []string) erro
 	if _, err := weather.SaveObs(ctx, pool, obs); err != nil {
 		return err
 	}
-	log.Printf("weather-test: %s 시나리오 — 지점 %d곳, %s 기준 최근 3시간 관측 %d행 (지우기: etl weather-test clear)",
-		scenario, len(ids), now.Format("2006-01-02 15:00"), len(obs))
+	log.Printf("weather-test: %s 시나리오 — 지점 %d곳, %s 기준 최근 %d시간 관측 %d행 (지우기: etl weather-test clear)",
+		scenario, len(ids), now.Format("2006-01-02 15:00"), hours, len(obs))
 	return nil
 }
 

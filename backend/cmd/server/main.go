@@ -37,6 +37,10 @@ func main() {
 	if _, err := pool.Exec(context.Background(), migrations.DriveTimeOSRM); err != nil {
 		log.Fatalf("drive-time 스키마: %v", err)
 	}
+	// 교통·넘어짐 보정 확률 v4 (015)
+	if _, err := pool.Exec(context.Background(), migrations.RiskV4); err != nil {
+		log.Fatalf("risk v4 스키마: %v", err)
+	}
 
 	r := gin.Default()
 	r.Use(corsMiddleware())

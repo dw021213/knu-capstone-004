@@ -28,6 +28,7 @@ var knownMetrics = map[string]string{
 	"rain_1h":      "1시간 강수량 (mm)",
 	"rain_3h":      "최근 3시간 누적 강수량 (mm)",
 	"rain_12h":     "최근 12시간 누적 강수량 (mm)",
+	"temp_min_24h": "최근 24시간 최저기온 (℃, 결빙 판별. 12시간 이상 관측 있을 때만)",
 	"snow_24h":     "최근 24시간 신적설 (cm, 적설 증가량)",
 	"feels_like":   "체감온도 (℃, 기상청 여름철 식)",
 }
@@ -53,6 +54,7 @@ func ComputeMetrics(series []Obs, at time.Time) Metrics {
 	m["rain_3h"] = sumRain(byHour, at, 3)
 	m["humidity_24h"] = meanHumidity(byHour, at, 24, 12)
 	m["rain_12h"] = sumRain(byHour, at, 12)
+	m["temp_min_24h"] = minTemp(byHour, at, 24, 12)
 	if cur.TA != nil && cur.HM != nil {
 		f := FeelsLike(*cur.TA, *cur.HM)
 		m["feels_like"] = &f
@@ -86,6 +88,22 @@ func meanHumidity(byHour map[int64]Obs, at time.Time, n, minObs int) *float64 {
 	}
 	v := sum / float64(cnt)
 	return &v
+}
+
+// minTemp 는 최근 n시간 최저기온. 관측이 minObs 시간 미만이면 nil.
+// 결빙 배율은 일 최저기온으로 쟀다(analysis, 2011~2015·2020·2021). 실시간에서는 달력 하루 대신 최근 24시간을 쓴다.
+func minTemp(byHour map[int64]Obs, at time.Time, n, minObs int) *float64 {
+	lo, cnt := math.Inf(1), 0
+	for h := 0; h < n; h++ {
+		if o, ok := byHour[at.Add(-time.Duration(h)*time.Hour).Truncate(time.Hour).Unix()]; ok && o.TA != nil {
+			lo = math.Min(lo, *o.TA)
+			cnt++
+		}
+	}
+	if cnt < minObs {
+		return nil
+	}
+	return &lo
 }
 
 // sumRain 은 최근 n시간 1시간 강수량 합. 관측이 하나도 없으면 nil (결측 시간은 0 으로 보지 않고 건너뜀).
