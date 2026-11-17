@@ -24,12 +24,18 @@
     .controls label { display: block; cursor: pointer; }
     .controls input[type=date] { margin-top: 4px; font: inherit; }
     .controls input[type=date]:disabled { opacity: .4; }
+    .walk-link {
+      color: #164d41; font-weight: 700; text-decoration: none;
+    }
+    .walk-link:not(.leaflet-control) { position: absolute; z-index: 1000; top: 10px; right: 10px; }
+    .walk-link:hover, .walk-link:focus-visible { text-decoration: underline; }
     @media (max-width: 650px) {
       .leaflet-control.legend { margin-bottom: 260px; max-height: 100px; overflow-y: auto; max-width: 180px; }
     }
   </style>
 </head>
 <body>
+<a class="panel walk-link" href="/walk">산책 코스</a>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -58,6 +64,9 @@ function scoreColor(score) {
 const GRADIENT_CSS = `linear-gradient(to top, ${COLOR_STOPS.map(([s, c]) => `${c} ${s * 100}%`).join(', ')})`;
 
 const map = L.map('map', { preferCanvas: true }).setView([33.38, 126.55], 10);
+const walkNavigation = L.control({ position: 'topright' });
+walkNavigation.onAdd = () => document.querySelector('.walk-link');
+walkNavigation.addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18,
   attribution: '&copy; OpenStreetMap contributors',

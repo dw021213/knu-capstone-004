@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>제주 산책 코스 | 제주 안전지도</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font: 15px/1.5 "DM Sans", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      color: #172d27;
+      background: #f4f6f1;
+      --green: #176b55;
+      --muted: #50635a;
+      --border: #dbe3dc;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { min-width: 0; margin: 0; }
+    a { color: var(--green); }
+    button, input { font: inherit; }
+    button, .action-link {
+      min-height: 39px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px;
+      color: inherit; background: white; font-weight: 650; cursor: pointer;
+    }
+    button:disabled { opacity: .55; cursor: default; }
+    button:not(:disabled):hover, .action-link:hover { border-color: var(--green); background: #eff7f3; }
+    :focus-visible { outline: 2px solid #17795f; outline-offset: 2px; }
+    p, h1, h2, ol, dl, dd { margin: 0; }
+    header { background: #fff; border-bottom: 1px solid var(--border); }
+    .header-inner, main { width: min(1400px, calc(100% - 44px)); margin-inline: auto; }
+    .header-inner {
+      min-height: 59px; display: flex; justify-content: space-between; gap: 16px; align-items: center;
+    }
+    .brand { font-weight: 800; }
+    .back { text-decoration: none; font-weight: 700; }
+    .back:hover { text-decoration: underline; }
+    main { padding-block: 25px 32px; }
+    h1 { margin-bottom: 16px; font-size: clamp(1.65rem, 4vw, 2.15rem); line-height: 1.2; letter-spacing: -.045em; }
+    h2 { font-size: 1.1rem; }
+    .workspace {
+      display: grid; grid-template-columns: minmax(300px, 365px) minmax(0, 1fr); gap: 16px; align-items: start;
+    }
+    .editor, .map-panel {
+      overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: #fff;
+    }
+    .editor { display: grid; gap: 16px; padding: 18px; }
+    .editor-heading, .search-line, .stop, .stop-tools, .map-bar {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .editor-heading, .stop-tools, .map-bar { justify-content: space-between; }
+    .quiet, .remove { border-color: transparent; color: var(--green); font-size: .86rem; }
+    .editor-heading button { white-space: nowrap; }
+    .search { display: grid; gap: 7px; }
+    .search label { font-weight: 700; }
+    .search input {
+      min-width: 0; width: 100%; height: 44px; padding: 0 10px; border: 1px solid #93afa3; border-radius: 8px;
+      background: white; color: inherit; font-size: 16px;
+    }
+    .search-line button { flex: none; min-height: 44px; }
+    .primary, .action-link.primary { background: var(--green); color: #fff; border-color: var(--green); }
+    .primary:not(:disabled):hover, .action-link.primary:hover { background: #125640; }
+    .hint { color: var(--muted); font-size: .85rem; }
+    .hint[role="status"]:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .results { max-height: 210px; padding: 0; border: 1px solid var(--border); border-radius: 8px; overflow: auto; list-style: none; }
+    .results li + li { border-top: 1px solid var(--border); }
+    .results button { display: block; width: 100%; border: 0; border-radius: 0; text-align: left; }
+    .results button:focus-visible { outline-offset: -2px; }
+    .results span { display: block; color: var(--muted); font-size: .83rem; font-weight: 450; }
+    .stops, #waypoints { display: grid; gap: 6px; }
+    #waypoints:empty { display: none; }
+    .stop { position: relative; min-width: 0; }
+    .drag-handle {
+      flex: none; min-width: 34px; padding-inline: 6px; border-color: transparent;
+      color: var(--muted); cursor: grab; font-size: 1.1rem; line-height: 1;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    .stop[data-dragging] { opacity: .55; }
+    .stop[data-drop]::after {
+      content: ''; position: absolute; z-index: 1; inset-inline: 0; height: 3px;
+      border-radius: 3px; background: var(--green); pointer-events: none;
+    }
+    .stop[data-drop="above"]::after { top: -4px; }
+    .stop[data-drop="below"]::after { bottom: -4px; }
+    .stop button.slot {
+      display: flex; flex: 1; align-items: center; gap: 9px; min-width: 0; padding: 7px 9px; text-align: left;
+    }
+    .stop button.slot[aria-pressed="true"] { border-color: var(--green); background: #eef8f2; }
+    .slot-text { min-width: 0; }
+    .point-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .number, .map-pin {
+      display: grid; flex: none; place-items: center; width: 25px; height: 25px; border-radius: 50%;
+      background: #e1eee7; color: #185e4a; font-size: 12px; font-weight: 800;
+    }
+    .number.start, .map-pin.start { background: #176b55; color: white; }
+    .number.end, .map-pin.end { background: #9c4a34; color: white; }
+    .map-pin {
+      width: 31px; height: 31px; border: 2px solid white;
+      box-shadow: 0 2px 6px #162b2460; pointer-events: none;
+    }
+    .map-pin.waypoint { background: #294f66; color: white; }
+    .actions { display: grid; gap: 8px; }
+    .action-link { display: block; text-align: center; text-decoration: none; }
+    .route-summary {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px 12px;
+      border-radius: 9px; background: #e9f4ed;
+    }
+    .route-summary dt { color: var(--muted); font-size: .83rem; }
+    .route-summary dd { font-size: 1.14rem; font-weight: 800; }
+    #route-status[data-error="true"] { color: #96371f; }
+    .map-bar { min-height: 47px; padding: 4px 10px 4px 14px; }
+    .map-bar button { flex: none; min-height: 34px; font-size: .82rem; }
+    #map { height: min(70vh, 750px); min-height: 460px; background: #e5ebe4; }
+    #map[data-selecting="true"], #map[data-selecting="true"] .leaflet-grab { cursor: crosshair; }
+    @media (max-width: 760px) {
+      .header-inner, main { width: calc(100% - 28px); }
+      main { padding-block: 20px; }
+      .workspace { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+      .editor { padding: 14px; gap: 12px; }
+      #map { height: 51vh; min-height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <span class="brand">제주 안전지도</span>
+      <a class="back" href="/">← 격자 지도</a>
+    </div>
+  </header>
+  <main>
+    <h1>제주 산책 코스</h1>
+    <div class="workspace">
+      <section class="editor" aria-labelledby="stops-heading">
+        <div class="editor-heading">
+          <h2 id="stops-heading">코스 지점</h2>
+          <button id="sample" class="quiet" type="button">예시 코스</button>
+        </div>
+        <form class="search" id="search">
+          <label id="search-label" for="query">출발지 검색</label>
+          <div class="search-line">
+            <input id="query" type="search" maxlength="100" placeholder="장소명 또는 도로명주소" autocomplete="off"
+              aria-describedby="search-help search-status" aria-controls="results">
+            <button id="search-button" class="primary" type="submit">검색</button>
+          </div>
+          <p id="search-help" class="hint" hidden></p>
+          <p id="search-status" class="hint" role="status"></p>
+          <ol id="results" class="results" aria-label="장소 검색 결과" hidden></ol>
+        </form>
+
+        <div class="stops" aria-label="방문 순서">
+          <div id="start"></div>
+          <div id="waypoints"></div>
+          <div id="end"></div>
+          <div class="stop-tools">
+            <button id="add" type="button">+ 경유지 추가</button>
+            <button id="reset" class="quiet" type="button">다시 시작</button>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="route" class="primary" type="button" disabled hidden>도보 경로 찾기</button>
+          <dl id="summary" class="route-summary" hidden>
+            <div><dt>총 거리</dt><dd id="distance"></dd></div>
+            <div><dt>예상 소요 시간</dt><dd id="duration"></dd></div>
+          </dl>
+          <a id="external" class="action-link" target="_blank" rel="noopener noreferrer" hidden>카카오맵에서 도보 길찾기 ↗</a>
+          <p id="route-status" class="hint" role="status"></p>
+        </div>
+      </section>
+      <section class="map-panel" aria-label="산책 지도">
+        <div class="map-bar">
+          <p class="hint" id="map-status" role="status">지도를 불러오는 중입니다.</p>
+          <button id="map-center" type="button" disabled>지도 중심 선택</button>
+        </div>
+        <div id="map"></div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const el = id => document.getElementById(id);
+    const mapElement = el('map');
+    const query = el('query');
+    const maxWaypoints = 5;
+    const initialCenter = [126.524, 33.5135];
+    const sample = [
+      { name: '제주목 관아', coords: [126.52153, 33.51428] },
+      { name: '동문시장', coords: [126.52629, 33.51336] },
+      { name: '탑동광장', coords: [126.52389, 33.5190] },
+    ];
+    const state = { start: null, end: null, waypoints: [], target: 'start' };
+    let map;
+    let searchPlaces;
+    let mapStatus = '지도를 불러오는 중입니다.';
+    let mapLoaded = false;
+    let routingEnabled = false;
+    let searchVersion = 0;
+    let routeRequest;
+    let draggedIndex = null;
+    let dropTarget;
+
+    function validCoords(coords) {
+      return Array.isArray(coords) && coords.length === 2
+        && coords.every(Number.isFinite) && Math.abs(coords[0]) <= 180 && Math.abs(coords[1]) <= 90;
+    }
+
+    function slotLabel(slot) {
+      if (slot === 'start') return '출발지';
+      if (slot === 'end') return '도착지';
+      return '경유지 ' + (slot + 1);
+    }
+
+    function orderedStops() {
+      return [
+        { slot: 'start', point: state.start, number: 1 },
+        ...state.waypoints.map((point, slot) => ({ slot, point, number: slot + 2 })),
+        { slot: 'end', point: state.end, number: state.waypoints.length + 2 },
+      ];
+    }
+
+    function pointKind(slot) {
+      return typeof slot === 'number' ? 'waypoint' : slot;
+    }
+
+    function clearSearch() {
+      searchVersion++;
+      el('results').replaceChildren();
+      el('results').hidden = true;
+      setSearchStatus('');
+    }
+
+    function setSearchStatus(message) {
+      el('search-status').textContent = message;
+    }
+
+    function setTarget(target, focusSearch = false) {
+      clearSearch();
+      state.target = target;
+      query.value = '';
+      render();
+      if (focusSearch && target !== null) query.focus();
+    }
+
+    function clearRoute() {
+      routeRequest?.abort();
+      routeRequest = undefined;
+      map?.drawRoute?.([]);
+      el('summary').hidden = true;
+      setRouteStatus('');
+    }
+
+    function setRouteStatus(message, error = false) {
+      el('route-status').textContent = message;
+      el('route-status').dataset.error = String(error);
+    }
+
+    function choosePoint(point, focusSearch = false) {
+      const slot = state.target;
+      if (slot === null || !validCoords(point.coords)) return;
+      clearRoute();
+      if (typeof slot === 'number') state.waypoints[slot] = point;
+      else state[slot] = point;
+      setTarget(!state.start ? 'start' : !state.end ? 'end' : null, focusSearch);
+      if (focusSearch && state.target === null) {
+        (routingEnabled ? el('route') : el('external')).focus({ preventScroll: true });
+      }
+    }
+
+    function moveStop(from, to) {
+      const visits = [...state.waypoints];
+      if (state.end) visits.push(state.end);
+      if (from === to || to < 0 || to >= visits.length) return;
+
+      const activePoint = state.target === 'end' ? state.end : state.waypoints[state.target];
+      const [point] = visits.splice(from, 1);
+      visits.splice(to, 0, point);
+      if (state.end) state.end = visits.pop();
+      state.waypoints = visits;
+      if (activePoint) state.target = activePoint === state.end ? 'end' : visits.indexOf(activePoint);
+      clearRoute();
+      render();
+      const handleRow = el('waypoints').children[to] || el('end').children[0];
+      handleRow.querySelector('.drag-handle')?.focus({ preventScroll: true });
+      setRouteStatus(routingEnabled && state.start && state.end
+        ? '방문 순서를 변경했어요. 도보 경로 찾기를 눌러 새 경로를 확인하세요.'
+        : '방문 순서를 변경했어요.');
+    }
+
+    function clearDropTarget() {
+      if (dropTarget) delete dropTarget.dataset.drop;
+      dropTarget = undefined;
+    }
+
+    function makeDragHandle(row, slot, index) {
+      const handle = document.createElement('button');
+      handle.type = 'button';
+      handle.className = 'drag-handle';
+      handle.draggable = true;
+      handle.textContent = '⠿';
+      handle.title = '위아래로 드래그하거나 방향키로 이동';
+      handle.setAttribute('aria-label', slotLabel(slot) + ' 순서 이동');
+      handle.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown');
+      handle.addEventListener('keydown', event => {
+        if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+        event.preventDefault();
+        moveStop(index, index + (event.key === 'ArrowUp' ? -1 : 1));
+      });
+      handle.addEventListener('dragstart', event => {
+        draggedIndex = index;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', '');
+        const { left, top } = row.getBoundingClientRect();
+        event.dataTransfer.setDragImage(row, event.clientX - left, event.clientY - top);
+        row.dataset.dragging = '';
+      });
+      handle.addEventListener('dragend', () => {
+        draggedIndex = null;
+        delete row.dataset.dragging;
+        clearDropTarget();
+      });
+      row.addEventListener('dragover', event => {
+        if (draggedIndex === null || draggedIndex === index) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        if (dropTarget !== row) clearDropTarget();
+        dropTarget = row;
+        row.dataset.drop = draggedIndex < index ? 'below' : 'above';
+      });
+      row.addEventListener('dragleave', event => {
+        if (dropTarget === row && !row.contains(event.relatedTarget)) clearDropTarget();
+      });
+      row.addEventListener('drop', event => {
+        if (draggedIndex === null || draggedIndex === index) return;
+        event.preventDefault();
+        moveStop(draggedIndex, index);
+      });
+      return handle;
+    }
+
+    function makeSlot({ slot, point, number }) {
+      const row = document.createElement('div');
+      row.className = 'stop';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'slot';
+      button.setAttribute('aria-pressed', String(slot === state.target));
+      button.addEventListener('click', () => setTarget(slot, true));
+      const badge = document.createElement('span');
+      badge.className = 'number ' + pointKind(slot);
+      badge.setAttribute('aria-hidden', 'true');
+      badge.textContent = number;
+      const text = document.createElement('span');
+      text.className = 'slot-text';
+      const label = document.createElement('span');
+      label.className = 'hint';
+      label.textContent = slotLabel(slot);
+      const name = document.createElement('span');
+      name.className = 'point-label';
+      name.textContent = point?.name || '선택하기';
+      text.append(label, name);
+      button.append(badge, text);
+      row.append(button);
+      if (point) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'remove';
+        remove.textContent = '삭제';
+        remove.setAttribute('aria-label', slotLabel(slot) + ' 삭제');
+        remove.addEventListener('click', () => {
+          clearRoute();
+          if (typeof slot === 'number') state.waypoints.splice(slot, 1);
+          else state[slot] = null;
+          setTarget(!state.start ? 'start' : !state.end ? 'end' : null, true);
+          if (state.target === null) el('add').focus();
+        });
+        row.append(remove);
+        const movableCount = state.waypoints.length + Number(!!state.end);
+        if (slot !== 'start' && movableCount > 1) row.append(makeDragHandle(row, slot, number - 2));
+      }
+      return row;
+    }
+
+    function render() {
+      draggedIndex = null;
+      clearDropTarget();
+      const stops = orderedStops();
+      const activeStops = stops.filter(stop => stop.point);
+      el('start').replaceChildren(makeSlot(stops[0]));
+      el('waypoints').replaceChildren(...stops.slice(1, -1).map(makeSlot));
+      el('end').replaceChildren(makeSlot(stops.at(-1)));
+      el('add').disabled = state.waypoints.length >= maxWaypoints;
+      el('add').title = '경유지는 최대 5개까지 추가할 수 있어요.';
+
+      const choosing = state.target !== null;
+      const searchFallback = mapLoaded && !searchPlaces;
+      el('search-label').textContent = choosing ? slotLabel(state.target) + ' 검색' : '코스 지점 검색';
+      query.placeholder = choosing
+        ? (searchFallback ? '위도, 경도' : '장소명 또는 도로명주소')
+        : '변경할 지점을 선택하세요';
+      el('search-help').hidden = !choosing || !searchFallback;
+      el('search-help').textContent = '카카오 지도가 연결되면 장소명과 주소를 검색할 수 있어요. 지금은 지도에서 고르거나 좌표를 입력하세요.';
+      query.disabled = el('search-button').disabled = !choosing;
+      el('map-center').disabled = !choosing || !map;
+      mapElement.dataset.selecting = String(choosing && !!map);
+      el('map-status').textContent = map
+        ? (choosing ? '지도에서도 ' + slotLabel(state.target) + ' 위치를 선택할 수 있어요.' : '선택한 지점을 방문 순서로 표시합니다.')
+        : mapStatus;
+      map?.drawStops(activeStops);
+
+      const complete = !!(state.start && state.end);
+      const external = el('external');
+      external.hidden = !complete;
+      external.classList.toggle('primary', !routingEnabled);
+      if (complete) {
+        const parts = activeStops.map(({ slot, point }) => {
+          const name = point.name.replace(/[,/]/g, ' ').trim() || slotLabel(slot);
+          return [encodeURIComponent(name), point.coords[1], point.coords[0]].join(',');
+        });
+        external.href = 'https://map.kakao.com/link/by/walk/' + parts.join('/');
+      } else {
+        external.removeAttribute('href');
+      }
+      el('route').hidden = !routingEnabled;
+      el('route').disabled = !complete || !!routeRequest;
+    }
+
+    function mapPick(coords) {
+      if (state.target !== null) choosePoint({ name: '지도에서 선택한 위치', coords });
+    }
+
+    function pin(stop) {
+      const node = document.createElement('span');
+      node.className = 'map-pin ' + pointKind(stop.slot);
+      node.textContent = stop.number;
+      node.title = slotLabel(stop.slot) + ' · ' + stop.point.name;
+      node.setAttribute('aria-hidden', 'true');
+      return node;
+    }
+
+    function loadScript(url) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        const timer = setTimeout(() => { script.remove(); reject(new Error('지도 로딩 시간 초과')); }, 7000);
+        script.src = url;
+        script.onload = () => { clearTimeout(timer); resolve(); };
+        script.onerror = () => { clearTimeout(timer); reject(new Error('지도 로딩 실패')); };
+        document.head.append(script);
+      });
+    }
+
+    async function createKakaoMap(key) {
+      await loadScript('https://dapi.kakao.com/v2/maps/sdk.js?autoload=false&libraries=services&appkey=' + encodeURIComponent(key));
+      const maps = window.kakao.maps;
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('카카오 지도 로딩 시간 초과')), 7000);
+        maps.load(() => { clearTimeout(timer); resolve(); });
+      });
+      const toLatLng = ([lng, lat]) => new maps.LatLng(lat, lng);
+      const fromLatLng = point => [point.getLng(), point.getLat()];
+      const instance = new maps.Map(mapElement, { center: toLatLng(initialCenter), level: 5 });
+      instance.addControl(new maps.ZoomControl(), maps.ControlPosition.RIGHT);
+      instance.setKeyboardShortcuts(true);
+      maps.event.addListener(instance, 'click', event => mapPick(fromLatLng(event.latLng)));
+      let markers = [];
+      let routeLines = [];
+      if (maps.services) searchPlaces = createPlaceSearch(maps);
+      return {
+        center: () => fromLatLng(instance.getCenter()),
+        panTo: coords => instance.panTo(toLatLng(coords)),
+        fit: coords => {
+          if (coords.length < 2) return;
+          const bounds = new maps.LatLngBounds();
+          coords.forEach(point => bounds.extend(toLatLng(point)));
+          instance.setBounds(bounds, 50);
+        },
+        drawStops: stops => {
+          markers.forEach(marker => marker.setMap(null));
+          markers = stops.map(stop => new maps.CustomOverlay({
+            map: instance, position: toLatLng(stop.point.coords), content: pin(stop), yAnchor: .5, zIndex: 4,
+          }));
+        },
+        drawRoute: paths => {
+          routeLines.forEach(line => line.setMap(null));
+          routeLines = paths.flatMap(coords => {
+            const path = coords.map(toLatLng);
+            return [
+              new maps.Polyline({ map: instance, path, strokeColor: '#ffffff', strokeWeight: 9, strokeOpacity: .94, zIndex: 2 }),
+              new maps.Polyline({ map: instance, path, strokeColor: '#176b55', strokeWeight: 5, strokeOpacity: 1, zIndex: 3 }),
+            ];
+          });
+        },
+      };
+    }
+
+    async function createFallbackMap() {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.append(css);
+      await loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
+      const L = window.L;
+      const toLatLng = ([lng, lat]) => [lat, lng];
+      const fromLatLng = point => [point.lng, point.lat];
+      const instance = L.map(mapElement, { zoomControl: false }).setView(toLatLng(initialCenter), 15);
+      L.control.zoom({ position: 'topright' }).addTo(instance);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(instance);
+      instance.on('click', event => mapPick(fromLatLng(event.latlng)));
+      const markers = L.layerGroup().addTo(instance);
+      return {
+        center: () => fromLatLng(instance.getCenter()),
+        panTo: coords => instance.panTo(toLatLng(coords)),
+        fit: coords => {
+          if (coords.length >= 2) instance.fitBounds(coords.map(toLatLng), { padding: [40, 40], maxZoom: 17 });
+        },
+        drawStops: stops => {
+          markers.clearLayers();
+          for (const stop of stops) {
+            const icon = L.divIcon({ html: pin(stop), className: '', iconSize: [31, 31] });
+            L.marker(toLatLng(stop.point.coords), { icon, interactive: false, keyboard: false }).addTo(markers);
+          }
+        },
+      };
+    }
+
+    function createPlaceSearch(maps) {
+      const { Places, Geocoder, Status } = maps.services;
+      const places = new Places();
+      const geocoder = new Geocoder();
+      function search(service, term) {
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('검색 응답 시간 초과')), 7000);
+          service(term, (results, status) => {
+            clearTimeout(timer);
+            if (status === Status.OK) resolve(results);
+            else if (status === Status.ZERO_RESULT) resolve([]);
+            else reject(new Error('검색 오류'));
+          }, { size: 8 });
+        });
+      }
+      return async (keyword, isCurrent) => {
+        const localKeyword = keyword.includes('제주') ? keyword : '제주 ' + keyword;
+        const keywordSearch = term => search(places.keywordSearch.bind(places), term);
+        const addressSearch = term => search(geocoder.addressSearch.bind(geocoder), term);
+        const isAddress = /[로길동리읍면]\s*\d/.test(keyword);
+        if (isAddress) {
+          const addresses = await addressSearch(localKeyword);
+          if (addresses.length || !isCurrent()) return addresses;
+          if (localKeyword !== keyword) {
+            const elsewhere = await addressSearch(keyword);
+            if (elsewhere.length || !isCurrent()) return elsewhere;
+          }
+        }
+        const local = await keywordSearch(localKeyword);
+        if (local.length || !isCurrent()) return local;
+        if (localKeyword !== keyword) {
+          const general = await keywordSearch(keyword);
+          if (general.length || !isCurrent()) return general;
+        }
+        return isAddress ? [] : addressSearch(keyword);
+      };
+    }
+
+    async function findPlaces(event) {
+      event.preventDefault();
+      const keyword = query.value.trim();
+      if (state.target === null) return;
+      clearSearch();
+      if (!keyword) {
+        setSearchStatus('검색할 장소명이나 주소를 입력하세요.');
+        return;
+      }
+      const coordinateInput = /^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/.exec(keyword);
+      if (coordinateInput) {
+        const coords = [Number(coordinateInput[2]), Number(coordinateInput[1])];
+        if (!validCoords(coords)) {
+          setSearchStatus('위도, 경도 순서로 입력하세요. 예를 들어 33.51428, 126.52153');
+          return;
+        }
+        choosePoint({ name: '입력한 좌표', coords }, true);
+        map?.panTo(coords);
+        return;
+      }
+      if (!searchPlaces) {
+        setSearchStatus('위도, 경도 순서로 입력해 주세요. 예를 들어 33.51428, 126.52153');
+        return;
+      }
+
+      const version = searchVersion;
+      const isCurrent = () => version === searchVersion;
+      setSearchStatus('장소를 검색 중입니다.');
+      try {
+        const results = await searchPlaces(keyword, isCurrent);
+        if (!isCurrent()) return;
+        const list = el('results');
+        for (const result of results) {
+          const coords = [Number(result.x), Number(result.y)];
+          const address = result.road_address_name || result.road_address?.address_name || result.address_name;
+          const name = result.place_name || address;
+          if (!name || !validCoords(coords)) continue;
+          const item = document.createElement('li');
+          const option = document.createElement('button');
+          option.type = 'button';
+          option.textContent = name;
+          if (address && address !== name) {
+            const detail = document.createElement('span');
+            detail.textContent = address;
+            option.append(detail);
+          }
+          option.addEventListener('click', () => {
+            if (!isCurrent()) return;
+            choosePoint({ name, coords }, true);
+            map?.panTo(coords);
+          });
+          item.append(option);
+          list.append(item);
+        }
+        list.hidden = !list.childElementCount;
+        setSearchStatus(list.hidden
+          ? '검색 결과가 없어요. 장소명이나 주소를 확인해 주세요.'
+          : '검색 결과 ' + list.childElementCount + '개. 목록에서 지점을 선택하세요.');
+      } catch {
+        if (isCurrent()) setSearchStatus('장소 검색에 실패했어요. 다시 검색하거나 지도에서 선택하세요.');
+      }
+    }
+
+    async function findRoute() {
+      if (!routingEnabled || !state.start || !state.end || routeRequest) return;
+      clearRoute();
+      const current = new AbortController();
+      routeRequest = current;
+      el('route').disabled = true;
+      setRouteStatus('도보 경로를 찾는 중입니다.');
+      const params = new URLSearchParams({
+        origin: state.start.coords.join(','),
+        destination: state.end.coords.join(','),
+      });
+      if (state.waypoints.length) params.set('waypoints', state.waypoints.map(point => point.coords.join(',')).join('|'));
+      try {
+        const response = await fetch('/api/walk/route?' + params, { signal: current.signal });
+        const data = await response.json().catch(() => null);
+        if (routeRequest !== current) return;
+        if (!response.ok) throw new Error(data?.error || '경로를 불러오지 못했어요.');
+        if (!Array.isArray(data?.paths) || !data.paths.length
+          || !data.paths.every(path => Array.isArray(path) && path.length >= 2 && path.every(validCoords))
+          || !Number.isFinite(data.distance_m) || !Number.isFinite(data.duration_s)) {
+          throw new Error('표시할 도보 경로가 없어요.');
+        }
+        map.drawRoute(data.paths);
+        map.fit([...data.paths.flat(), ...orderedStops().filter(stop => stop.point).map(stop => stop.point.coords)]);
+        el('distance').textContent = data.distance_m >= 1000
+          ? (data.distance_m / 1000).toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + ' km'
+          : Math.round(data.distance_m).toLocaleString('ko-KR') + ' m';
+        el('duration').textContent = '약 ' + Math.ceil(data.duration_s / 60) + '분';
+        el('summary').hidden = false;
+        setRouteStatus('도보 경로를 지도에 표시했어요.');
+      } catch (error) {
+        if (routeRequest === current) setRouteStatus(error.message + ' 카카오맵에서도 경로를 확인할 수 있어요.', true);
+      } finally {
+        if (routeRequest === current) {
+          routeRequest = undefined;
+          el('route').disabled = false;
+        }
+      }
+    }
+
+    async function initialize() {
+      try {
+        const response = await fetch('/api/walk/config', { signal: AbortSignal.timeout(5000) });
+        if (response.ok) {
+          const config = await response.json();
+          if (config.map_key) {
+            map = await createKakaoMap(config.map_key);
+            routingEnabled = config.routing_enabled === true;
+          }
+        }
+      } catch {
+        mapElement.replaceChildren();
+      }
+      if (!map) {
+        try {
+          map = await createFallbackMap();
+        } catch {
+          mapStatus = '지도를 불러오지 못했어요. 좌표를 입력하거나 예시 코스를 선택하세요.';
+        }
+      }
+      mapLoaded = true;
+      render();
+      const coords = orderedStops().filter(stop => stop.point).map(stop => stop.point.coords);
+      if (coords.length === 1) map?.panTo(coords[0]);
+      if (coords.length >= 2) map?.fit(coords);
+    }
+
+    el('search').addEventListener('submit', findPlaces);
+    query.addEventListener('input', clearSearch);
+    el('add').addEventListener('click', () => setTarget(state.waypoints.length, true));
+    el('reset').addEventListener('click', () => {
+      clearRoute();
+      Object.assign(state, { start: null, end: null, waypoints: [] });
+      setTarget('start', true);
+    });
+    el('sample').addEventListener('click', () => {
+      clearRoute();
+      Object.assign(state, { start: sample[0], end: sample.at(-1), waypoints: sample.slice(1, -1) });
+      setTarget(null);
+      map?.fit(sample.map(point => point.coords));
+    });
+    el('route').addEventListener('click', findRoute);
+    el('map-center').addEventListener('click', () => { if (map) mapPick(map.center()); });
+    render();
+    initialize();
+  </script>
+</body>
+</html>

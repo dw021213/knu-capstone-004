@@ -181,6 +181,14 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - DB 완전 초기화(스키마 변경 시): `docker compose down -v && docker compose up -d`
 - Claude 데스크톱 미리보기: `.claude/launch.json`의 `jeju-risk-server`
 
+### 산책 코스 실행
+
+1. [카카오 디벨로퍼스 앱](https://developers.kakao.com/console/app)에서 카카오맵 API를 활성화한다. JavaScript 키의 SDK 도메인에 `http://localhost:8080` 또는 실제 접속 주소를 등록한다.
+2. `backend/.env.example`의 `KAKAO_MAP_JS_KEY`, `KAKAO_MAP_REST_KEY`를 서버 환경 변수로 설정하고 서버를 시작한다. 로컬에서 `backend/.env` 파일을 사용하면 `backend/`에서 `set -a; source .env; set +a`를 실행한 뒤 `go run ./cmd/server`를 실행한다.
+3. 격자 지도에서 **산책 코스**를 누르거나 <http://localhost:8080/walk>를 연다. 장소명·주소를 검색하거나 지도를 클릭해 출발지, 경유지(최대 5개), 도착지를 고르고 경로를 조회한다.
+
+JavaScript 키는 지도와 위치 검색에, REST 키는 서버의 도보 경로 요청에 사용한다. REST 키는 서버에서만 사용한다. 키 설정 전에는 지도에서 위치를 고르고 카카오맵에서 길찾기를 열 수 있다. 무료 쿼터는 개발자 계정에서 처음으로 카카오맵 API를 활성화한 앱에 적용된다. [카카오맵 사용 설정](https://developers.kakao.com/docs/ko/kakaomap/common), [도보 경로 API](https://developers.kakao.com/docs/ko/kakaomap/rest-api#route-walk)
+
 ### 검증 결과 (2026-10-07)
 - H3 res8 셀 **3,483개** (경계 걸침 포함, 우도 포함·추자도 없음), 격자 중심 (126.557, 33.382) = 한라산 부근 → 좌표 순서 정상
 - facility 24행, 전부 격자 안, `count_in_cell` 합 24
@@ -230,6 +238,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 다음 후보: 모델 점수와 실시간 요소(기상·혼잡도) 결합 방식 팀 합의 / 실시간 예측용 피처 생성(최신 사고 이력 공급 필요)
 
 ## 진행 로그
+- 2026-11-17: 격자 지도에 산책 코스 링크를 추가하고 `/walk`에서 위치 검색, 경유지 지정, 카카오 도보 경로 조회를 연결.
 - 2026-10-07: 로드맵 작성. Go 설치, Docker 실행, go.mod 생성, 경계 GeoJSON 다운로드, 119 CSV 작성(대정 주소 수정).
   Nominatim 1건 테스트 성공(제주 중앙로 342 → 33.4911, 126.5368). **다음: Step 0의 docker-compose부터.**
 - 2026-10-07: git 저장소 생성, 첫 커밋. 격자 = Uber H3 육각 격자임을 명시.

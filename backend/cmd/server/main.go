@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"jejurisk/internal/api"
 	"jejurisk/internal/db"
@@ -23,23 +24,35 @@ func main() {
 	}
 	defer pool.Close()
 
-	r := gin.Default()
-	r.Use(corsMiddleware())
-	(&api.Handler{DB: pool, Crowd: api.NewCrowdClient(), Population: api.NewPopulationClient()}).Register(r.Group("/api"))
-	// 확인용 지도 페이지. 코드가 자주 바뀌어서 브라우저가 옛 페이지를 캐시로 쓰지 않게 한다.
-	r.GET("/", func(c *gin.Context) {
-		c.Header("Cache-Control", "no-cache")
-		c.File("web/index.html")
-	})
-
 	addr := os.Getenv("SERVER_ADDR")
 	if addr == "" {
 		addr = ":8080"
 	}
 	log.Printf("listening on %s", addr)
-	if err := r.Run(addr); err != nil {
+	if err := newRouter(pool).Run(addr); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func newRouter(pool *pgxpool.Pool) *gin.Engine {
+	r := gin.New()
+	// 산책 경로 조회에 포함된 사용자 좌표를 요청 로그에 남기지 않는다.
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{SkipQueryString: true}), gin.Recovery())
+	r.Use(corsMiddleware())
+	apiRoutes := r.Group("/api")
+	(&api.Handler{DB: pool, Crowd: api.NewCrowdClient(), Population: api.NewPopulationClient()}).Register(apiRoutes)
+	api.NewWalkClient(os.Getenv("KAKAO_MAP_JS_KEY"), os.Getenv("KAKAO_MAP_REST_KEY")).Register(apiRoutes)
+
+	// 확인용 지도 페이지. 코드가 자주 바뀌어서 브라우저가 옛 페이지를 캐시로 쓰지 않게 한다.
+	r.GET("/", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-cache")
+		c.File("web/index.html")
+	})
+	r.GET("/walk", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-cache")
+		c.File("web/walk.html")
+	})
+	return r
 }
 
 // corsMiddleware 는 다른 주소에서 도는 프론트(D3 등)가 API 를 호출할 수 있게 한다.
