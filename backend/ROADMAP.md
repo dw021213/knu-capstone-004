@@ -402,6 +402,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   기상: 확률이라 환산 상수 불필요 → q′ = 1 − (1 − q)^배율. weather_rules **v5**: 지표 `temp_min_24h`, 규칙 `freeze`(≤0 주의보급·≤−2 경보급, 기존 가산 0),
   규칙별 `rate_ratio`(결빙 교통 1.12/1.35·넘어짐 1.33/1.58, 호우 1). 기존 지도 호우 +0.15 는 그대로(바꿀지 미결정). `etl weather-test freeze` 추가.
   남은 일: 등급·색 경계 미정 / 운영 반영(risks.json 업로드 → etl risk-v4) / 매일 예측은 입도객 CSV(로그인 필요) → run_daily.sh → etl risk-v4.
+- 2026-11-18: **운영 반영** — feat/backend 6238565 push, 서버 SSH 로 pull + `up -d --build server`. meta/grid 에 weather_rules_v5(결빙 규칙·rate_ratio) 확인, 기존 지도 가산은 그대로(호우 +0.15, 결빙 0). v4 는 risk_v4_run 비어 있어 `v4.status=none`(risks.json 업로드 + `etl risk-v4` 전).
 
 ## ▶ 현재 상태 요약 (2026-10-19, 이어서 작업할 때 여기부터)
 
@@ -414,7 +415,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - **운영**: https://jeju-risk.duckdns.org — Vultr 서울 vc2-1c-2gb($10/월) 158.247.200.215, root SSH 키(로컬 `~/.ssh/id_ed25519`, passphrase 있음, 키체인)
   - 서버 코드 `/root/knu-capstone-004`, `backend/deploy/docker-compose.prod.yml`(db+server+caddy), `.env` 서버에만
   - 자동 배포: `.github/workflows/backend-deploy.yml` — **main 에 backend/ 머지 시에만**, 서버 `/root/deploy-backend.sh`(origin/main), 시크릿 DEPLOY_SSH_KEY(로컬 `~/.ssh/jeju_deploy_actions`, 서버에서 스크립트만 실행 가능)
-  - ⚠️ 서버는 지금 feat/backend `e24e981` 상태(2026-11-09 SSH 수동 배포 + `etl drive-apply`). **feat/backend→main PR 머지 전에 Run workflow 누르면 main(5b0f6cc)으로 되돌아감** — 되돌아가도 DB 의 도로 주행시간은 남지만 fall 테이블·도로 필드 API 는 사라짐
+  - ⚠️ 서버는 지금 feat/backend `6238565` 상태(2026-11-18 SSH 수동 배포, weather_rules_v5 + v4 테이블 생성·데이터 없음). **feat/backend→main PR 머지 전에 Run workflow 누르면 main(5b0f6cc)으로 되돌아감** — 되돌아가도 DB 의 도로 주행시간은 남지만 fall 테이블·도로 필드·v4 API 는 사라짐
   - 데이터 변경 시: `scripts/db-dump.sh --deploy` → scp → DEPLOY.md 6번. Vultr 크레딧 $250 은 **2026-11-17 만료**
 - **문서**: 프론트용 `docs/FRONTEND_API.md`(맨 위 2026-10-17 변경 박스), 배포 `deploy/DEPLOY.md`, 분석 `analysis/calibration.py`
 - **남은 일**: PR(feat/backend→main) 머지 확인 / 프론트 api 모드 연결(VITE_DATA_MODE=api, VITE_API_BASE) / CORS_ORIGINS 를 팀 Vercel 주소로 제한 / 기상청 키 재발급 / ASOS 로 사고 시각 복원 후 시간 단위 재검증 / 프론트에 weather_alerts 표시 요청 / 백엔드 단위 테스트
