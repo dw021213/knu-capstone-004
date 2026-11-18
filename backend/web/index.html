@@ -87,7 +87,7 @@ async function getJSON(url) {
 }
 
 // 표시 모드: combined = 위험도(교통사고 도로 모델 + 기상 가산), compare = 시설 가산 기준 비교(실험), dummy = 백엔드 테스트용 더미
-const state = { mode: 'combined', v4kind: 'combined', v4: null, weather: true, meta: null, hour: null, date: null, wx: null, fall: null, features: [], cmp: null, cmpRes: new Map() };
+const state = { mode: 'combined', v4kind: 'combined', v4gh: false, v4: null, weather: true, meta: null, hour: null, date: null, wx: null, fall: null, features: [], cmp: null, cmpRes: new Map() };
 const pad2 = n => String(n).padStart(2, '0');
 // at(시각, KST) + 기상 가산 여부
 const slotQuery = () => `?at=${state.date}T${pad2(state.hour)}:00&weather=${state.weather ? 'on' : 'off'}`;
@@ -98,7 +98,8 @@ const NO_DATA_COLOR = '#bdbdbd';
 // 셀 색에 쓰는 0~1 값. 위험도는 셀 간 백분위(0~100, 기상 가산 반영)를 0~1 로. null 이면 "자료 없음".
 // v4 는 등급(1~5, 전체 기간 고정 경계)을 각 등급 구간 가운데 색으로.
 const V4_KINDS = { combined: '종합 (교통+넘어짐)', traffic: '교통사고', fall: '넘어짐·추락' };
-const v4Level = p => p['p_' + state.v4kind + '_level'];
+const v4Key = () => state.v4kind + (state.v4gh ? '_gh' : '');
+const v4Level = p => p['p_' + v4Key() + '_level'];
 const cellValue = p => state.mode === 'combined'
   ? (p.risk_percentile == null ? null : p.risk_percentile / 100)
   : state.mode === 'v4' ? (v4Level(p) == null ? null : (v4Level(p) - 0.5) / 5)
@@ -218,6 +219,7 @@ async function cellPopup(h3) {
       <tr><td>종합</td><td>${lv(v.combined_level)} · 지수 ${v.combined.toFixed(4)}${partial ? ' <span class="muted">(교통 없음 → 넘어짐만, 부분 지수)</span>' : ''}${wx ? ` <span class="muted">(기상 전 ${LEVEL_LABELS[v.combined_base_level]})</span>` : ''}</td></tr>
       <tr><td>교통사고</td><td>${v.traffic == null ? '<span class="muted">모델 없음 (위험 0 아님)</span>' : `${lv(v.traffic_level)} · ${pf(v.traffic)}${wx ? ` <span class="muted">← ${pf(v.traffic_base)} ×${rr.traffic}</span>` : ''}`}</td></tr>
       <tr><td>넘어짐·추락</td><td>${lv(v.fall_level)} · ${pf(v.fall)}${wx ? ` <span class="muted">← ${pf(v.fall_base)} ×${rr.fall}</span>` : ''}</td></tr>
+      <tr><td>골든아워</td><td>119+응급실 ${v.gh_minutes ?? '-'}분 → ×${v.gh_rr ?? 1}<br>반영 후 종합 ${lv(v.combined_gh_level)} · 지수 ${v.combined_gh?.toFixed(4) ?? '-'}</td></tr>
       <tr><td>기상</td><td>${!state.weather ? '<span class="muted">반영 끔</span>' : wx ? `<b>${alerts}</b> 배율 적용` : '<span class="muted">배율 없음 (×1)</span>'}<br><span class="muted">${w.name ?? ''} ${w.dist_m != null ? (w.dist_m / 1000).toFixed(1) + 'km' : ''}</span></td></tr>
       ${fireRows}
     </table><div class="muted" style="margin-top:4px">확률 = 그날 그 셀에 해당 출동 1건 이상일 추정치<br>예측일 ${v.prediction_date ?? '-'}${v.stale ? ' (그날 예측 없어 최근 것)' : ''}${v.fall_quality === 'partial_arrivals' ? ' · 입도객 일부 결측' : ''}</div></div>`;
@@ -290,7 +292,7 @@ async function main() {
     state.hour = m[2] != null ? +m[2] : 0;
   }
   if (qs.get('weather') === 'off') state.weather = false;
-  if (qs.get('mode') === 'v4') { state.mode = 'v4'; if (V4_KINDS[qs.get('v4')]) state.v4kind = qs.get('v4'); }
+  if (qs.get('mode') === 'v4') { state.mode = 'v4'; if (V4_KINDS[qs.get('v4')]) state.v4kind = qs.get('v4'); state.v4gh = qs.get('gh') === 'on'; }
   const [grid, fac] = await Promise.all([
     getJSON('/api/grid' + slotQuery()),
     getJSON('/api/facilities?type=fire_station'),
@@ -385,16 +387,16 @@ async function main() {
       return;
     }
     if (state.mode === 'v4') {
-      const v = state.v4 || {}, cuts = meta.v4?.levels?.cuts?.[state.v4kind] || [];
+      const v = state.v4 || {}, cuts = meta.v4?.levels?.cuts?.[v4Key()] || [];
       const pf = x => (x * 100).toPrecision(2) + '%';
       const rows = [5, 4, 3, 2, 1].map(l => `<div><i style="background:${scoreColor((l - 0.5) / 5)}"></i>${LEVEL_LABELS[l]} <span class="muted">${
         l === 5 ? '≥ ' + pf(cuts[3] ?? 0) : l === 1 ? '< ' + pf(cuts[0] ?? 0) : pf(cuts[l - 2] ?? 0) + ' ~'}</span></div>`).join('');
       const nWx = state.features.filter(f => { const r = f.properties.p_weather_rr; return r && (r.traffic !== 1 || r.fall !== 1); }).length;
-      div.innerHTML = `<h4>v4 ${V4_KINDS[state.v4kind]}</h4>` + rows +
+      div.innerHTML = `<h4>v4 ${V4_KINDS[state.v4kind]}${state.v4gh ? ' + 골든아워' : ''}</h4>` + rows +
         `<div><i style="background:${NO_DATA_COLOR}"></i>${state.v4kind === 'traffic' ? '교통 모델 없음' : '예측 없음'}</div>` +
         (state.v4kind === 'combined' ? `<div><i style="background:${scoreColor(0.1)};opacity:.4"></i>옅은 셀 = 교통 없음(부분 지수)</div>` : '') + fire +
         `<div class="muted" style="margin-top:6px">${v.status === 'ok' ? `예측일 ${v.prediction_date}${v.stale ? ' <b>(최근 예측)</b>' : ''}` : '<b>v4 예측 없음</b>'}<br>` +
-        `경계: 2013~2026 전체 ${meta.v4?.levels?.reference?.days ?? ''}일 분포 고정<br>${!state.weather ? '기상 반영 끔' : `기상 배율 적용 셀 ${nWx}개`}<br>${meta.v4?.levels?.version ?? ''} · 확률 추정, 2026 정확도 미검증</div>`;
+        (state.v4gh ? '골든아워: 119+응급실 편도 4→60분, ×1.00~1.25<br>' : '') + `경계: 2013~2026 전체 ${meta.v4?.levels?.reference?.days ?? ''}일 분포 고정<br>${!state.weather ? '기상 반영 끔' : `기상 배율 적용 셀 ${nWx}개`}<br>${meta.v4?.levels?.version ?? ''} · 확률 추정, 2026 정확도 미검증</div>`;
     } else if (state.mode === 'combined') {
       const traffic = meta.hazards.find(h => h.hazard === 'traffic');
       div.innerHTML = `<h4>${meta.legend}</h4>` + bar +
@@ -422,7 +424,8 @@ async function main() {
         <input type="range" id="hour" min="0" max="23" step="1"> <b id="hour-label"></b>
       </div>
       <label><input type="radio" name="mode" value="v4"> v4 보정 확률 등급</label>
-      <select id="v4kind" style="margin-left:6px"><option value="combined">종합</option><option value="traffic">교통사고</option><option value="fall">넘어짐·추락</option></select><br>
+      <select id="v4kind" style="margin-left:6px"><option value="combined">종합</option><option value="traffic">교통사고</option><option value="fall">넘어짐·추락</option></select>
+      <label style="margin-left:6px"><input type="checkbox" id="v4gh"> 골든아워</label><br>
       <label><input type="radio" name="mode" value="compare"> 시설 가산 비교 (실험)</label>
       <div class="cmp" id="cmp" hidden>
         <div class="row">모델 <select id="cmp-model"><option value="traffic">교통사고</option><option value="fall">넘어짐·추락</option></select>
@@ -454,14 +457,14 @@ async function main() {
     const off = state.mode === 'dummy';
     dateIn.disabled = hourIn.disabled = document.getElementById('now').disabled = off;
     wxBox.disabled = state.mode !== 'combined' && state.mode !== 'v4';
-    document.getElementById('v4kind').disabled = state.mode !== 'v4';
+    document.getElementById('v4kind').disabled = document.getElementById('v4gh').disabled = state.mode !== 'v4';
     document.getElementById('cmp').hidden = state.mode !== 'compare';
   };
   // 지금 보는 시각·설정을 주소에 남겨 새로고침·공유해도 같은 화면이 나오게 한다
   function syncURL() {
     const q = new URLSearchParams({ at: `${state.date}T${pad2(state.hour)}:00` });
     if (!state.weather) q.set('weather', 'off');
-    if (state.mode === 'v4') { q.set('mode', 'v4'); q.set('v4', state.v4kind); }
+    if (state.mode === 'v4') { q.set('mode', 'v4'); q.set('v4', state.v4kind); if (state.v4gh) q.set('gh', 'on'); }
     history.replaceState(null, '', '?' + q.toString());
   }
   const redraw = () => {
@@ -492,6 +495,9 @@ async function main() {
   v4sel.value = state.v4kind;
   document.querySelector(`input[name=mode][value=${state.mode}]`).checked = true;
   v4sel.addEventListener('change', () => { state.v4kind = v4sel.value; redraw(); });
+  const ghBox = document.getElementById('v4gh');
+  ghBox.checked = state.v4gh;
+  ghBox.addEventListener('change', () => { state.v4gh = ghBox.checked; redraw(); });
   document.querySelectorAll('input[name=mode]').forEach(el => el.addEventListener('change', () => {
     state.mode = el.value;
     redraw();

@@ -167,10 +167,19 @@ SELECT json_build_object(
       'p_fall_quality', p4.fall_quality,
       'p_weather_rr', CASE WHEN p4.scope IS NULL THEN NULL ELSE json_build_object('traffic', p4.rt, 'fall', p4.rf) END,
       -- v4 등급 1~5 ($15 = 전체 기간 고정 경계). 기상 반영 후 값 기준, *_base_level 은 반영 전
-      'p_traffic_level', v4_level(p4.t1, $15::jsonb -> 'traffic'),
-      'p_fall_level', v4_level(p4.f1, $15::jsonb -> 'fall'),
-      'p_combined_level', v4_level(COALESCE(p4.t1, 0) + p4.f1, $15::jsonb -> 'combined'),
-      'p_combined_base_level', v4_level(p4.c0, $15::jsonb -> 'combined'),
+      'p_traffic_level', v4_level(p4.t1, $15::jsonb -> 'cuts' -> 'traffic'),
+      'p_fall_level', v4_level(p4.f1, $15::jsonb -> 'cuts' -> 'fall'),
+      'p_combined_level', v4_level(COALESCE(p4.t1, 0) + p4.f1, $15::jsonb -> 'cuts' -> 'combined'),
+      'p_combined_base_level', v4_level(p4.c0, $15::jsonb -> 'cuts' -> 'combined'),
+      -- 골든아워(119 편도 + 응급실 편도) 반영: 출동 확률 × 중증 결과 배율. 순수 확률(p_*)과 별도
+      'p_gh_minutes', round(p4.tmin::numeric, 1),
+      'p_gh_rr', round(p4.grr::numeric, 4),
+      'p_traffic_gh', p4.tg,
+      'p_fall_gh', p4.fg,
+      'p_combined_gh', COALESCE(p4.tg, 0) + p4.fg,
+      'p_traffic_gh_level', v4_level(p4.tg, $15::jsonb -> 'cuts' -> 'traffic_gh'),
+      'p_fall_gh_level', v4_level(p4.fg, $15::jsonb -> 'cuts' -> 'fall_gh'),
+      'p_combined_gh_level', v4_level(COALESCE(p4.tg, 0) + p4.fg, $15::jsonb -> 'cuts' -> 'combined_gh'),
       'has_road', ht.available,
       'road_source', ht.detail->>'road_source',
       'facility_counts', COALESCE(fc.counts, '{}'::json),
@@ -196,7 +205,7 @@ LEFT JOIN cell_weather_station cw ON cw.h3_index = c.h3_index
 LEFT JOIN sf ON sf.h3_index = c.h3_index
 -- 넘어짐·추락: $11 예측 날짜 (교통사고 위험도와 섞지 않음)
 LEFT JOIN fall_score fs ON fs.h3_index = c.h3_index AND fs.prediction_date = $11::date
-` + v4SQL("c.h3_index", "cw.stn", "$7", "$13") + `
+` + v4SQL("c.h3_index", "cw.stn", "$7", "$13", "$15") + `
 -- 기상 가산: 셀의 지점 판별 결과($7: 지점번호 → {bonus, alerts, …})
 CROSS JOIN LATERAL (
   SELECT COALESCE(($7::jsonb -> cw.stn::text ->> 'bonus')::float8, 0) AS bonus,
@@ -319,10 +328,15 @@ SELECT json_build_object(
            'traffic_base', p4.t0, 'fall_base', p4.f0, 'combined_base', p4.c0,
            'scope', p4.scope, 'traffic_quality', p4.traffic_quality, 'fall_quality', p4.fall_quality,
            'weather_rr', jsonb_build_object('traffic', p4.rt, 'fall', p4.rf),
-           'traffic_level', v4_level(p4.t1, $11::jsonb -> 'traffic'),
-           'fall_level', v4_level(p4.f1, $11::jsonb -> 'fall'),
-           'combined_level', v4_level(COALESCE(p4.t1, 0) + p4.f1, $11::jsonb -> 'combined'),
-           'combined_base_level', v4_level(p4.c0, $11::jsonb -> 'combined')) || $10::jsonb END,
+           'traffic_level', v4_level(p4.t1, $11::jsonb -> 'cuts' -> 'traffic'),
+           'fall_level', v4_level(p4.f1, $11::jsonb -> 'cuts' -> 'fall'),
+           'combined_level', v4_level(COALESCE(p4.t1, 0) + p4.f1, $11::jsonb -> 'cuts' -> 'combined'),
+           'combined_base_level', v4_level(p4.c0, $11::jsonb -> 'cuts' -> 'combined'),
+           'gh_minutes', round(p4.tmin::numeric, 1), 'gh_rr', round(p4.grr::numeric, 4),
+           'traffic_gh', p4.tg, 'fall_gh', p4.fg, 'combined_gh', COALESCE(p4.tg, 0) + p4.fg,
+           'traffic_gh_level', v4_level(p4.tg, $11::jsonb -> 'cuts' -> 'traffic_gh'),
+           'fall_gh_level', v4_level(p4.fg, $11::jsonb -> 'cuts' -> 'fall_gh'),
+           'combined_gh_level', v4_level(COALESCE(p4.tg, 0) + p4.fg, $11::jsonb -> 'cuts' -> 'combined_gh')) || $10::jsonb END,
   -- 그 시각 셀의 기상 판별 (가장 가까운 AWS 지점)
   'weather', (SELECT jsonb_build_object('stn', cw.stn, 'dist_m', round(cw.dist_m::numeric)) || $4::jsonb
                      || COALESCE($3::jsonb -> cw.stn::text, '{}'::jsonb)
@@ -349,7 +363,7 @@ SELECT json_build_object(
 )
 FROM h3_cell c
 LEFT JOIN cell_weather_station cw0 ON cw0.h3_index = c.h3_index
-` + v4SQL("c.h3_index", "cw0.stn", "$3", "$9") + `
+` + v4SQL("c.h3_index", "cw0.stn", "$3", "$9", "$11") + `
 WHERE c.h3_index = $1`
 
 // GET /api/cells/:h3?at=&weather=&safety=

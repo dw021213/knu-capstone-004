@@ -43,17 +43,28 @@ func (h *Handler) v4For(c *gin.Context, at time.Time) (date *string, info gin.H,
 
 // v4SQL 은 셀 c, 기상 판별 JSON(지점번호 → {rate_ratio, …}) wx, 예측 날짜 d 로 v4 확률(기상 반영 전·후)을 계산하는 LATERAL 조각.
 // 기상 반영: q′ = 1 − (1 − q)^배율 (그날 출동 건수가 배율만큼 늘 때 '1건 이상' 확률). 교통 모델 없는 셀은 교통 null, 합산은 넘어짐만.
-func v4SQL(cell, stn, wx, d string) string {
+func v4SQL(cell, stn, wx, d, cfg string) string {
 	return `LEFT JOIN LATERAL (
   SELECT v.traffic_prob AS t0, v.fall_prob AS f0, v.combined_index AS c0, v.index_scope AS scope,
-         v.traffic_quality, v.fall_quality, r.rt, r.rf,
+         v.traffic_quality, v.fall_quality, r.rt, r.rf, g.tmin, g.grr,
          CASE WHEN r.rt = 1 THEN v.traffic_prob ELSE 1 - power(1 - v.traffic_prob, r.rt) END AS t1,
-         CASE WHEN r.rf = 1 THEN v.fall_prob ELSE 1 - power(1 - v.fall_prob, r.rf) END AS f1
+         CASE WHEN r.rf = 1 THEN v.fall_prob ELSE 1 - power(1 - v.fall_prob, r.rf) END AS f1,
+         1 - power(1 - v.traffic_prob, r.rt * g.grr) AS tg,
+         1 - power(1 - v.fall_prob, r.rf * g.grr) AS fg
   FROM risk_v4_score v
   CROSS JOIN LATERAL (
     SELECT COALESCE((` + wx + `::jsonb -> ` + stn + `::text -> 'rate_ratio' ->> 'traffic')::float8, 1) AS rt,
            COALESCE((` + wx + `::jsonb -> ` + stn + `::text -> 'rate_ratio' ->> 'fall')::float8, 1) AS rf
   ) r
+  -- 골든아워: T = 119 편도 + 응급실 편도 (분), 배율 = rr^((clamp(T, t0, t1) − t0)/10). T 없으면 배율 1
+  CROSS JOIN LATERAL (
+    SELECT x.tmin, COALESCE(power((` + cfg + `::jsonb -> 'gh' ->> 'rr')::float8,
+             (LEAST(GREATEST(x.tmin, (` + cfg + `::jsonb -> 'gh' ->> 't0')::float8), (` + cfg + `::jsonb -> 'gh' ->> 't1')::float8)
+              - (` + cfg + `::jsonb -> 'gh' ->> 't0')::float8) / 10), 1) AS grr
+    FROM (SELECT sum(nearest_drive_min) AS tmin FROM cell_facility_stat
+          WHERE h3_index = ` + cell + ` AND type IN ('fire_station', 'er') HAVING count(nearest_drive_min) = 2) x
+    RIGHT JOIN (SELECT 1) one ON true
+  ) g
   WHERE v.h3_index = ` + cell + ` AND v.prediction_date = ` + d + `::date
 ) p4 ON true`
 }
@@ -68,13 +79,14 @@ type v4Levels struct {
 	Levels      []map[string]any     `json:"levels"`
 	Cuts        map[string][]float64 `json:"cuts"`
 	CutsNote    string               `json:"cuts_note"`
+	GoldenHour  map[string]any       `json:"golden_hour"`
 	JSON        string               `json:"-"` // SQL 로 넘기는 cuts JSON (경로가 비면 "{}" → 등급 null)
 }
 
 // v4Cuts 는 요청마다 등급 경계를 읽는다(파일 수정 즉시 반영). 경계는 오름차순 4개여야 한다.
 func (h *Handler) v4Cuts() (*v4Levels, error) {
 	if h.V4LevelsPath == "" {
-		return &v4Levels{Version: "none", JSON: "{}"}, nil
+		return &v4Levels{Version: "none", JSON: `{"cuts":{},"gh":{"t0":4,"t1":60,"rr":1}}`}, nil
 	}
 	b, err := os.ReadFile(h.V4LevelsPath)
 	if err != nil {
@@ -84,7 +96,7 @@ func (h *Handler) v4Cuts() (*v4Levels, error) {
 	if err := json.Unmarshal(b, &l); err != nil {
 		return nil, err
 	}
-	for _, k := range []string{"traffic", "fall", "combined"} {
+	for _, k := range []string{"traffic", "fall", "combined", "traffic_gh", "fall_gh", "combined_gh"} {
 		c := l.Cuts[k]
 		if len(c) != 4 {
 			return nil, fmt.Errorf("cuts.%s 는 4개여야 한다 (%d개)", k, len(c))
@@ -95,7 +107,15 @@ func (h *Handler) v4Cuts() (*v4Levels, error) {
 			}
 		}
 	}
-	j, _ := json.Marshal(l.Cuts)
+	for _, k := range []string{"t0_min", "t1_min", "rr_per_10min"} {
+		if v, ok := l.GoldenHour[k].(float64); !ok || v <= 0 {
+			return nil, fmt.Errorf("golden_hour.%s 가 없거나 0 이하", k)
+		}
+	}
+	if l.GoldenHour["t1_min"].(float64) <= l.GoldenHour["t0_min"].(float64) {
+		return nil, fmt.Errorf("golden_hour.t1_min 은 t0_min 보다 커야 한다")
+	}
+	j, _ := json.Marshal(gin.H{"cuts": l.Cuts, "gh": gin.H{"t0": l.GoldenHour["t0_min"], "t1": l.GoldenHour["t1_min"], "rr": l.GoldenHour["rr_per_10min"]}})
 	l.JSON = string(j)
 	return &l, nil
 }
@@ -137,12 +157,17 @@ func (h *Handler) v4Meta(c *gin.Context) gin.H {
 			"p_fall_quality":        "넘어짐 입력 품질 (partial_arrivals = 입도객 일부 결측, 숨기지 말고 표시)",
 			"p_*_level":             "등급 1~5 (1 매우 낮음 … 5 매우 높음). 기상 반영 후 값을 전체 기간 고정 경계(levels.cuts)와 비교. 교통 없는 셀은 p_traffic_level null",
 			"p_combined_base_level": "기상 반영 전 종합 등급",
+			"p_*_gh":                "골든아워 반영 (출동 확률 × 중증 결과 배율, 순수 확률 아님). 1 − (1 − q)^(기상 배율 × 골든아워 배율)",
+			"p_*_gh_level":          "골든아워 반영 값의 등급 (levels.cuts.*_gh, 같은 참조 분포에 셀별 배율을 곱해 낸 고정 경계)",
+			"p_gh_minutes":          "T = 119 편도 + 응급실 편도 도로 주행시간(분)",
+			"p_gh_rr":               "골든아워 배율 1.04^((min(max(T,4),60) − 4)/10), ×1.00~×1.25",
 		},
 		"formula": "q교통 = sigmoid(1.0303·logit(t) − 2.9617), q넘어짐 = sigmoid(0.8965·logit(f) − 1.2038), 종합 = q교통 + q넘어짐. 기상: q′ = 1 − (1 − q)^배율",
 		"date":    "at 날짜(KST)의 예측을 쓰고, 없으면 그 전 최근 예측 + v4.stale=true",
 		"notes": []string{
 			"기존 risk_*(교통 도로 백분위)·fall_*(넘어짐 백분위)와 섞지 않는다. 색은 p_*_level(고정 경계) 을 쓸 것",
 			"등급 경계는 2013-01-30~2026-11-04 모든 날짜 v4 예측(기상 반영 전) 분포의 10·30·70·90 백분위로 고정. 날마다 다시 줄 세우지 않으므로 결빙 배율이 붙으면 등급이 오른다",
+			"골든아워(119+응급실): Gauss 2019 중증외상 10분 지연당 사망 OR 1.04, 4→60분. 사고 빈도가 아니라 결과 심각도 쪽이라 p_* 와 별도 *_gh 필드로만 낸다",
 			"fall_only_partial 셀의 p_combined_level 은 교통이 빠진 부분 지수라 낮게 나올 수 있다(빗금 등으로 구분 권장)",
 			"종합 위험지수는 확률이 아니다. 0.6 + 0.6 = 1.2 가 정상이며 1 로 자르지 않는다",
 			"기상 배율은 7년(2011~2015·2020·2021) 구급출동 × AWS 분석(관측소×월 비교). 호우는 1(근거 없음), 결빙(최근 24시간 최저 ≤0℃ / ≤−2℃)은 교통 ×1.12/×1.35, 넘어짐 ×1.33/×1.58",
