@@ -1,7 +1,10 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -55,6 +58,48 @@ func v4SQL(cell, stn, wx, d string) string {
 ) p4 ON true`
 }
 
+// v4Levels 는 config/v4_levels.json (전체 기간 고정 등급 경계).
+type v4Levels struct {
+	Version     string               `json:"version"`
+	ModelID     string               `json:"model_id"`
+	Method      string               `json:"method"`
+	Reference   map[string]any       `json:"reference"`
+	Percentiles []float64            `json:"percentiles"`
+	Levels      []map[string]any     `json:"levels"`
+	Cuts        map[string][]float64 `json:"cuts"`
+	CutsNote    string               `json:"cuts_note"`
+	JSON        string               `json:"-"` // SQL 로 넘기는 cuts JSON (경로가 비면 "{}" → 등급 null)
+}
+
+// v4Cuts 는 요청마다 등급 경계를 읽는다(파일 수정 즉시 반영). 경계는 오름차순 4개여야 한다.
+func (h *Handler) v4Cuts() (*v4Levels, error) {
+	if h.V4LevelsPath == "" {
+		return &v4Levels{Version: "none", JSON: "{}"}, nil
+	}
+	b, err := os.ReadFile(h.V4LevelsPath)
+	if err != nil {
+		return nil, err
+	}
+	var l v4Levels
+	if err := json.Unmarshal(b, &l); err != nil {
+		return nil, err
+	}
+	for _, k := range []string{"traffic", "fall", "combined"} {
+		c := l.Cuts[k]
+		if len(c) != 4 {
+			return nil, fmt.Errorf("cuts.%s 는 4개여야 한다 (%d개)", k, len(c))
+		}
+		for i := 1; i < len(c); i++ {
+			if !(c[i] > c[i-1]) {
+				return nil, fmt.Errorf("cuts.%s 가 오름차순이 아니다", k)
+			}
+		}
+	}
+	j, _ := json.Marshal(l.Cuts)
+	l.JSON = string(j)
+	return &l, nil
+}
+
 // v4Meta 는 /api/risk/meta 의 v4 항목.
 func (h *Handler) v4Meta(c *gin.Context) gin.H {
 	type run struct {
@@ -74,23 +119,31 @@ func (h *Handler) v4Meta(c *gin.Context) gin.H {
 	if err != nil {
 		return gin.H{"error": err.Error()}
 	}
+	levels, err := h.v4Cuts()
+	if err != nil {
+		return gin.H{"error": "v4 등급 경계: " + err.Error()}
+	}
 	return gin.H{
-		"label": "교통·넘어짐 보정 확률 (v4)",
-		"runs":  runs,
+		"label":  "교통·넘어짐 보정 확률 (v4)",
+		"runs":   runs,
+		"levels": levels,
 		"fields": map[string]string{
-			"p_traffic":       "교통사고 출동이 그날 그 셀에 1건 이상 있을 확률 추정 (0~1, 기상 반영). 교통 모델 없는 셀은 null(위험 0 아님)",
-			"p_fall":          "넘어짐·추락 출동 1건 이상 확률 추정 (0~1, 기상 반영)",
-			"p_combined":      "p_traffic + p_fall (0~2 종합 위험지수, 확률 아님). 교통 없는 셀은 p_fall 만(부분 지수)",
-			"p_*_base":        "기상 반영 전 (모델 전달값 그대로)",
-			"p_scope":         "traffic_and_fall | fall_only_partial",
-			"p_weather_rr":    "그 셀 지점의 기상 사고 배율 {traffic, fall} (1 = 영향 없음)",
-			"p_fall_quality":  "넘어짐 입력 품질 (partial_arrivals = 입도객 일부 결측, 숨기지 말고 표시)",
-			"p_traffic_level": "없음 — 등급·색 경계는 아직 정하지 않았다(전달본도 자동 등급을 만들지 않음)",
+			"p_traffic":             "교통사고 출동이 그날 그 셀에 1건 이상 있을 확률 추정 (0~1, 기상 반영). 교통 모델 없는 셀은 null(위험 0 아님)",
+			"p_fall":                "넘어짐·추락 출동 1건 이상 확률 추정 (0~1, 기상 반영)",
+			"p_combined":            "p_traffic + p_fall (0~2 종합 위험지수, 확률 아님). 교통 없는 셀은 p_fall 만(부분 지수)",
+			"p_*_base":              "기상 반영 전 (모델 전달값 그대로)",
+			"p_scope":               "traffic_and_fall | fall_only_partial",
+			"p_weather_rr":          "그 셀 지점의 기상 사고 배율 {traffic, fall} (1 = 영향 없음)",
+			"p_fall_quality":        "넘어짐 입력 품질 (partial_arrivals = 입도객 일부 결측, 숨기지 말고 표시)",
+			"p_*_level":             "등급 1~5 (1 매우 낮음 … 5 매우 높음). 기상 반영 후 값을 전체 기간 고정 경계(levels.cuts)와 비교. 교통 없는 셀은 p_traffic_level null",
+			"p_combined_base_level": "기상 반영 전 종합 등급",
 		},
 		"formula": "q교통 = sigmoid(1.0303·logit(t) − 2.9617), q넘어짐 = sigmoid(0.8965·logit(f) − 1.2038), 종합 = q교통 + q넘어짐. 기상: q′ = 1 − (1 − q)^배율",
 		"date":    "at 날짜(KST)의 예측을 쓰고, 없으면 그 전 최근 예측 + v4.stale=true",
 		"notes": []string{
-			"기존 risk_*(교통 도로 백분위)·fall_*(넘어짐 백분위)와 섞지 않는다. 백분위 색 경계를 이 확률에 그대로 쓰지 말 것",
+			"기존 risk_*(교통 도로 백분위)·fall_*(넘어짐 백분위)와 섞지 않는다. 색은 p_*_level(고정 경계) 을 쓸 것",
+			"등급 경계는 2013-01-30~2026-11-04 모든 날짜 v4 예측(기상 반영 전) 분포의 10·30·70·90 백분위로 고정. 날마다 다시 줄 세우지 않으므로 결빙 배율이 붙으면 등급이 오른다",
+			"fall_only_partial 셀의 p_combined_level 은 교통이 빠진 부분 지수라 낮게 나올 수 있다(빗금 등으로 구분 권장)",
 			"종합 위험지수는 확률이 아니다. 0.6 + 0.6 = 1.2 가 정상이며 1 로 자르지 않는다",
 			"기상 배율은 7년(2011~2015·2020·2021) 구급출동 × AWS 분석(관측소×월 비교). 호우는 1(근거 없음), 결빙(최근 24시간 최저 ≤0℃ / ≤−2℃)은 교통 ×1.12/×1.35, 넘어짐 ×1.33/×1.58",
 			"2026년 실제 정확도는 검증되지 않았다 (보정 학습 2020, 2021 비교 포착률 78%)",

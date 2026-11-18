@@ -21,6 +21,7 @@ type Handler struct {
 	DB               *pgxpool.Pool
 	WeatherRulesPath string // config/weather_rules.json (요청마다 읽어 수정 즉시 반영)
 	SafetyRulesPath  string // config/safety_rules.json (요청마다 읽음, 비우면 안전시설 지수 끔)
+	V4LevelsPath     string // config/v4_levels.json (요청마다 읽음, 비우면 v4 등급 null)
 }
 
 func (h *Handler) Register(r gin.IRouter) {
@@ -165,6 +166,11 @@ SELECT json_build_object(
       'p_scope', p4.scope,
       'p_fall_quality', p4.fall_quality,
       'p_weather_rr', CASE WHEN p4.scope IS NULL THEN NULL ELSE json_build_object('traffic', p4.rt, 'fall', p4.rf) END,
+      -- v4 등급 1~5 ($15 = 전체 기간 고정 경계). 기상 반영 후 값 기준, *_base_level 은 반영 전
+      'p_traffic_level', v4_level(p4.t1, $15::jsonb -> 'traffic'),
+      'p_fall_level', v4_level(p4.f1, $15::jsonb -> 'fall'),
+      'p_combined_level', v4_level(COALESCE(p4.t1, 0) + p4.f1, $15::jsonb -> 'combined'),
+      'p_combined_base_level', v4_level(p4.c0, $15::jsonb -> 'combined'),
       'has_road', ht.available,
       'road_source', ht.detail->>'road_source',
       'facility_counts', COALESCE(fc.counts, '{}'::json),
@@ -236,8 +242,14 @@ func (h *Handler) grid(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "v4 확률: " + err.Error()})
 		return
 	}
+	cuts, err := h.v4Cuts()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "v4 등급 경계: " + err.Error()})
+		return
+	}
+	vInfo["levels_version"] = cuts.Version
 	vinfo, _ := json.Marshal(vInfo)
-	args := []any{nil, nil, nil, nil, Version, riskLegend, string(wx), string(info), string(sp), string(sinfo), fd, string(finfo), vd, string(vinfo)}
+	args := []any{nil, nil, nil, nil, Version, riskLegend, string(wx), string(info), string(sp), string(sinfo), fd, string(finfo), vd, string(vinfo), cuts.JSON}
 	if s := c.Query("bbox"); s != "" {
 		parts := strings.Split(s, ",")
 		if len(parts) != 4 {
@@ -306,7 +318,11 @@ SELECT json_build_object(
            'traffic', p4.t1, 'fall', p4.f1, 'combined', COALESCE(p4.t1, 0) + p4.f1,
            'traffic_base', p4.t0, 'fall_base', p4.f0, 'combined_base', p4.c0,
            'scope', p4.scope, 'traffic_quality', p4.traffic_quality, 'fall_quality', p4.fall_quality,
-           'weather_rr', jsonb_build_object('traffic', p4.rt, 'fall', p4.rf)) || $10::jsonb END,
+           'weather_rr', jsonb_build_object('traffic', p4.rt, 'fall', p4.rf),
+           'traffic_level', v4_level(p4.t1, $11::jsonb -> 'traffic'),
+           'fall_level', v4_level(p4.f1, $11::jsonb -> 'fall'),
+           'combined_level', v4_level(COALESCE(p4.t1, 0) + p4.f1, $11::jsonb -> 'combined'),
+           'combined_base_level', v4_level(p4.c0, $11::jsonb -> 'combined')) || $10::jsonb END,
   -- 그 시각 셀의 기상 판별 (가장 가까운 AWS 지점)
   'weather', (SELECT jsonb_build_object('stn', cw.stn, 'dist_m', round(cw.dist_m::numeric)) || $4::jsonb
                      || COALESCE($3::jsonb -> cw.stn::text, '{}'::jsonb)
@@ -365,9 +381,15 @@ func (h *Handler) cell(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "v4 확률: " + err.Error()})
 		return
 	}
+	cuts, err := h.v4Cuts()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "v4 등급 경계: " + err.Error()})
+		return
+	}
+	vInfo["levels_version"] = cuts.Version
 	vinfo, _ := json.Marshal(vInfo)
 	var raw []byte
-	err = h.DB.QueryRow(c, cellSQL, c.Param("h3"), Version, string(wx), string(info), string(sp), string(sinfo), fd, string(finfo), vd, string(vinfo)).Scan(&raw)
+	err = h.DB.QueryRow(c, cellSQL, c.Param("h3"), Version, string(wx), string(info), string(sp), string(sinfo), fd, string(finfo), vd, string(vinfo), cuts.JSON).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "격자에 없는 셀"})
 		return

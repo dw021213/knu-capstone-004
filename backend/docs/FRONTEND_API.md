@@ -8,6 +8,12 @@
 - CORS 허용 (운영에서는 `CORS_ORIGINS` 에 프론트 주소를 넣는다)
 - 좌표는 GeoJSON 표준 **[경도, 위도]**
 
+> **2026-11-18 추가 — v4 등급 `p_*_level` (전체 기간 고정 경계)**
+> `/api/grid` 에 `p_traffic_level`·`p_fall_level`·`p_combined_level`(기상 반영 후)·`p_combined_base_level`(반영 전), 1~5 (1 매우 낮음 · 2 낮음 · 3 보통 · 4 높음 · 5 매우 높음). **v4 색은 이 값으로 칠한다.**
+> 경계는 2013-01-30~2026-11-04 **모든 날짜**의 v4 예측(5,027일) 분포 10·30·70·90 백분위로 **고정** — 날마다 다시 줄 세우지 않으므로 결빙 배율이 붙거나 관광객이 많은 날엔 높은 등급 셀이 늘어난다.
+> 경계값은 `/api/risk/meta` → `v4.levels.cuts` (`config/v4_levels.json`). `/api/cells` 의 `v4` 에는 `traffic_level`·`fall_level`·`combined_level`·`combined_base_level`.
+> `p_scope = fall_only_partial` 셀의 `p_combined_level` 은 교통이 빠진 부분 지수라 낮게 나올 수 있다 → 빗금·테두리 등으로 구분 권장. 교통 없는 셀의 `p_traffic_level` 은 `null`.
+
 > **2026-11-17 추가 — 교통·넘어짐 보정 확률 v4 (기존 값 변화 없음)**
 > ML 전달본 `jeju-risk-backend-v4` 의 확률을 **새 필드 `p_*`** 로 내려준다. 기존 `risk_*`(교통 백분위)·`fall_*`(넘어짐 백분위)는 그대로.
 >
@@ -24,7 +30,7 @@
 > 최상위 `v4` = `{status, prediction_date, stale, model_id, data_quality}`. `at` 날짜 예측이 없으면 그 전 최근 예측 + `stale=true`. 하나도 없으면 `status:"none"` 이고 `p_*` 는 모두 `null`.
 > `/api/cells/{h3}` 에는 `v4` 객체(`traffic`, `fall`, `combined`, `*_base`, `scope`, `weather_rr` + 위 요약).
 > 기상 반영: 확률 q → `1 − (1 − q)^배율`. 배율은 7년 구급출동 분석 — **결빙**(최근 24시간 최저 ≤0℃: 교통 ×1.12·넘어짐 ×1.33, ≤−2℃: ×1.35·×1.58). 호우는 1(근거 없음).
-> 확률 값이 아주 작다(셀 대부분 0.001~0.08). **등급·색 경계는 아직 정하지 않았다** — 백분위용 경계(10/30/70/90)를 그대로 쓰지 말 것. 이름은 '종합 위험지수'로 표시하고 '사고 확률 %' 로 쓰지 않는다.
+> 확률 값이 아주 작다(셀 대부분 0.001~0.08). 등급·색은 `p_*_level`(위 2026-11-18 박스)을 쓴다 — 확률 값에 백분위용 경계(10/30/70/90)를 직접 대지 말 것. 이름은 '종합 위험지수'로 표시하고 '사고 확률 %' 로 쓰지 않는다.
 
 > **2026-11-09 변경 — 안전시설 지수에서 CCTV 제외, 주행시간 실제 도로 기준**
 > `safety_score` 는 경찰서·편의점·119·응급실 **4종**(각 0.25) 평균, `safety_detail` 에 `cctv` 키가 없다(CCTV 자료 지역별 누락이 커서). CCTV 마커(`/api/facilities?type=cctv`)는 그대로.

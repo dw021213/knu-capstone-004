@@ -18,3 +18,8 @@ var DriveTimeOSRM string
 //
 //go:embed 015_risk_v4.sql
 var RiskV4 string
+
+// V4Levels 는 016_v4_levels.sql. v4 확률을 고정 경계로 등급(1~5)으로 바꾸는 함수.
+//
+//go:embed 016_v4_levels.sql
+var V4Levels string

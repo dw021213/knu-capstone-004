@@ -403,6 +403,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
   규칙별 `rate_ratio`(결빙 교통 1.12/1.35·넘어짐 1.33/1.58, 호우 1). 기존 지도 호우 +0.15 는 그대로(바꿀지 미결정). `etl weather-test freeze` 추가.
   남은 일: 등급·색 경계 미정 / 운영 반영(risks.json 업로드 → etl risk-v4) / 매일 예측은 입도객 CSV(로그인 필요) → run_daily.sh → etl risk-v4.
 - 2026-11-18: **운영 반영** — feat/backend 6238565 push, 서버 SSH 로 pull + `up -d --build server`. meta/grid 에 weather_rules_v5(결빙 규칙·rate_ratio) 확인, 기존 지도 가산은 그대로(호우 +0.15, 결빙 0). v4 는 risk_v4_run 비어 있어 `v4.status=none`(risks.json 업로드 + `etl risk-v4` 전).
+- 2026-11-18: **v4 등급 고정 경계** (`config/v4_levels.json`, `v4_level()` 016, `analysis/v4_levels_reference.py`). 2013-01-30~2026-11-04 전체 5,027일 v4 예측(공간 입력 2026 고정, 공휴일 python-holidays) 분포 10·30·70·90 백분위. 2011~2012 는 입도객 자료 없어 제외. 2026만으로 낸 경계와 거의 같음(종합 c90 0.01329 vs 0.01346). 연도별 최상위 등급 비율 9.7~10.7% — 날짜 차이는 작고 결빙 배율이 등급을 크게 움직임. 교통은 날짜 무관.
 
 ## ▶ 현재 상태 요약 (2026-10-19, 이어서 작업할 때 여기부터)
 

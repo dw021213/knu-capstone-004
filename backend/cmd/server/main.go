@@ -41,10 +41,14 @@ func main() {
 	if _, err := pool.Exec(context.Background(), migrations.RiskV4); err != nil {
 		log.Fatalf("risk v4 스키마: %v", err)
 	}
+	// v4 등급 함수 (016)
+	if _, err := pool.Exec(context.Background(), migrations.V4Levels); err != nil {
+		log.Fatalf("v4 등급 함수: %v", err)
+	}
 
 	r := gin.Default()
 	r.Use(corsMiddleware())
-	(&api.Handler{DB: pool, WeatherRulesPath: "config/weather_rules.json", SafetyRulesPath: "config/safety_rules.json"}).Register(r.Group("/api"))
+	(&api.Handler{DB: pool, WeatherRulesPath: "config/weather_rules.json", SafetyRulesPath: "config/safety_rules.json", V4LevelsPath: "config/v4_levels.json"}).Register(r.Group("/api"))
 	startWeatherPoller(pool)
 	// 확인용 지도 페이지. 코드가 자주 바뀌어서 브라우저가 옛 페이지를 캐시로 쓰지 않게 한다.
 	r.GET("/", func(c *gin.Context) {
