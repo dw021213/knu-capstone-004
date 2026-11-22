@@ -11,6 +11,14 @@ declare global {
       revealDone(): number | null;
       /** 맞춤(focus)·reveal로 옮기는 중이 아니면 true */
       idle(): boolean;
+      /** 지금 그린 코스 장소 핀(페이지 좌표) */
+      pins(): {
+        x: number;
+        y: number;
+        label: string;
+        kind: 'stop' | 'result' | 'draft';
+        active: boolean;
+      }[];
       /** 지금 그린 코스 구간 수, 주의 지점, 시작·끝 표지(페이지 좌표) */
       route(): {
         lines: number;

@@ -1,0 +1,278 @@
+/* 편집 시트(모바일 아래, 데스크톱 오른쪽 패널) 안에서 편집 화면 대신 보이는 검색 결과·장소 카드 */
+.results {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.head {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-s);
+  font-weight: 400;
+  word-break: keep-all;
+}
+
+.head strong {
+  font-weight: 700;
+}
+
+.note {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink2);
+  word-break: keep-all;
+}
+
+.status {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-s);
+  font-size: var(--text-s);
+  color: var(--ink2);
+  word-break: keep-all;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.row[aria-current='true'] {
+  background: var(--surf);
+}
+
+.rowMain {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: var(--touch);
+  padding: var(--space-2) var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowMain:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+/* 지도 결과 표지(MapView .pin[data-kind='result'])와 같은 모양 */
+.letter {
+  flex-shrink: 0;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--space-1);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--white);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 19px;
+  text-align: center;
+}
+
+.letter[data-active] {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.rowBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rowName {
+  font-size: var(--text-s);
+  font-weight: 700;
+  word-break: keep-all;
+}
+
+.rowMeta {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--ink2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add {
+  flex-shrink: 0;
+  min-width: 56px;
+  min-height: 36px;
+  margin-right: var(--space-1);
+  padding: 0 var(--space-3);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.add:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--white);
+}
+
+.add:disabled {
+  border-color: var(--line);
+  color: var(--ink2);
+  cursor: default;
+}
+
+.add:focus-visible,
+.pageButton:focus-visible,
+.close:focus-visible,
+.primary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 0;
+}
+
+.pageButton {
+  min-height: var(--touch);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pageButton:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
+
+.pageNo {
+  font-size: var(--text-xs);
+  color: var(--ink2);
+}
+
+/* 장소 카드는 모바일에서 지도 표지를 눌렀을 때만(데스크톱은 목록 줄 강조로 충분하다) */
+.cardView {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .results[data-card] .listView {
+    display: none;
+  }
+
+  .results[data-card] .cardView {
+    display: block;
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cardName {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-m);
+  font-weight: 700;
+  word-break: keep-all;
+}
+
+.cardMeta {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-s);
+  color: var(--ink2);
+  word-break: keep-all;
+}
+
+.blocked {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.close {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch);
+  height: var(--touch);
+  margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.close svg {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.close:hover {
+  background: var(--surf);
+}
+
+.primary {
+  min-height: var(--touch);
+  margin-top: var(--space-2);
+  padding: 0 var(--space-6);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--ink);
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-s);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary:disabled {
+  opacity: var(--disabled-opacity);
+  cursor: default;
+}
