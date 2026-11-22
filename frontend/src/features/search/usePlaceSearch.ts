@@ -70,6 +70,8 @@ export interface Results {
   items: Candidate[];
   /** 전체 결과 수 */
   total: number;
+  /** 카카오가 넘겨 주는 상한(45건)에 닿아 실제로는 더 있을 수 있음 */
+  capped: boolean;
   /** 넘길 수 있는 마지막 쪽 */
   pages: number;
   loading: boolean;
@@ -87,15 +89,17 @@ export function useResults(
   const q = query?.trim() ?? '';
   const kakaoOn = useKakaoOn();
   const remote = useQuery(kakaoQuery(q, page, query !== null && kakaoOn));
-  if (!q) return { items: [], total: 0, pages: 1, loading: false };
+  if (!q) return { items: [], total: 0, capped: false, pages: 1, loading: false };
   const localHits = searchLocal(local, q, KAKAO_PAGE_SIZE);
   if (kakaoOn && q.length >= KAKAO_MIN) {
-    if (!remote.data) return { items: [], total: 0, pages: 1, loading: true };
+    if (!remote.data) return { items: [], total: 0, capped: false, pages: 1, loading: true };
     const { places, total } = remote.data;
     if (places.length > 0 || page > 1) {
       const pages = Math.min(KAKAO_MAX_PAGE, Math.max(1, Math.ceil(total / KAKAO_PAGE_SIZE)));
-      return { items: places.map(fromKakao), total, pages, loading: false };
+      // 카카오 SDK의 totalCount는 실제 수가 아니라 넘겨 줄 수 있는 수(최대 45)다
+      const capped = total >= KAKAO_PAGE_SIZE * KAKAO_MAX_PAGE;
+      return { items: places.map(fromKakao), total, capped, pages, loading: false };
     }
   }
-  return { items: localHits, total: localHits.length, pages: 1, loading: false };
+  return { items: localHits, total: localHits.length, capped: false, pages: 1, loading: false };
 }

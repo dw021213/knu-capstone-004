@@ -16,7 +16,7 @@ export interface KakaoPlace {
 
 export interface KakaoPage {
   places: KakaoPlace[];
-  /** 제주 범위 안 전체 결과 수(카카오는 이 가운데 앞 45건까지만 준다) */
+  /** 제주 범위 안 결과 수. 카카오 SDK는 넘겨 줄 수 있는 앞 45건까지만 센다 */
   total: number;
 }
 

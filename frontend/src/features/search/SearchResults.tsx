@@ -98,7 +98,7 @@ export function SearchResults({
   }, [selected]);
 
   const q = query.trim();
-  const { items, total, pages, loading } = results;
+  const { items, total, capped, pages, loading } = results;
   const picked = selected !== null ? items[selected] : undefined;
   let status: ReactNode = null;
   if (loading) status = '찾는 중이에요';
@@ -121,7 +121,12 @@ export function SearchResults({
     >
       <div className={styles.listView}>
         <h2 className={styles.head}>
-          ‘{q}’ 검색 결과 {!loading && <strong data-testid="result-total">{total}건</strong>}
+          ‘{q}’ 검색 결과{' '}
+          {!loading && (
+            <strong data-testid="result-total">
+              {total}건{capped ? ' 이상' : ''}
+            </strong>
+          )}
         </h2>
         {!kakaoOn && (
           <p className={styles.note}>카카오 장소 검색을 쓸 수 없어 읍면동 이름에서만 찾았어요.</p>
