@@ -5,6 +5,8 @@ export default defineConfig({
     ? undefined
     : {
         command: 'npm run build && npm run preview',
+        // .env.local의 실제 키 대신 가짜 키로 빌드한다(SDK 요청은 fixtures가 막거나 가짜로 바꾼다)
+        env: { VITE_KAKAO_MAP_JS_KEY: 'e2e-fake-key' },
         port: 4173,
         reuseExistingServer: false,
         timeout: 180_000,

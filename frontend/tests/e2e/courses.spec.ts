@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-17T10:00:00+09:00'));
 });
 
-const courseList = (page: Page) => page.getByRole('list', { name: '코스 목록' });
+const courseList = (page: Page) => page.getByRole('list', { name: '올레 코스 목록' });
 
 async function rowFacts(page: Page) {
   return courseList(page)
