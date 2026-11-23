@@ -9,9 +9,13 @@ import { focusRingSource } from '../../shared/a11y/inputModality';
 import { LAYER_DEFS, OSM_COORDS } from '../layers/layerDefs';
 import { LAYER_TYPES } from '../layers/useLayers';
 import type { SheetData } from './useSheetData';
+import { LocationWeather } from './LocationWeather';
 import styles from './CellSheet.module.css';
 
-export type SheetTarget = { kind: 'cell'; h3: string } | { kind: 'sea'; lngLat: [number, number] };
+export type SheetTarget = ({ kind: 'cell'; h3: string } | { kind: 'sea' }) & {
+  lngLat: [number, number];
+  selection?: number;
+};
 
 interface CellSheetProps {
   target: SheetTarget;
@@ -22,6 +26,7 @@ interface CellSheetProps {
   /** 고른 날짜(예: '10월 17일 (토)'). api 모드 기준 문구에 쓴다 */
   dateLabel: string;
   data: SheetData;
+  getLiveWeather?: DataSource['getLiveWeather'];
   /** 시설 카드가 떠 있는 동안 숨긴다(선택은 그대로) */
   hidden?: boolean;
   onClose(): void;
@@ -48,6 +53,7 @@ export function CellSheet({
   weather,
   dateLabel,
   data,
+  getLiveWeather,
   hidden = false,
   onClose,
 }: CellSheetProps) {
@@ -198,6 +204,10 @@ export function CellSheet({
       )}
       {target.kind === 'sea' && place && (
         <p className={styles.basis}>가까운 지역: {placeLabel({ ...place, inside: true })}</p>
+      )}
+
+      {getLiveWeather && !hidden && (
+        <LocationWeather key={target.selection} lngLat={target.lngLat} load={getLiveWeather} />
       )}
 
       {reason && (

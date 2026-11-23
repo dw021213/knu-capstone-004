@@ -48,7 +48,8 @@ cp .env.example .env && nano .env
 | `DOMAIN` | `jeju-risk.duckdns.org` |
 | `POSTGRES_PASSWORD` | `openssl rand -hex 24` 로 만든 값 |
 | `CORS_ORIGINS` | 프론트 주소 (예: `https://<팀 vercel 주소>`), 여러 개면 쉼표 |
-| `KMA_APIHUB_KEY` | 기상청 API허브 키 (실시간 기상 수집) |
+| `KMA_APIHUB_KEY` | 기상청 API허브 키 (위험도용 기상 관측 수집) |
+| `KMA_SERVICE_KEY` | 공공데이터포털 기상청 단기예보 조회서비스 키 (지도에서 선택한 좌표의 현재 날씨) |
 
 ## 5. 띄우기
 ```bash
@@ -87,6 +88,8 @@ Vercel 프로젝트 → Settings → Environment Variables:
 | `VITE_API_BASE` | `https://jeju-risk.duckdns.org` |
 
 저장 후 다시 배포(Redeploy). 백엔드 `.env` 의 `CORS_ORIGINS` 에 그 Vercel 주소가 들어 있어야 한다.
+
+지도 클릭 날씨를 검수하는 Preview에는 `/api/weather/live`가 실행되는 백엔드 주소를 `VITE_API_BASE`로 설정한다. 백엔드의 `CORS_ORIGINS`에는 해당 Preview 주소도 등록한다. `KMA_SERVICE_KEY`는 백엔드에서만 설정한다.
 
 ## 운영
 | 할 일 | 명령 (`backend/deploy` 에서) |

@@ -1,4 +1,5 @@
 import { createSnapshotSource, fetchScoresFile, toCellScore } from './snapshot';
+import { createLiveWeatherLookup } from './weather';
 import type {
   CellScore,
   DataSource,
@@ -89,6 +90,7 @@ export function createApiSource(apiBase = '', snapshotBase = ''): DataSource {
     getJson<FacilitiesResponse>(`${apiBase}/api/facilities?type=${type}`);
   return {
     mode: 'api',
+    getLiveWeather: createLiveWeatherLookup(apiBase),
     async getScores(opts?: { at?: string }): Promise<Scores> {
       const params = new URLSearchParams({ weather: 'on' });
       if (opts?.at) params.set('at', opts.at);

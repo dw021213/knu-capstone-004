@@ -89,9 +89,12 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
   const pickedLayer = pickedState?.status === 'ready' ? pickedState.layer : null;
   const pickedPoi = pickedLayer?.items.find((p) => p.id === picked?.id) ?? null;
 
+  // 같은 위치를 다시 누르면 날씨도 새 선택으로 다룬다. 유효한 캐시는 조회 훅이 재사용한다.
+  const selectTarget = (t: SheetTarget) =>
+    setTarget((previous) => ({ ...t, selection: (previous?.selection ?? 0) + 1 }));
   const openSheet = (t: SheetTarget) => {
     if (!target) returnFocus.current = document.activeElement;
-    setTarget(t);
+    selectTarget(t);
   };
   const closeSheet = () => {
     setTarget(null);
@@ -197,6 +200,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
       weather={scores?.weather ?? 'off'}
       dateLabel={chipLabel(date)}
       data={sheetData}
+      getLiveWeather={source.getLiveWeather}
       // 시설 카드와 함께 보이지 않는다: 카드가 떠 있는 동안 숨기고 닫으면 다시 보인다
       hidden={pickedPoi !== null}
       onClose={closeSheet}
@@ -228,7 +232,11 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
                 if (!scores) return;
                 const h3 = cellAt(lng, lat, scores.cells);
                 returnFocus.current = input;
-                setTarget(h3 ? { kind: 'cell', h3 } : { kind: 'sea', lngLat: item.center });
+                selectTarget(
+                  h3
+                    ? { kind: 'cell', h3, lngLat: item.center }
+                    : { kind: 'sea', lngLat: item.center },
+                );
               }}
             />
           </div>
@@ -249,7 +257,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
             // 점수가 없으면(받는 중·실패) 셀인지 바다인지 모르므로 시트를 열지 않는다
             if (!scores) return;
             setPicked(null);
-            openSheet(h3 ? { kind: 'cell', h3 } : { kind: 'sea', lngLat });
+            openSheet(h3 ? { kind: 'cell', h3, lngLat } : { kind: 'sea', lngLat });
           }}
           markers={markerLayout}
           onMarkerSelect={(type, id) => setPicked({ type: type as PoiType, id })}

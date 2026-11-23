@@ -5,9 +5,34 @@
 > 여행객이 "지금 있는 곳이 얼마나 안전한지"를 **근거와 함께** 볼 수 있는 격자 기반 안전 분석 웹앱.
 > 기업 서비스 위에 얹지 않고 팀이 별도 웹앱으로 개발하며, 검증된 부분은 기업이 이후 마이그레이션을 검토한다.
 
+## 제주 지도에서 현재 날씨 확인하기
+
+지도에서 제주 위치를 누르면 상세 카드에 **기상청 날씨**가 표시됩니다. 기온, 습도, 1시간 강수량, 풍속과 함께 **실황** 또는 **예보**, 한국 시각 기준 시각을 확인할 수 있습니다. 실황이 없는 곳은 같은 시각의 초단기예보로 보완하며, 예보의 적용 시각도 표시합니다. 날씨는 누른 좌표에 해당하는 기상청 약 5km 격자 자료입니다. 지도 하단의 날짜 선택은 위험도 조회에 쓰입니다.
+
+1. [기상청 단기예보 조회서비스](https://www.data.go.kr/data/15084084/openapi.do)의 서비스키를 `backend/.env`의 `KMA_SERVICE_KEY`에 설정합니다. 처음 실행한다면 `backend/.env.example`을 `backend/.env`로 복사합니다.
+2. Docker를 켠 뒤 저장소 루트에서 백엔드를 실행합니다.
+
+   ```bash
+   cd backend
+   docker compose up -d --wait db
+   go run ./cmd/server
+   ```
+
+3. 다른 터미널에서 저장소 루트 기준으로 프런트를 실행합니다. Node.js 22.13 이상이 필요합니다.
+
+   ```bash
+   cd frontend
+   npm ci
+   VITE_API_BASE=http://localhost:8080 npm run dev
+   ```
+
+4. [로컬 지도](http://localhost:5173)를 열고 제주 위치를 누릅니다. 예를 들어 제주시청을 누르면 **기상청 날씨**가 표시됩니다.
+
+백엔드 위험도 데이터까지 사용하려면 `VITE_DATA_MODE=api`를 함께 설정합니다. 자세한 설정은 [프런트 실행법](frontend/README.md), [날씨 API 명세](backend/docs/FRONTEND_API.md), [서버 배포 가이드](backend/deploy/DEPLOY.md)를 참고하세요.
+
 ## 지도 표현 목업 실행
 
-현재 저장소에 포함된 화면 구현은 제주 안전지도의 지도 표현을 비교하는 **정적 HTML 목업 3개**입니다. 아래 명령을 저장소 루트에서 실행한 뒤 브라우저에서 각 주소를 여세요. Python 3 외의 설치나 API 키는 필요하지 않습니다.
+제주 안전지도의 지도 표현을 비교하는 **정적 HTML 목업 3개**도 함께 들어 있습니다. 아래 명령을 저장소 루트에서 실행한 뒤 브라우저에서 각 주소를 여세요. Python 3 외의 설치나 API 키는 필요하지 않습니다.
 
 ```bash
 python3 -m http.server 8765
@@ -19,7 +44,7 @@ python3 -m http.server 8765
 | [기상 위험장](mockups/02-weather-field.html) | <http://localhost:8765/mockups/02-weather-field.html> | 강수·강풍의 연속적인 예시 영향 범위 |
 | [안전 자원 분포](mockups/03-safety-elements.html) | <http://localhost:8765/mockups/03-safety-elements.html> | 경찰·소방·편의점 자료의 유형별 분포 |
 
-각 화면의 조작 방법, 데이터 출처와 한계는 [목업 설명](mockups/README.md)에 정리했습니다. 1·2번의 위험 수치와 기상 값은 예시이며, 3번의 경찰·소방 점은 개략 위치입니다. 현재 화면은 아래에 적힌 계획 단계의 React·Go 서비스와 연동되지 않았습니다.
+각 화면의 조작 방법, 데이터 출처와 한계는 [목업 설명](mockups/README.md)에 정리했습니다. 1·2번의 위험 수치와 기상 값은 예시이며, 3번의 경찰·소방 점은 개략 위치입니다. 실제 지도와 날씨 조회는 위의 React·Go 서비스에서 사용할 수 있습니다.
 
 ![Go](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
@@ -150,7 +175,8 @@ docs/       회의록 · 데이터 명세 · 보고서
 mockups/    정적 HTML 지도 표현 목업 3개와 로컬 지도 자산
 ```
 
-`backend/`, `frontend/`, `pipeline/`은 예정 구조이며 현재 저장소에는 `docs/`와 `mockups/`가 있습니다.
+`pipeline/`은 수집·정제 코드의 계획 구조입니다. 현재 서비스는 `backend/`와 `frontend/`에서 실행합니다.
+
 ## 과제 추진 및 개발 일정
 gantt
     title 과제 추진 및 개발 일정

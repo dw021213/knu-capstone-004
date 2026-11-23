@@ -77,7 +77,24 @@ export interface CourseList {
   items: Course[];
 }
 
+export interface LiveWeather {
+  source: 'observation' | 'forecast';
+  base_at: string;
+  valid_at: string;
+  temperature_c: number;
+  humidity_pct: number;
+  wind_speed_mps: number;
+  precipitation_1h_mm: number | null;
+  precipitation_1h_text?: string;
+}
+
+export type LiveWeatherLookup = (
+  lngLat: readonly [number, number],
+  signal: AbortSignal,
+) => Promise<LiveWeather | null>;
+
 export interface DataSource {
+  getLiveWeather?: LiveWeatherLookup;
   mode: 'snapshot' | 'api';
   getScores(opts?: { at?: string }): Promise<Scores>;
   getPoi(type: PoiType): Promise<PoiLayer>;

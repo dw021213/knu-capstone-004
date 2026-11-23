@@ -28,9 +28,12 @@ func main() {
 	}
 	defer pool.Close()
 
-	r := gin.Default()
-	r.Use(corsMiddleware())
-	(&api.Handler{DB: pool, WeatherRulesPath: "config/weather_rules.json", SafetyRulesPath: "config/safety_rules.json"}).Register(r.Group("/api"))
+	r := gin.New()
+	// 위치가 들어 있는 요청의 쿼리는 서버 로그에서 제외한다.
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{SkipQueryString: true}), gin.Recovery(), corsMiddleware())
+	apiRoutes := r.Group("/api")
+	(&api.Handler{DB: pool, WeatherRulesPath: "config/weather_rules.json", SafetyRulesPath: "config/safety_rules.json"}).Register(apiRoutes)
+	api.NewWeatherClient().Register(apiRoutes)
 	startWeatherPoller(pool)
 	// 확인용 지도 페이지. 코드가 자주 바뀌어서 브라우저가 옛 페이지를 캐시로 쓰지 않게 한다.
 	r.GET("/", func(c *gin.Context) {

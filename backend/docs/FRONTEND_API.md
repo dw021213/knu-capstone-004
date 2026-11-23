@@ -206,6 +206,27 @@ H3 육각형 3,651개(추자도 포함)의 도형과 그 시각의 위험도를 
 
 ---
 
+## `GET /api/weather/live` — 선택한 제주 좌표의 현재 날씨
+
+```bash
+curl 'http://localhost:8080/api/weather/live?lat=33.4996&lng=126.5312'
+```
+
+`lat`은 위도(32.9~34.2), `lng`는 경도(125.9~127.2)입니다. 선택한 좌표를 기상청 약 5km 격자 `nx`, `ny`로 바꾸어 조회합니다. 서버에 [공공데이터포털 단기예보 조회서비스](https://www.data.go.kr/data/15084084/openapi.do)의 `KMA_SERVICE_KEY`를 설정합니다.
+
+| 필드 | 의미 |
+|---|---|
+| `lat`, `lng`, `nx`, `ny` | 요청 좌표와 기상청 격자 번호 |
+| `source` | `observation` = 초단기실황, `forecast` = 초단기예보 |
+| `base_at`, `valid_at`, `fetched_at` | 기상청 자료의 기준 시각, 적용 시각, 서버 수집 시각. 한국 시각(`+09:00`) ISO 8601 |
+| `temperature_c`, `humidity_pct`, `wind_speed_mps`, `wind_direction_deg` | 기온(°C), 습도(%), 풍속(m/s), 풍향(°). 풍향은 결측 시 `null` |
+| `precipitation_1h_mm`, `precipitation_1h_text` | 1시간 강수량(mm). 무강수는 `0`. 예보가 범위로 주어지면 숫자는 `null`, 문구는 예를 들어 `1.0mm 미만` |
+| `precipitation_type_code`, `cached` | 기상청 강수형태 코드(결측 시 `null`), 서버 조회 재사용 여부 |
+
+매시 10분부터 그 시각의 정시 실황을 조회합니다. 주요 항목이 결측이면 직전 시간의 `:30`을 요청해 현재 정시의 예보를 고릅니다. 화면에 `source`와 `base_at`을 표시하고, 예보에는 `valid_at`도 함께 표시합니다. `/api/grid`의 날짜별 기상 가산과 이 API의 현재 날씨는 별도로 조회합니다.
+
+오류 응답은 `{"error":"안내 메시지"}`입니다. `400`은 좌표 오류, `404`는 실황과 예보 모두 자료 없음, `502`는 기상청 응답 오류, `503`은 키 미설정 또는 조회 한도, `504`는 응답 시간 초과입니다.
+
 ## 에러 응답
 
 | 상황 | 코드 | 응답 |

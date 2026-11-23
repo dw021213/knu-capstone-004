@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { toCellScore } from '../../data/snapshot';
 import type { EmergencyList, PoiLayer, PoiType } from '../../data/types';
@@ -48,10 +49,11 @@ function data(over: Partial<SheetData> = {}): SheetData {
   };
 }
 
-const cellTarget: SheetTarget = { kind: 'cell', h3: H3 };
+const cellTarget: SheetTarget = { kind: 'cell', h3: H3, lngLat: [lng, lat] };
 
 function renderSheet(props: Partial<Parameters<typeof CellSheet>[0]> = {}) {
   const onClose = vi.fn();
+  const qc = new QueryClient();
   const utils = render(
     <CellSheet
       target={cellTarget}
@@ -63,11 +65,73 @@ function renderSheet(props: Partial<Parameters<typeof CellSheet>[0]> = {}) {
       onClose={onClose}
       {...props}
     />,
+    {
+      wrapper: ({ children }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>,
+    },
   );
   return { ...utils, onClose };
 }
 
 describe('CellSheet', () => {
+  it.each(['observation', 'forecast'] as const)(
+    '선택한 좌표의 %s 날씨와 기준 시각을 표시한다',
+    async (source) => {
+      const lngLat: [number, number] = [lng + 0.001, lat - 0.001];
+      const baseAt = '2026-11-23T09:00:00+09:00';
+      const validAt = source === 'forecast' ? '2026-11-23T10:00:00+09:00' : baseAt;
+      const getLiveWeather = vi.fn(async () => ({
+        source,
+        base_at: baseAt,
+        valid_at: validAt,
+        temperature_c: 15.2,
+        humidity_pct: 70,
+        precipitation_1h_mm: 0,
+        wind_speed_mps: 2.5,
+      }));
+      renderSheet({
+        target: { kind: 'cell', h3: H3, lngLat },
+        getLiveWeather,
+      });
+      expect(await screen.findByText(source === 'forecast' ? '예보' : '실황')).toBeInTheDocument();
+      expect(getLiveWeather).toHaveBeenCalledWith(lngLat, expect.any(AbortSignal));
+      expect(screen.getByText(/기준 시각/)).toHaveTextContent('09:00');
+      expect(screen.getByText('15.2°C')).toBeInTheDocument();
+      expect(screen.getByText('0 mm')).toBeInTheDocument();
+      if (source === 'forecast') {
+        expect(screen.getByText(/적용 시각/)).toHaveTextContent('10:00');
+      } else {
+        expect(screen.queryByText(/적용 시각/)).not.toBeInTheDocument();
+      }
+    },
+  );
+
+  it('같은 좌표를 다시 누르면 실패한 날씨를 다시 조회한다', async () => {
+    const at = '2026-11-23T09:00:00+09:00';
+    const getLiveWeather = vi.fn().mockRejectedValueOnce(new Error('연결 실패')).mockResolvedValue({
+      source: 'observation',
+      base_at: at,
+      valid_at: at,
+      temperature_c: 15,
+      humidity_pct: 70,
+      precipitation_1h_mm: 0,
+      wind_speed_mps: 2,
+    });
+    const props = {
+      cell: toCellScore(H3, 82, 'standard_link'),
+      mode: 'snapshot' as const,
+      weather: 'off' as const,
+      dateLabel: '10월 20일 (화)',
+      data: data(),
+      getLiveWeather,
+      onClose: vi.fn(),
+    };
+    const { rerender } = renderSheet({ ...props, target: { ...cellTarget, selection: 1 } });
+    expect(await screen.findByText('날씨를 불러오지 못했어요')).toBeInTheDocument();
+    rerender(<CellSheet {...props} target={{ ...cellTarget, selection: 2 }} />);
+    expect(await screen.findByText('실황')).toBeInTheDocument();
+    expect(getLiveWeather).toHaveBeenCalledTimes(2);
+  });
+
   it('snapshot 모드 기준 문구', () => {
     renderSheet();
     expect(screen.getByTestId('sheet-basis')).toHaveTextContent(

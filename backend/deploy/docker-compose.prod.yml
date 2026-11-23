@@ -27,6 +27,7 @@ services:
       SERVER_ADDR: ":8080"
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       KMA_APIHUB_KEY: ${KMA_APIHUB_KEY:-}
+      KMA_SERVICE_KEY: ${KMA_SERVICE_KEY:-}
     depends_on:
       db:
         condition: service_healthy
