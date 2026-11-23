@@ -419,7 +419,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - **운영**: https://jeju-risk.duckdns.org — Vultr 서울 vc2-1c-2gb($10/월) 158.247.200.215, root SSH 키(로컬 `~/.ssh/id_ed25519`, passphrase 있음, 키체인)
   - 서버 코드 `/root/knu-capstone-004`, `backend/deploy/docker-compose.prod.yml`(db+server+caddy), `.env` 서버에만
   - 자동 배포: `.github/workflows/backend-deploy.yml` — **main 에 backend/ 머지 시에만**, 서버 `/root/deploy-backend.sh`(origin/main), 시크릿 DEPLOY_SSH_KEY(로컬 `~/.ssh/jeju_deploy_actions`, 서버에서 스크립트만 실행 가능)
-  - ⚠️ 서버는 지금 feat/backend `0efcc0f` 상태(2026-11-23 SSH 수동 배포, weather_rules_v5 + v4 행안부 등급 v3·안전 점수·골든아워, risk_v4 2026-11-04 1일분 적재 — 새 날짜는 run_daily.sh → scp → `exec server bin/etl risk-v4`, 컨테이너 안 파일은 chmod 644 필요). **feat/backend→main PR 머지 전에 Run workflow 누르면 main(5b0f6cc)으로 되돌아감** — 되돌아가도 DB 의 도로 주행시간은 남지만 fall 테이블·도로 필드·v4 API 는 사라짐
+  - ⚠️ 서버는 지금 feat/backend `3251f8f` 상태(2026-11-23 SSH 수동 배포, weather_rules_v5 + v4 행안부 등급 v3·안전 점수·골든아워 + /api/weather/live(.env KMA_SERVICE_KEY, 백업 .env.bak.20261123), risk_v4 2026-11-04 1일분 적재 — 새 날짜는 run_daily.sh → scp → `exec server bin/etl risk-v4`, 컨테이너 안 파일은 chmod 644 필요). **feat/backend→main PR 머지 전에 Run workflow 누르면 main(5b0f6cc)으로 되돌아감** — 되돌아가도 DB 의 도로 주행시간은 남지만 fall 테이블·도로 필드·v4 API 는 사라짐
   - 데이터 변경 시: `scripts/db-dump.sh --deploy` → scp → DEPLOY.md 6번. Vultr 크레딧 $250 은 **2026-11-17 만료**
 - **문서**: 프론트용 `docs/FRONTEND_API.md`(맨 위 2026-10-17 변경 박스), 배포 `deploy/DEPLOY.md`, 분석 `analysis/calibration.py`
 - **남은 일**: PR(feat/backend→main) 머지 확인 / 프론트 api 모드 연결(VITE_DATA_MODE=api, VITE_API_BASE) / CORS_ORIGINS 를 팀 Vercel 주소로 제한 / 기상청 키 재발급 / ASOS 로 사고 시각 복원 후 시간 단위 재검증 / 프론트에 weather_alerts 표시 요청 / 백엔드 단위 테스트
