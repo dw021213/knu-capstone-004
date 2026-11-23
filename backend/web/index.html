@@ -97,6 +97,7 @@ const NO_DATA_COLOR = '#bdbdbd';
 
 // 셀 색에 쓰는 0~1 값. 위험도는 셀 간 백분위(0~100, 기상 가산 반영)를 0~1 로. null 이면 "자료 없음".
 // v4 는 등급(1~5, 전체 기간 고정 경계)을 각 등급 구간 가운데 색으로.
+const V4_LABELS = { 1: '매우 안전', 2: '안전', 3: '보통', 4: '위험', 5: '매우 위험' }; // 행안부 안전등급 방향 (1 = 가장 안전)
 const V4_KINDS = { combined: '종합 (교통+넘어짐)', traffic: '교통사고', fall: '넘어짐·추락' };
 const v4Key = () => state.v4kind + (state.v4gh ? '_gh' : '');
 const v4Level = p => p['p_' + v4Key() + '_level'];
@@ -209,17 +210,17 @@ async function cellPopup(h3) {
     const v = d.v4;
     if (!v) return `<div class="popup"><b>H3 ${d.h3}</b><br>v4 예측 없음</div>`;
     const pf = x => x == null ? '-' : (x * 100).toFixed(x < 0.01 ? 3 : 2) + '%';
-    const lv = l => l == null ? '-' : `${swatch((l - 0.5) / 5)}<b>${LEVEL_LABELS[l]}</b>`;
+    const lv = (l, s) => l == null ? '-' : `${swatch((l - 0.5) / 5)}<b>${V4_LABELS[l]}</b>${s != null ? ` · 안전 ${Math.round(s)}점` : ''}`;
     const rr = v.weather_rr || {};
     const wx = (rr.traffic ?? 1) !== 1 || (rr.fall ?? 1) !== 1;
     const w = d.weather || {};
     const alerts = (w.alerts || []).map(a => `${a.label} ${a.level === 'warning' ? '경보급' : '주의보급'}`).join(', ');
     const partial = v.scope === 'fall_only_partial';
     return `<div class="popup"><b>H3 ${d.h3}</b> <span class="muted">${state.date} ${state.hour}시</span><table>
-      <tr><td>종합</td><td>${lv(v.combined_level)} · 지수 ${v.combined.toFixed(4)}${partial ? ' <span class="muted">(교통 없음 → 넘어짐만, 부분 지수)</span>' : ''}${wx ? ` <span class="muted">(기상 전 ${LEVEL_LABELS[v.combined_base_level]})</span>` : ''}</td></tr>
-      <tr><td>교통사고</td><td>${v.traffic == null ? '<span class="muted">모델 없음 (위험 0 아님)</span>' : `${lv(v.traffic_level)} · ${pf(v.traffic)}${wx ? ` <span class="muted">← ${pf(v.traffic_base)} ×${rr.traffic}</span>` : ''}`}</td></tr>
-      <tr><td>넘어짐·추락</td><td>${lv(v.fall_level)} · ${pf(v.fall)}${wx ? ` <span class="muted">← ${pf(v.fall_base)} ×${rr.fall}</span>` : ''}</td></tr>
-      <tr><td>골든아워</td><td>119+응급실 ${v.gh_minutes ?? '-'}분 → ×${v.gh_rr ?? 1}<br>반영 후 종합 ${lv(v.combined_gh_level)} · 지수 ${v.combined_gh?.toFixed(4) ?? '-'}</td></tr>
+      <tr><td>종합</td><td>${lv(v.combined_level, v.combined_safety)} · 지수 ${v.combined.toFixed(4)}${partial ? ' <span class="muted">(교통 없음 → 넘어짐만, 부분 지수)</span>' : ''}${wx ? ` <span class="muted">(기상 전 ${V4_LABELS[v.combined_base_level]})</span>` : ''}</td></tr>
+      <tr><td>교통사고</td><td>${v.traffic == null ? '<span class="muted">모델 없음 (위험 0 아님)</span>' : `${lv(v.traffic_level, v.traffic_safety)} · ${pf(v.traffic)}${wx ? ` <span class="muted">← ${pf(v.traffic_base)} ×${rr.traffic}</span>` : ''}`}</td></tr>
+      <tr><td>넘어짐·추락</td><td>${lv(v.fall_level, v.fall_safety)} · ${pf(v.fall)}${wx ? ` <span class="muted">← ${pf(v.fall_base)} ×${rr.fall}</span>` : ''}</td></tr>
+      <tr><td>골든아워</td><td>119+응급실 ${v.gh_minutes ?? '-'}분 → ×${v.gh_rr ?? 1}<br>반영 후 종합 ${lv(v.combined_gh_level, v.combined_gh_safety)} · 지수 ${v.combined_gh?.toFixed(4) ?? '-'}</td></tr>
       <tr><td>기상</td><td>${!state.weather ? '<span class="muted">반영 끔</span>' : wx ? `<b>${alerts}</b> 배율 적용` : '<span class="muted">배율 없음 (×1)</span>'}<br><span class="muted">${w.name ?? ''} ${w.dist_m != null ? (w.dist_m / 1000).toFixed(1) + 'km' : ''}</span></td></tr>
       ${fireRows}
     </table><div class="muted" style="margin-top:4px">확률 = 그날 그 셀에 해당 출동 1건 이상일 추정치<br>예측일 ${v.prediction_date ?? '-'}${v.stale ? ' (그날 예측 없어 최근 것)' : ''}${v.fall_quality === 'partial_arrivals' ? ' · 입도객 일부 결측' : ''}</div></div>`;
@@ -389,14 +390,15 @@ async function main() {
     if (state.mode === 'v4') {
       const v = state.v4 || {}, cuts = meta.v4?.levels?.cuts?.[v4Key()] || [];
       const pf = x => (x * 100).toPrecision(2) + '%';
-      const rows = [5, 4, 3, 2, 1].map(l => `<div><i style="background:${scoreColor((l - 0.5) / 5)}"></i>${LEVEL_LABELS[l]} <span class="muted">${
+      const SAFE = { 5: '<10', 4: '10~35', 3: '35~65', 2: '65~90', 1: '90+' };
+      const rows = [5, 4, 3, 2, 1].map(l => `<div><i style="background:${scoreColor((l - 0.5) / 5)}"></i>${V4_LABELS[l]} <span class="muted">안전 ${SAFE[l]}점 · ${
         l === 5 ? '≥ ' + pf(cuts[3] ?? 0) : l === 1 ? '< ' + pf(cuts[0] ?? 0) : pf(cuts[l - 2] ?? 0) + ' ~'}</span></div>`).join('');
       const nWx = state.features.filter(f => { const r = f.properties.p_weather_rr; return r && (r.traffic !== 1 || r.fall !== 1); }).length;
       div.innerHTML = `<h4>v4 ${V4_KINDS[state.v4kind]}${state.v4gh ? ' + 골든아워' : ''}</h4>` + rows +
         `<div><i style="background:${NO_DATA_COLOR}"></i>${state.v4kind === 'traffic' ? '교통 모델 없음' : '예측 없음'}</div>` +
         (state.v4kind === 'combined' ? `<div><i style="background:${scoreColor(0.1)};opacity:.4"></i>옅은 셀 = 교통 없음(부분 지수)</div>` : '') + fire +
         `<div class="muted" style="margin-top:6px">${v.status === 'ok' ? `예측일 ${v.prediction_date}${v.stale ? ' <b>(최근 예측)</b>' : ''}` : '<b>v4 예측 없음</b>'}<br>` +
-        (state.v4gh ? '골든아워: 119+응급실 편도 4→60분, ×1.00~1.25<br>' : '') + `경계: 2013~2026 전체 ${meta.v4?.levels?.reference?.days ?? ''}일 분포 고정<br>${!state.weather ? '기상 반영 끔' : `기상 배율 적용 셀 ${nWx}개`}<br>${meta.v4?.levels?.version ?? ''} · 확률 추정, 2026 정확도 미검증</div>`;
+        (state.v4gh ? '골든아워: 119+응급실 편도 4→60분, ×1.00~1.25<br>' : '') + `등급: 행안부 안전등급 비율 10/25/30/25/10<br>경계: 2013~2026 전체 ${meta.v4?.levels?.reference?.days ?? ''}일 분포 고정<br>${!state.weather ? '기상 반영 끔' : `기상 배율 적용 셀 ${nWx}개`}<br>${meta.v4?.levels?.version ?? ''} · 확률 추정, 2026 정확도 미검증</div>`;
     } else if (state.mode === 'combined') {
       const traffic = meta.hazards.find(h => h.hazard === 'traffic');
       div.innerHTML = `<h4>${meta.legend}</h4>` + bar +
@@ -423,7 +425,7 @@ async function main() {
         <input type="date" id="date"> <button type="button" id="now" title="현재 한국 시각 기준">지금</button><br>
         <input type="range" id="hour" min="0" max="23" step="1"> <b id="hour-label"></b>
       </div>
-      <label><input type="radio" name="mode" value="v4"> v4 보정 확률 등급</label>
+      <label><input type="radio" name="mode" value="v4"> v4 안전 등급</label>
       <select id="v4kind" style="margin-left:6px"><option value="combined">종합</option><option value="traffic">교통사고</option><option value="fall">넘어짐·추락</option></select>
       <label style="margin-left:6px"><input type="checkbox" id="v4gh"> 골든아워</label><br>
       <label><input type="radio" name="mode" value="compare"> 시설 가산 비교 (실험)</label>

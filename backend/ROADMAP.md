@@ -405,6 +405,7 @@ go run ./cmd/server           # http://localhost:8080 (지도), /api/*
 - 2026-11-18: **운영 반영** — feat/backend 6238565 push, 서버 SSH 로 pull + `up -d --build server`. meta/grid 에 weather_rules_v5(결빙 규칙·rate_ratio) 확인, 기존 지도 가산은 그대로(호우 +0.15, 결빙 0). v4 는 risk_v4_run 비어 있어 `v4.status=none`(risks.json 업로드 + `etl risk-v4` 전).
 - 2026-11-18: **v4 등급 고정 경계** (`config/v4_levels.json`, `v4_level()` 016, `analysis/v4_levels_reference.py`). 2013-01-30~2026-11-04 전체 5,027일 v4 예측(공간 입력 2026 고정, 공휴일 python-holidays) 분포 10·30·70·90 백분위. 2011~2012 는 입도객 자료 없어 제외. 2026만으로 낸 경계와 거의 같음(종합 c90 0.01329 vs 0.01346). 연도별 최상위 등급 비율 9.7~10.7% — 날짜 차이는 작고 결빙 배율이 등급을 크게 움직임. 교통은 날짜 무관.
 - 2026-11-18: **v4 골든아워(119+응급실) 반영** `p_*_gh` (v4_levels_v2). T = 119 편도 + 응급실 편도(cell_facility_stat), 배율 1.04^((clamp(T,4,60)−4)/10) ×1.00~1.25 (Gauss 2019). 기상 배율과 곱해 q′ = 1−(1−q)^(기상×골든아워). 순수 확률 p_* 와 별도 필드, 등급 경계도 참조 분포×배율로 따로(*_gh). 11-04 종합 등급 변화 116셀(오름 66·내림 50). 확인용 지도 v4 모드에 '골든아워' 체크.
+- 2026-11-23: **v4 등급 → 행안부 안전등급 비율 10/25/30/25/10** (「안전지수 운영 및 활용 지침」 제8조, v4_levels_v3) — 경계 10·35·65·90 백분위, 이름 1 매우 안전 … 5 매우 위험. **안전 점수 `p_*_safety`** = 100 − 참조 분포 백분위(quantiles 101개, `v4_pct()`). grid properties 가 함수 인자 100개 제한에 걸려 v4 필드를 별도 jsonb_build_object 로 합침. 참조 재계산: `analysis/v4_levels_reference.py` → `analysis/v4_levels_config.py` (참조 결과·venv 는 `종프/v4_reference`, `jeju-risk-backend-v4/.venv`).
 
 ## ▶ 현재 상태 요약 (2026-10-19, 이어서 작업할 때 여기부터)
 

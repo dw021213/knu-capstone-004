@@ -3,7 +3,10 @@
 사용: python -I analysis/v4_levels_reference.py <jeju-risk-backend-v4 폴더> <출력 폴더> <공휴일 CSV(2013~2026)>
   - 2013-01-30~2026-11-04 모든 날짜에 v4 예측(기상 반영 전)을 돌려 <출력>/ref_all.npz 저장 (약 3분)
   - 공휴일 CSV: python-holidays KR 2013~2025 + 패키지 holidays_2026.csv, known_by 는 전년 06-30
-  - 경계 = 전체 셀·날짜 값의 10·30·70·90 백분위 (combined 는 traffic_and_fall 셀만)
+  - 경계 = 전체 셀·날짜 값의 10·35·65·90 백분위 (행안부 안전등급 비율 10/25/30/25/10, combined 는 traffic_and_fall 셀만)
+  - 안전 점수용 0~100 백분위 값 101개도 같은 분포에서 (config/v4_levels.json quantiles)
+  - 골든아워(_gh)는 셀별 T(119+응급실 편도, gh_t.csv: h3,분)로 배율을 곱한 뒤 같은 방식
+  - config 갱신: python3 analysis/v4_levels_config.py <출력 폴더> (gh_t.csv 는 DB cell_facility_stat 에서)
 """
 import sys,time
 import numpy as np,pandas as pd

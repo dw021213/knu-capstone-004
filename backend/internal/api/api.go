@@ -136,7 +136,8 @@ SELECT json_build_object(
     'type', 'Feature',
     -- D3(d3-geo)는 바깥 고리가 시계 방향이어야 해서 CW 로 내보낸다. Leaflet 은 방향과 무관.
     'geometry', ST_AsGeoJSON(ST_ForcePolygonCW(c.geom), 6)::json,
-    'properties', json_build_object(
+    -- PostgreSQL 함수 인자 100개 제한 → 기존 필드와 v4 필드를 나눠 jsonb 로 합친다
+    'properties', jsonb_build_object(
       'h3', c.h3_index,
       'risk_score', round(adj.s::numeric, 4),
       'risk_percentile', round(adj.pct::numeric, 2),
@@ -156,6 +157,17 @@ SELECT json_build_object(
       'fall_percentile', round(fs.percentile::numeric, 2),
       'fall_level', risk_level(fs.percentile),
       'traffic_percentile', round(ht.percentile::numeric, 2),
+      'has_road', ht.available,
+      'road_source', ht.detail->>'road_source',
+      'facility_counts', COALESCE(fc.counts, '{}'::json),
+      'fire_station_dist_m', round(s.nearest_dist_m::numeric),
+      'fire_station_drive_min', round(s.nearest_drive_min::numeric, 1),
+      'fire_station_k1', s.count_k1,
+      'dummy_score', round(d.score::numeric, 3),
+      'dummy_level', d.level,
+      'ems_count', e.count,
+      'congestion', round(g.value::numeric, 2)
+    ) || jsonb_build_object(
       -- 교통·넘어짐 보정 확률 v4 ($13 예측 날짜). 기존 risk_*·fall_* 백분위와 별개, 기상 배율 반영
       'p_traffic', p4.t1,
       'p_fall', p4.f1,
@@ -168,8 +180,11 @@ SELECT json_build_object(
       'p_weather_rr', CASE WHEN p4.scope IS NULL THEN NULL ELSE json_build_object('traffic', p4.rt, 'fall', p4.rf) END,
       -- v4 등급 1~5 ($15 = 전체 기간 고정 경계). 기상 반영 후 값 기준, *_base_level 은 반영 전
       'p_traffic_level', v4_level(p4.t1, $15::jsonb -> 'cuts' -> 'traffic'),
+      'p_traffic_safety', round((100 - v4_pct(p4.t1, $15::jsonb -> 'q' -> 'traffic'))::numeric, 1),
       'p_fall_level', v4_level(p4.f1, $15::jsonb -> 'cuts' -> 'fall'),
+      'p_fall_safety', round((100 - v4_pct(p4.f1, $15::jsonb -> 'q' -> 'fall'))::numeric, 1),
       'p_combined_level', v4_level(COALESCE(p4.t1, 0) + p4.f1, $15::jsonb -> 'cuts' -> 'combined'),
+      'p_combined_safety', round((100 - v4_pct(COALESCE(p4.t1, 0) + p4.f1, $15::jsonb -> 'q' -> 'combined'))::numeric, 1),
       'p_combined_base_level', v4_level(p4.c0, $15::jsonb -> 'cuts' -> 'combined'),
       -- 골든아워(119 편도 + 응급실 편도) 반영: 출동 확률 × 중증 결과 배율. 순수 확률(p_*)과 별도
       'p_gh_minutes', round(p4.tmin::numeric, 1),
@@ -178,18 +193,11 @@ SELECT json_build_object(
       'p_fall_gh', p4.fg,
       'p_combined_gh', COALESCE(p4.tg, 0) + p4.fg,
       'p_traffic_gh_level', v4_level(p4.tg, $15::jsonb -> 'cuts' -> 'traffic_gh'),
+      'p_traffic_gh_safety', round((100 - v4_pct(p4.tg, $15::jsonb -> 'q' -> 'traffic_gh'))::numeric, 1),
       'p_fall_gh_level', v4_level(p4.fg, $15::jsonb -> 'cuts' -> 'fall_gh'),
+      'p_fall_gh_safety', round((100 - v4_pct(p4.fg, $15::jsonb -> 'q' -> 'fall_gh'))::numeric, 1),
       'p_combined_gh_level', v4_level(COALESCE(p4.tg, 0) + p4.fg, $15::jsonb -> 'cuts' -> 'combined_gh'),
-      'has_road', ht.available,
-      'road_source', ht.detail->>'road_source',
-      'facility_counts', COALESCE(fc.counts, '{}'::json),
-      'fire_station_dist_m', round(s.nearest_dist_m::numeric),
-      'fire_station_drive_min', round(s.nearest_drive_min::numeric, 1),
-      'fire_station_k1', s.count_k1,
-      'dummy_score', round(d.score::numeric, 3),
-      'dummy_level', d.level,
-      'ems_count', e.count,
-      'congestion', round(g.value::numeric, 2)
+      'p_combined_gh_safety', round((100 - v4_pct(COALESCE(p4.tg, 0) + p4.fg, $15::jsonb -> 'q' -> 'combined_gh'))::numeric, 1)
     )
   )), '[]'::json)
 )
@@ -329,14 +337,20 @@ SELECT json_build_object(
            'scope', p4.scope, 'traffic_quality', p4.traffic_quality, 'fall_quality', p4.fall_quality,
            'weather_rr', jsonb_build_object('traffic', p4.rt, 'fall', p4.rf),
            'traffic_level', v4_level(p4.t1, $11::jsonb -> 'cuts' -> 'traffic'),
+           'traffic_safety', round((100 - v4_pct(p4.t1, $11::jsonb -> 'q' -> 'traffic'))::numeric, 1),
            'fall_level', v4_level(p4.f1, $11::jsonb -> 'cuts' -> 'fall'),
+           'fall_safety', round((100 - v4_pct(p4.f1, $11::jsonb -> 'q' -> 'fall'))::numeric, 1),
            'combined_level', v4_level(COALESCE(p4.t1, 0) + p4.f1, $11::jsonb -> 'cuts' -> 'combined'),
+           'combined_safety', round((100 - v4_pct(COALESCE(p4.t1, 0) + p4.f1, $11::jsonb -> 'q' -> 'combined'))::numeric, 1),
            'combined_base_level', v4_level(p4.c0, $11::jsonb -> 'cuts' -> 'combined'),
            'gh_minutes', round(p4.tmin::numeric, 1), 'gh_rr', round(p4.grr::numeric, 4),
            'traffic_gh', p4.tg, 'fall_gh', p4.fg, 'combined_gh', COALESCE(p4.tg, 0) + p4.fg,
            'traffic_gh_level', v4_level(p4.tg, $11::jsonb -> 'cuts' -> 'traffic_gh'),
+           'traffic_gh_safety', round((100 - v4_pct(p4.tg, $11::jsonb -> 'q' -> 'traffic_gh'))::numeric, 1),
            'fall_gh_level', v4_level(p4.fg, $11::jsonb -> 'cuts' -> 'fall_gh'),
-           'combined_gh_level', v4_level(COALESCE(p4.tg, 0) + p4.fg, $11::jsonb -> 'cuts' -> 'combined_gh')) || $10::jsonb END,
+           'fall_gh_safety', round((100 - v4_pct(p4.fg, $11::jsonb -> 'q' -> 'fall_gh'))::numeric, 1),
+           'combined_gh_level', v4_level(COALESCE(p4.tg, 0) + p4.fg, $11::jsonb -> 'cuts' -> 'combined_gh'),
+           'combined_gh_safety', round((100 - v4_pct(COALESCE(p4.tg, 0) + p4.fg, $11::jsonb -> 'q' -> 'combined_gh'))::numeric, 1)) || $10::jsonb END,
   -- 그 시각 셀의 기상 판별 (가장 가까운 AWS 지점)
   'weather', (SELECT jsonb_build_object('stn', cw.stn, 'dist_m', round(cw.dist_m::numeric)) || $4::jsonb
                      || COALESCE($3::jsonb -> cw.stn::text, '{}'::jsonb)
