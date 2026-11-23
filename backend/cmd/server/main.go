@@ -46,9 +46,13 @@ func main() {
 		log.Fatalf("v4 등급 함수: %v", err)
 	}
 
-	r := gin.Default()
-	r.Use(corsMiddleware())
-	(&api.Handler{DB: pool, WeatherRulesPath: "config/weather_rules.json", SafetyRulesPath: "config/safety_rules.json", V4LevelsPath: "config/v4_levels.json"}).Register(r.Group("/api"))
+	r := gin.New()
+	// 위치가 들어 있는 요청의 쿼리는 서버 로그에서 제외한다.
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{SkipQueryString: true}), gin.Recovery(), corsMiddleware())
+	apiRoutes := r.Group("/api")
+	(&api.Handler{DB: pool, WeatherRulesPath: "config/weather_rules.json", SafetyRulesPath: "config/safety_rules.json", V4LevelsPath: "config/v4_levels.json"}).Register(apiRoutes)
+	// 지도에서 누른 좌표의 현재 날씨 (공공데이터포털 초단기실황, KMA_SERVICE_KEY). 위험도 계산과는 별개
+	api.NewWeatherClient().Register(apiRoutes)
 	startWeatherPoller(pool)
 	// 확인용 지도 페이지. 코드가 자주 바뀌어서 브라우저가 옛 페이지를 캐시로 쓰지 않게 한다.
 	r.GET("/", func(c *gin.Context) {

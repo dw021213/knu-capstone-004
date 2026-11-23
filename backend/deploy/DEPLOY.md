@@ -48,7 +48,8 @@ cp .env.example .env && nano .env
 | `DOMAIN` | `jeju-risk.duckdns.org` |
 | `POSTGRES_PASSWORD` | `openssl rand -hex 24` 로 만든 값 |
 | `CORS_ORIGINS` | 프론트 주소 (예: `https://<팀 vercel 주소>`), 여러 개면 쉼표 |
-| `KMA_APIHUB_KEY` | 기상청 API허브 키 (실시간 기상 수집) |
+| `KMA_APIHUB_KEY` | 기상청 API허브 키 (위험도용 AWS 관측 수집) |
+| `KMA_SERVICE_KEY` | 공공데이터포털 기상청 단기예보 조회서비스 키 (`/api/weather/live`, 지도에서 누른 좌표의 현재 날씨) |
 
 ## 5. 띄우기
 ```bash
