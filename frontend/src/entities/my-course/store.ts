@@ -161,7 +161,7 @@ export function newId(): string {
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** 새로 저장하거나(id 없음) 고친다. 장소가 MAX_STOPS를 넘으면 던지고, 쓰지 못하면 StorageWriteError */
+/** 새로 저장하거나(id가 없거나 처음 보는 id) 고친다. 장소가 MAX_STOPS를 넘으면 던지고, 쓰지 못하면 StorageWriteError */
 export function saveCourse(
   input: { id?: string; name: string; stops: Stop[] },
   now: Date = new Date(),

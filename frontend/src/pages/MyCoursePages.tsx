@@ -180,6 +180,8 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
   const [aim, setAim] = useState<Aim>({ key: 0, to: 'start' });
   const [reveal, setReveal] = useState<MapReveal | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
+  // 새 코스 id는 화면을 열 때 정한다(저장을 연달아 눌러도 같은 코스 하나로 모인다)
+  const [courseId] = useState(() => initial.id ?? newId());
   const local = useLocalCandidates();
   const kakaoOn = useKakaoOn();
   const suggest = useSuggestions(local, search.query, search.mode === 'suggest');
@@ -292,7 +294,7 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
     let saved: MyCourse;
     try {
       saved = saveCourse({
-        id: initial.id,
+        id: courseId,
         name: draft.name.trim() || '내 코스',
         stops: draft.stops,
       });

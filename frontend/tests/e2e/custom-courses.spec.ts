@@ -571,6 +571,20 @@ test.describe('내 코스', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  const saved = (page: Page) =>
+    page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '{"courses":[]}').courses, STORE);
+
+  test('저장을 빠르게 두 번 눌러도 코스는 하나만 생긴다', async ({ page }) => {
+    await page.goto('/courses/mine/new');
+    await mapReady(page);
+    await addFromResults(page, '애월', '애월읍');
+    await addFromResults(page, '성산', '성산읍');
+    await page.getByRole('button', { name: '저장' }).dblclick();
+    await expect(page).toHaveURL(/\/courses\/mine\/(?!new$)[\w-]+$/);
+    await expect(page.getByRole('heading', { level: 1, name: '내 코스' })).toBeVisible();
+    expect(await saved(page)).toHaveLength(1);
+  });
+
   for (const blocked of ['가득 참', '사이트 데이터 막힘'] as const) {
     test(`이 기기에 저장하지 못하면(${blocked}) 화면을 넘기지 않고 알리며 만들던 코스를 그대로 둔다`, async ({
       page,

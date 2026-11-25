@@ -40,6 +40,13 @@ describe('저장소', () => {
     expect(readCourses()[0].stops.map((s) => s.id)).toEqual(['s2', 's1']);
   });
 
+  it('처음 보는 id로 저장하면 그 id로 만들고, 같은 id로 다시 저장해도 하나만 남는다', () => {
+    const input = { id: 'draft-1', name: 'A', stops: [stop(1), stop(2)] };
+    saveCourse(input);
+    saveCourse(input);
+    expect(readCourses().map((c) => c.id)).toEqual(['draft-1']);
+  });
+
   it('여러 코스를 두고 하나를 지울 수 있다', () => {
     const a = saveCourse({ name: 'A', stops: [stop(1)] });
     const b = saveCourse({ name: 'B', stops: [stop(2)] });
