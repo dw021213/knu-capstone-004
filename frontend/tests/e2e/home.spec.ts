@@ -26,9 +26,9 @@ test('동작하지 않는 자리 채우기 컨트롤은 두지 않는다', async
   await expect(page.getByRole('textbox')).toHaveCount(0);
 });
 
-test("'오늘 안전한 코스'는 날짜 칩 바로 위에 있고 누르면 코스 목록으로 간다", async ({ page }) => {
+test("'코스 위험 구간'는 날짜 칩 바로 위에 있고 누르면 코스 목록으로 간다", async ({ page }) => {
   await openMap(page);
-  const link = page.getByRole('link', { name: '오늘 안전한 코스' });
+  const link = page.getByRole('link', { name: '코스 위험 구간' });
   await expect(link).toHaveCount(1);
   await expect(link).toBeVisible();
   const box = (await link.boundingBox())!;
@@ -37,12 +37,12 @@ test("'오늘 안전한 코스'는 날짜 칩 바로 위에 있고 누르면 코
   expect(bar.y - (box.y + box.height)).toBeLessThan(80);
   await link.click();
   await expect(page).toHaveURL(/\/courses$/);
-  await expect(page.getByRole('heading', { level: 1, name: '오늘 안전한 코스' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: '코스 위험 구간' })).toBeVisible();
 });
 
-test("@desktop '오늘 안전한 코스'는 좌상단 레이어 버튼 옆에 있다", async ({ page }) => {
+test("@desktop '코스 위험 구간'는 좌상단 레이어 버튼 옆에 있다", async ({ page }) => {
   await openMap(page);
-  const link = page.getByRole('link', { name: '오늘 안전한 코스' });
+  const link = page.getByRole('link', { name: '코스 위험 구간' });
   await expect(link).toHaveCount(1);
   const box = (await link.boundingBox())!;
   const layer = (await page.getByRole('button', { name: /^레이어/ }).boundingBox())!;

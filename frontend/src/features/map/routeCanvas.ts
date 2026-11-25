@@ -14,7 +14,7 @@ import { lngLatToScreen, type View } from './view';
 export interface MapRoute {
   lines: { coords: [number, number][]; level: Level | null }[];
   /** 주의 지점(번호) */
-  marks: { lngLat: [number, number]; label: string }[];
+  marks?: { lngLat: [number, number]; label: string }[];
   /** false면 시작·끝 표지를 그리지 않는다(장소 번호 핀이 끝점을 대신할 때) */
   ends?: boolean;
 }
@@ -120,7 +120,7 @@ export function drawRoute(
   ctx.setLineDash([]);
 
   const hits: RouteMarkHit[] = [];
-  for (const m of route.marks) {
+  for (const m of route.marks ?? []) {
     const [x, y] = lngLatToScreen(view, ...m.lngLat);
     ctx.beginPath();
     ctx.arc(x, y, CAUTION_MARK_RADIUS, 0, Math.PI * 2);

@@ -1,18 +1,14 @@
-import type { Segment } from '../../entities/course/segments';
 import type { CourseSummary } from '../../entities/course/summary';
 import type { MapFocus, MapRoute } from '../map/MapView';
 
-/** 구간 좌표의 가운데 점(촘촘히 한 점 중 가운데). 주의 지점 빨간 점을 여기에 찍는다 */
-export function segmentMid(seg: Segment): [number, number] {
-  return seg.coords[Math.floor((seg.coords.length - 1) / 2)];
+/** 좌표의 가운데 점(촘촘히 한 점 중 가운데) */
+export function midOf(coords: readonly [number, number][]): [number, number] {
+  return coords[Math.floor((coords.length - 1) / 2)];
 }
 
-/** 지도에 그릴 경로: 구간별 등급 색, 주의 구간마다 번호(1부터, 코스 순서) */
+/** 지도에 그릴 경로: 구간별 등급 색 선 */
 export function courseRoute(s: CourseSummary): MapRoute {
-  return {
-    lines: s.segments.map((g) => ({ coords: g.coords, level: g.level })),
-    marks: s.caution.map((g, i) => ({ lngLat: segmentMid(g), label: String(i + 1) })),
-  };
+  return { lines: s.segments.map((g) => ({ coords: g.coords, level: g.level })) };
 }
 
 /** 경로가 지나는 셀(이 밖의 셀은 흐리게) */
@@ -55,12 +51,12 @@ export function pointFocus(key: number, point: [number, number], right: number):
   };
 }
 
-/** 주의 구간 하나로 옮겨 확대 */
-export function segmentFocus(key: number, seg: Segment, right: number): MapFocus {
+/** 주의할 구간 묶음 하나로 옮겨 확대 */
+export function stretchFocus(key: number, coords: [number, number][], right: number): MapFocus {
   return {
     key,
-    bbox: bboxOf(seg.coords),
-    point: segmentMid(seg),
+    bbox: bboxOf(coords),
+    point: midOf(coords),
     zoom: { min: 14, max: 15 },
     ...place(right),
   };

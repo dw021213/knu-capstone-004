@@ -50,17 +50,26 @@
   }
 }
 
-.badgeRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-2);
+.lead {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-s);
+  line-height: 1.6;
+  word-break: keep-all;
 }
 
-.badgeNote {
-  font-size: var(--text-s);
+/* 구간 색 띠 + 전체 길이 한 줄 */
+.bandRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.length {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
   color: var(--ink2);
+  font-variant-numeric: tabular-nums;
 }
 
 .basis {

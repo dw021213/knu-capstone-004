@@ -28,7 +28,7 @@ test.describe('U9-3 768px 이하는 모바일 배치', () => {
     const lg = await box(page, 'legend');
     const bar = await box(page, 'date-bar');
     expect(lg.y).toBeLessThan(200);
-    const link = (await page.getByRole('link', { name: '오늘 안전한 코스' }).boundingBox())!;
+    const link = (await page.getByRole('link', { name: '코스 위험 구간' }).boundingBox())!;
     expect(link.y + link.height).toBeLessThanOrEqual(bar.y);
     // 서비스 이름은 화면에 보이지 않는다(모바일은 맨 위가 검색창)
     const h1 = (await page
@@ -52,7 +52,7 @@ test.describe('U9-3 769px부터는 데스크톱 배치', () => {
     );
     const lg = await box(page, 'legend');
     expect(lg.y + lg.height).toBeGreaterThan(1024 - 200);
-    const link = (await page.getByRole('link', { name: '오늘 안전한 코스' }).boundingBox())!;
+    const link = (await page.getByRole('link', { name: '코스 위험 구간' }).boundingBox())!;
     const layer = await box(page, 'layer-button');
     expect(Math.abs(link.y - layer.y)).toBeLessThan(2);
     expect(link.x).toBeGreaterThan(layer.x + layer.width);
@@ -173,7 +173,7 @@ async function visibleBoxes(page: Page) {
     날짜칩: page.getByTestId('date-bar').getByRole('group', { name: '날짜' }),
     날짜안내: page.getByTestId('date-bar').getByText('날씨 미반영 · 공간 점수는 날짜와 무관'),
     내위치: page.getByRole('button', { name: '내 위치' }),
-    코스: page.getByRole('link', { name: '오늘 안전한 코스' }),
+    코스: page.getByRole('link', { name: '코스 위험 구간' }),
     셀정보: page.getByTestId('cell-sheet'),
     지도출처: page.getByRole('link', { name: '© OpenStreetMap contributors' }),
   };
@@ -243,25 +243,28 @@ test.describe('U9-2 데스크톱 코스 화면', () => {
         return x > 0 && x < l.x && y > bar.y + bar.height && y < 900;
       })
       .toBe(true);
-    // 처음에는 목록 맨 위(위험 등급이 가장 낮은) 코스 경로와 주의 지점을 그린다
+    // 처음에는 목록 맨 위(1코스) 경로를 번호 표지 없이 그린다
+    await expect
+      .poll(async () => (await page.evaluate(() => window.__mapDebug!.route())).lines)
+      .toBe(29);
     const first = await page.evaluate(() => window.__mapDebug!.route());
-    expect(first.lines).toBeGreaterThan(6);
-    expect(first.marks.map((m) => m.label)).toEqual(['1', '2', '3', '4', '5', '6']);
+    expect(first.marks).toEqual([]);
   });
 
-  test('@desktop 1440 목록: 코스 줄에 마우스를 올리거나 포커스하면 그 코스 경로와 주의 지점을 미리 보여 준다', async ({
+  test('@desktop 1440 목록: 코스 줄에 마우스를 올리거나 포커스하면 그 코스 경로를 미리 보여 준다', async ({
     page,
   }) => {
     await page.clock.setFixedTime(FIXED_NOW);
     await page.goto('/courses');
     await page.waitForFunction(() => window.__mapReady === true);
     const link = (name: string) => page.getByRole('link', { name: new RegExp(name) });
-    const marks = async () => (await page.evaluate(() => window.__mapDebug!.route())).marks.length;
+    // 구간 수로 어느 코스를 그렸는지 안다(1코스 29개, 10코스 24개)
+    const lines = async () => (await page.evaluate(() => window.__mapDebug!.route())).lines;
     await link('제주올레 10코스').hover();
-    await expect.poll(marks).toBe(8);
+    await expect.poll(lines).toBe(24);
     await page.mouse.move(10, 450);
     await link('제주올레 1코스').focus();
-    await expect.poll(marks).toBe(6);
+    await expect.poll(lines).toBe(29);
   });
 
   test('@desktop 1440 상세: 오른쪽 400px 패널이 뒤로 막대 아래부터 바닥까지 붙고 지도 출처는 패널 왼쪽에 보인다', async ({
@@ -356,7 +359,7 @@ for (const [w, h] of [
       const panelX = (await list.boundingBox())!.x;
       const bar = (await page.getByRole('button', { name: '뒤로' }).boundingBox())!;
       const top = bar.y + bar.height;
-      // 표지(시작·끝 알약 반폭 18px, 주의 지점 반지름)가 패널 경계에 걸리지 않을 여유
+      // 시작·끝 알약(반폭 18px)이 패널 경계에 걸리지 않을 여유
       const MARGIN = 20;
       for (const c of courses) {
         const link = page.getByRole('link', { name: new RegExp(`${c.name}(?!\\d)`) });
@@ -377,7 +380,7 @@ for (const [w, h] of [
           expect(y, `${c.name} 경로 y`).toBeLessThan(h);
         }
         const r = await page.evaluate(() => window.__mapDebug!.route());
-        for (const m of [...r.ends, ...r.marks]) {
+        for (const m of r.ends) {
           expect(m.x - MARGIN, `${c.name} ${m.label}`).toBeGreaterThan(0);
           expect(m.x + MARGIN, `${c.name} ${m.label}`).toBeLessThanOrEqual(panelX);
         }

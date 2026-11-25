@@ -23,7 +23,7 @@ import { useMineList, useOlleList } from './courseData';
 import { useScores } from './useScores';
 import styles from './CoursesPage.module.css';
 
-const TITLE = '오늘 안전한 코스';
+const TITLE = '코스 위험 구간';
 
 /** 오른쪽 패널이 가리는 너비(px)를 잰다. 지도 맞춤을 그 왼쪽 영역에 한다 */
 function usePanelInset() {

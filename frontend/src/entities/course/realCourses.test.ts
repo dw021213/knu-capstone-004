@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { roadSourceFromCode, toCellScore } from '../../data/snapshot';
 import type { CellScore, CourseFile, ScoresFile } from '../../data/types';
 import { segmentCourse } from './segments';
-import { sortCourses, summarize } from './summary';
+import { summarize } from './summary';
 
 const read = <T>(path: string) =>
   JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')) as T;
@@ -24,38 +24,52 @@ const summaries = courses.items.map((c) =>
 );
 
 describe('배포본 코스 × 배포본 점수', () => {
-  it('코스마다 구간 수·코스 등급·주의 구간·데이터 부족 비율(스냅숏)', () => {
+  it('코스마다 구간 수·주의할 구간 묶음 수와 길이·데이터 부족 비율(스냅숏)', () => {
     const table = summaries.map((s) => ({
       id: s.course.id,
       segments: s.segments.length,
-      level: s.level,
-      caution: s.caution.length,
-      cautionKm: Math.round(s.cautionKm * 100) / 100,
+      groups: s.groups.length,
+      groupKm: s.groups.map((g) => Math.round((g.endKm - g.startKm) * 100) / 100),
       noDataPct: Math.round(s.noDataRatio * 100),
     }));
     expect(table).toMatchInlineSnapshot(`
       [
         {
-          "caution": 6,
-          "cautionKm": 4.14,
+          "groupKm": [
+            0.06,
+            1.07,
+            0.68,
+            1.32,
+            1.03,
+          ],
+          "groups": 5,
           "id": "olle-1",
-          "level": 5,
           "noDataPct": 10,
           "segments": 29,
         },
         {
-          "caution": 8,
-          "cautionKm": 4.67,
+          "groupKm": [
+            0.18,
+            1.63,
+            1.4,
+            1.51,
+          ],
+          "groups": 4,
           "id": "olle-10",
-          "level": 5,
           "noDataPct": 9,
           "segments": 24,
         },
         {
-          "caution": 8,
-          "cautionKm": 6.57,
+          "groupKm": [
+            0.61,
+            0.94,
+            1.54,
+            1.24,
+            0.87,
+            1.51,
+          ],
+          "groups": 6,
           "id": "olle-20",
-          "level": 5,
           "noDataPct": 0,
           "segments": 25,
         },
@@ -71,15 +85,5 @@ describe('배포본 코스 × 배포본 점수', () => {
       }
       expect(s.segments.at(-1)!.endKm).toBeCloseTo(s.course.lengthKm, 1);
     }
-  });
-
-  it('목록 순서(등급 낮은 순, 같으면 주의 구간 짧은 순)', () => {
-    expect(sortCourses(summaries).map((s) => s.course.id)).toMatchInlineSnapshot(`
-      [
-        "olle-1",
-        "olle-10",
-        "olle-20",
-      ]
-    `);
   });
 });

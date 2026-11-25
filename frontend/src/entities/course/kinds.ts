@@ -14,14 +14,14 @@ export interface CourseKindInfo {
   editable: boolean;
   /** 목록이 비었을 때 */
   empty: string;
-  /** 목록 머리 설명(줄 세우는 기준) */
+  /** 목록 머리 설명 */
   help: string;
   /** 목록 위 만들기 버튼 */
   create: { label: string; href: string } | null;
 }
 
-const RISK_ORDER =
-  '위험 등급이 낮은 코스부터 보여 줘요. 코스 등급은 가장 위험한 구간의 등급이에요.';
+const COLOR_HELP =
+  '코스가 지나는 구간의 위험 등급을 색으로 보여 줘요. 빨간 구간에서는 조금 더 유의해 주세요.';
 
 export const COURSE_KINDS: Record<CourseKind, CourseKindInfo> = {
   olle: {
@@ -31,7 +31,7 @@ export const COURSE_KINDS: Record<CourseKind, CourseKindInfo> = {
     owns: (id) => id.startsWith('olle-'),
     editable: false,
     empty: '코스 자료를 준비 중이에요',
-    help: RISK_ORDER,
+    help: COLOR_HELP,
     create: null,
   },
   mine: {
@@ -41,7 +41,7 @@ export const COURSE_KINDS: Record<CourseKind, CourseKindInfo> = {
     owns: () => false,
     editable: true,
     empty: '아직 만든 코스가 없어요. 장소를 골라 나만의 코스를 만들어 보세요.',
-    help: '최근에 고친 코스부터 보여 줘요. 이 기기에만 저장돼요. 코스 등급은 가장 위험한 구간의 등급이에요.',
+    help: `${COLOR_HELP} 최근에 고친 코스부터 보여 줘요. 이 기기에만 저장돼요.`,
     create: { label: '새 코스 만들기', href: '/courses/mine/new' },
   },
 };

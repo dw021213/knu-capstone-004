@@ -408,7 +408,7 @@ test.describe('내 코스', () => {
       await expect(page).toHaveURL(/\/courses\/mine\/[\w-]+$/);
       const sheet = page.getByTestId('course-sheet');
       await expect(page.getByRole('heading', { level: 1, name: '시연 코스' })).toBeVisible();
-      await expect(sheet.getByTestId('level-badge').first()).toBeVisible();
+      await expect(sheet.getByTestId('risk-band').first()).toBeVisible();
       await expect(sheet.getByTestId('route-via')).toContainText('직선 연결');
       await expect(sheet.getByTestId('route-via')).toHaveAttribute('data-via', 'straight');
       await expect(sheet.getByTestId('stop-list').getByRole('listitem')).toHaveCount(3);
@@ -424,8 +424,10 @@ test.describe('내 코스', () => {
       const row = page.getByRole('list', { name: '내 코스 목록' }).getByRole('listitem');
       await expect(row).toHaveCount(1);
       await expect(row).toContainText('시연 코스');
-      await expect(row).toContainText('장소 3곳 · 직선 연결');
-      await expect(row.getByTestId('level-badge')).toBeVisible();
+      await expect(row).toContainText(
+        /장소 3곳 · 직선 연결 · \d+\.\dkm · 주의할 구간 (없음|\d+곳)/,
+      );
+      await expect(row.getByTestId('risk-band')).toBeVisible();
     });
   }
 

@@ -62,15 +62,3 @@ export function segmentCourse(
   }
   return segs;
 }
-
-/** 코스 등급 = 구간 등급의 최댓값(평균이 아니다). 데이터 부족 구간은 빼고, 전부 부족이면 null */
-export function courseLevel(segs: Segment[]): Level | null {
-  let max: Level | null = null;
-  for (const s of segs) if (s.level !== null && (max === null || s.level > max)) max = s.level;
-  return max;
-}
-
-/** 주의 구간: 등급이 min(기본 4단계) 이상인 구간 */
-export function cautionSegments(segs: Segment[], min: Level = 4): Segment[] {
-  return segs.filter((s) => s.level !== null && s.level >= min);
-}

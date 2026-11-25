@@ -166,7 +166,7 @@ test.describe('상태 화면', () => {
   }
 });
 
-// 코스 화면(U8): 목록, 상세, 주의 구간을 고른 상세, 받지 못한 목록
+// 코스 화면(U8): 목록, 상세, 주의할 구간을 고른 상세, 펼친 목록, 받지 못한 목록
 test.describe('코스 화면', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.setFixedTime(new Date('2026-10-17T10:00:00+09:00'));
@@ -181,19 +181,29 @@ test.describe('코스 화면', () => {
       expect(await seriousViolations(page)).toEqual([]);
     });
 
-    test(`${tag}코스 상세와 주의 구간을 고른 화면에 접근성 critical·serious 위반이 없다`, async ({
+    test(`${tag}코스 상세와 주의할 구간을 고른 화면에 접근성 critical·serious 위반이 없다`, async ({
       page,
     }) => {
       await page.goto('/courses/olle-1');
       await page.waitForFunction(() => window.__mapReady === true);
-      const items = page.getByRole('list', { name: '주의 구간 목록' }).getByRole('button');
-      await expect(items).toHaveCount(6);
+      const items = page.getByRole('list', { name: '주의할 구간 목록' }).getByRole('button');
+      await expect(items).toHaveCount(5);
       expect(await seriousViolations(page)).toEqual([]);
       await items.first().click();
       await expect(items.first()).toHaveAttribute('aria-pressed', 'true');
       expect(await seriousViolations(page)).toEqual([]);
     });
   }
+
+  test('주의할 구간을 모두 펼친 상세에 접근성 critical·serious 위반이 없다', async ({ page }) => {
+    await page.goto('/courses/olle-20');
+    await page.waitForFunction(() => window.__mapReady === true);
+    await page.getByRole('button', { name: '주의할 구간 모두 보기(6곳)' }).click();
+    await expect(
+      page.getByRole('list', { name: '주의할 구간 목록' }).getByRole('button'),
+    ).toHaveCount(6);
+    expect(await seriousViolations(page)).toEqual([]);
+  });
 
   test('코스를 받지 못한 목록에 접근성 critical·serious 위반이 없다', async ({ page }) => {
     await page.route('**/data/courses.json', (route) => route.abort());

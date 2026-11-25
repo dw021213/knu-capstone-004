@@ -3,7 +3,7 @@ import { queryOptions, useQueries, useQuery, type UseQueryResult } from '@tansta
 import type { CellScore, Course, DataSource } from '../data/types';
 import { COURSE_KINDS, type CourseKind } from '../entities/course/kinds';
 import { segmentCourse } from '../entities/course/segments';
-import { sortCourses, summarize, type CourseSummary } from '../entities/course/summary';
+import { summarize, type CourseSummary } from '../entities/course/summary';
 import type { MyCourse, Stop } from '../entities/my-course/store';
 import { useMyCourses } from '../entities/my-course/useMyCourses';
 import {
@@ -26,7 +26,7 @@ import { useScores } from './useScores';
 
 type Cells = ReadonlyMap<string, CellScore>;
 
-/** 두 종류가 같은 입력({ id, name, coords, lengthKm })으로 구간·코스 등급을 낸다 */
+/** 두 종류가 같은 입력({ id, name, coords, lengthKm })으로 구간과 주의할 구간 묶음을 낸다 */
 function summarizeCourse(c: Course, cells: Cells): CourseSummary {
   return summarize(
     c,
@@ -74,14 +74,13 @@ const olleQuery = (source: DataSource, enabled: boolean) => ({
   enabled,
 });
 
+/** 올레 코스는 자료 순서(코스 번호) 그대로. 위험한 정도로 줄 세우지 않는다 */
 function olleItems(items: Course[], cells: Cells) {
-  return sortCourses(items.map((c) => summarizeCourse(c, cells))).map(
-    (summary): CourseListItem => ({
-      summary,
-      href: COURSE_KINDS.olle.href(summary.course.id),
-      meta: [],
-    }),
-  );
+  return items.map((c): CourseListItem => ({
+    summary: summarizeCourse(c, cells),
+    href: COURSE_KINDS.olle.href(c.id),
+    meta: [],
+  }));
 }
 
 export function useOlleList(source: DataSource, enabled = true): CourseListState {
