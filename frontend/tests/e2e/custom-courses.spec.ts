@@ -644,12 +644,14 @@ test.describe('예시 코스', () => {
       const rows = exampleList(page).getByRole('listitem');
       await expect(rows).toHaveCount(2);
       await expect(exampleList(page).getByRole('heading', { level: 3 })).toHaveText([
-        '유배 코스 2일차예시 · 확정 전',
-        '여성 코스 2일차예시 · 확정 전',
+        '유배 코스 2일차 예시 · 확정 전',
+        '여성 코스 2일차 예시 · 확정 전',
       ]);
       await expect(rows.first()).toContainText(/장소 6곳 · 직선 연결 · \d+\.\dkm · 주의할 구간/);
       await expect(rows.first().getByTestId('risk-band')).toBeVisible();
       await expect(group).toContainText('장소 카카오 로컬 검색(2026-11-23)');
+      // 묶음 제목(h2) 아래 줄 이름(h3), 이름 안 표지까지 접근성 위반이 없다
+      expect(await seriousViolations(page)).toEqual([]);
       // 올레 탭에는 없다
       await tabs(page).getByRole('link', { name: '올레 코스' }).click();
       await expect(olleList(page)).toBeVisible();

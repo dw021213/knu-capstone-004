@@ -33,7 +33,7 @@ export function CautionList({ groups, placeOf, selected, onSelect }: CautionList
             >
               <span className={styles.name}>
                 {placeRange(placeOf(g, 'start'), placeOf(g, 'end'))}
-              </span>
+              </span>{' '}
               <span className={styles.range}>{kmRange(g.startKm, g.endKm)}</span>
               <span className={styles.band}>
                 <RiskBand segments={g.segments} size="s" />

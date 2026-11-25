@@ -42,7 +42,7 @@
 /* 예시 코스 표지: 확정 전 자료임을 이름 옆에 */
 .tag {
   display: inline-block;
-  margin-left: var(--space-2);
+  margin-left: var(--space-1);
   padding: 0 var(--space-2);
   border: 1px solid var(--ink);
   border-radius: var(--radius-s);

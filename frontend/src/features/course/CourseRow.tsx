@@ -42,7 +42,12 @@ export function CourseRow({
         <div className={styles.body}>
           <Name className={styles.name}>
             {course.name}
-            {tag && <span className={styles.tag}>{tag}</span>}
+            {tag && (
+              <>
+                {' '}
+                <span className={styles.tag}>{tag}</span>
+              </>
+            )}
           </Name>
           {/* 색 띠는 바로 아래 글(주의할 구간 수)과 같은 내용이라 화면 읽기에서 숨긴다 */}
           <div className={styles.band}>

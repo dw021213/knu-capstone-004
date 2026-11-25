@@ -56,6 +56,8 @@ describe('CourseRow', () => {
     expect(
       screen.getByText('장소 3곳 · 직선 연결 · 12.3km · 주의할 구간 없음'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading')).toHaveTextContent('제주올레 9코스예시 · 확정 전');
+    expect(
+      screen.getByRole('heading', { name: '제주올레 9코스 예시 · 확정 전' }),
+    ).toBeInTheDocument();
   });
 });
