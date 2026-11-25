@@ -10,9 +10,15 @@ import styles from './CourseRow.module.css';
  */
 export function CourseRow({
   summary,
+  href,
+  meta = [],
   onPreview,
 }: {
   summary: CourseSummary;
+  /** 상세 주소(코스 종류마다 다르다) */
+  href: string;
+  /** 길이 앞에 붙일 짧은 정보 */
+  meta?: readonly string[];
   onPreview?: (id: string | null) => void;
 }) {
   const { course, level, cautionKm, noDataRatio } = summary;
@@ -20,7 +26,7 @@ export function CourseRow({
   return (
     <li className={styles.row} data-level={level ?? 'none'} data-caution-km={cautionKm.toFixed(3)}>
       <Link
-        to={`/courses/${course.id}`}
+        to={href}
         className={styles.link}
         onMouseEnter={() => onPreview?.(course.id)}
         onMouseLeave={() => onPreview?.(null)}
@@ -30,7 +36,7 @@ export function CourseRow({
         <LevelBadge level={level} />
         <div className={styles.body}>
           <h2 className={styles.name}>{course.name}</h2>
-          <p className={styles.meta}>{course.lengthKm.toFixed(1)}km</p>
+          <p className={styles.meta}>{[...meta, `${course.lengthKm.toFixed(1)}km`].join(' · ')}</p>
           <p className={styles.line}>{courseLine(summary)}</p>
           {noData && <p className={styles.noData}>{noData}</p>}
         </div>

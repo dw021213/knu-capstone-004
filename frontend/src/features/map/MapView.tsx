@@ -73,6 +73,20 @@ export interface MapViewProps {
   cover?: Cover | null;
   /** 이 점이 보이는 영역(cover 안쪽) 밖이면 확대 수준은 그대로 두고 그 가운데로 옮긴다. key가 바뀔 때마다 한 번 */
   reveal?: MapReveal | null;
+  /** 코스 장소 번호 핀, 검색 결과 글자 표지, 고른 곳 임시 핀 */
+  pins?: readonly MapPin[] | null;
+  /** 검색 결과 표지(kind 'result')를 눌렀을 때 그 핀의 순번. 다른 핀은 누르기를 가로채지 않는다 */
+  onPinSelect?: (index: number) => void;
+}
+
+export interface MapPin {
+  /** [경도, 위도] */
+  lngLat: [number, number];
+  label: string;
+  /** stop: 코스 장소 번호(기본), result: 검색 결과 글자 표지, draft: 넣기 전 고른 곳 */
+  kind?: 'stop' | 'result' | 'draft';
+  /** 고른 결과 표지(크게, 위에) */
+  active?: boolean;
 }
 
 export interface Cover {
@@ -113,6 +127,8 @@ const CLICK_SLOP = 6;
 const CLUSTER_ZOOM_BY = 2;
 /** 고른 점을 보이는 영역 가장자리에서 이만큼(px) 안쪽에 있어야 보인다고 본다 */
 const REVEAL_MARGIN = 32;
+/** 검색 결과 표지를 누른 것으로 보는 반지름(px) */
+const PIN_HIT = 18;
 
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -142,6 +158,8 @@ export function MapView({
   panelRight = 0,
   cover = null,
   reveal = null,
+  pins = null,
+  onPinSelect,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -173,6 +191,10 @@ export function MapView({
   const [settled, setSettled] = useState<View | null>(null);
   // 이벤트 처리기가 읽는 지금 변환(렌더 중에는 읽지 않는다)
   const viewRef = useRef<View | null>(null);
+  const pinsRef = useRef(pins);
+  useLayoutEffect(() => {
+    pinsRef.current = pins;
+  });
 
   const cells = useMemo(() => (scores ? prepareCells(scores.cells.values()) : []), [scores]);
 
@@ -490,6 +512,21 @@ export function MapView({
       idle() {
         return !focusing.current && appliedReveal.current === doneReveal.current;
       },
+      pins() {
+        const v = viewRef.current;
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!v || !rect) return [];
+        return (pinsRef.current ?? []).map((p) => {
+          const [x, y] = lngLatToScreen(v, ...p.lngLat);
+          return {
+            x: rect.left + x,
+            y: rect.top + y,
+            label: p.label,
+            kind: p.kind ?? 'stop',
+            active: p.active ?? false,
+          };
+        });
+      },
       route() {
         const v = viewRef.current;
         const rect = containerRef.current?.getBoundingClientRect();
@@ -539,9 +576,11 @@ export function MapView({
   const known = scores?.cells;
   const selectRef = useRef(onCellSelect);
   const markerSelectRef = useRef(onMarkerSelect);
+  const pinSelectRef = useRef(onPinSelect);
   useLayoutEffect(() => {
     selectRef.current = onCellSelect;
     markerSelectRef.current = onMarkerSelect;
+    pinSelectRef.current = onPinSelect;
   });
   useEffect(() => {
     const el = containerRef.current!;
@@ -570,6 +609,19 @@ export function MapView({
       if (Math.hypot(e.clientX - start[0], e.clientY - start[1]) >= CLICK_SLOP) return;
       const rect = el.getBoundingClientRect();
       const p: [number, number] = [e.clientX - rect.left, e.clientY - rect.top];
+      // 검색 결과 표지는 DOM 위에 있지만 누르기는 여기서 가린다(지도 누르기가 같이 일어나지 않게). 고른 표지가 맨 위
+      const results = (pinsRef.current ?? [])
+        .map((pin, i) => ({
+          pin,
+          i,
+          d: Math.hypot(...lngLatToScreen(v, ...pin.lngLat).map((c, j) => c - p[j])),
+        }))
+        .filter(({ pin, d }) => pin.kind === 'result' && d <= PIN_HIT)
+        .sort((a, b) => Number(b.pin.active ?? false) - Number(a.pin.active ?? false) || a.d - b.d);
+      if (results.length > 0 && pinSelectRef.current) {
+        pinSelectRef.current(results[0].i);
+        return;
+      }
       // 마커·클러스터를 누른 것이면 셀을 고르지 않는다
       const { view: drawnAt, hits } = hitsRef.current;
       const hit = hits.length > 0 ? hitTest(hits, ...reproject(v, drawnAt, p)) : null;
@@ -641,6 +693,23 @@ export function MapView({
           style={canvasTransform ? { transform: canvasTransform } : undefined}
         />
         {location && view && <LocationMark location={location} view={view} />}
+        {view &&
+          pins?.map((p, i) => {
+            const [x, y] = lngLatToScreen(view, ...p.lngLat);
+            return (
+              <span
+                key={i}
+                className={styles.pin}
+                data-kind={p.kind ?? 'stop'}
+                data-active={p.active || undefined}
+                style={{ left: x, top: y }}
+                data-testid="map-pin"
+                aria-hidden="true"
+              >
+                {p.label}
+              </span>
+            );
+          })}
         {overlays}
       </div>
       <p className={styles.attribution}>

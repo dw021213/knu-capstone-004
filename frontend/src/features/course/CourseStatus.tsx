@@ -1,8 +1,8 @@
-import type { CourseState } from '../../pages/useCourseSummaries';
+import type { Loadable } from './view';
 import styles from './CourseStatus.module.css';
 
 /** 코스 화면의 받는 중·실패·자료 없음 안내 */
-export function CourseStatus({ state }: { state: Exclude<CourseState, { status: 'ready' }> }) {
+export function CourseStatus({ state }: { state: Exclude<Loadable<object>, { status: 'ready' }> }) {
   if (state.status === 'loading') {
     return (
       <p className={styles.box} role="status">

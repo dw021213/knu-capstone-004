@@ -175,9 +175,9 @@ test.describe('코스 화면', () => {
   for (const tag of ['', '@desktop ']) {
     test(`${tag}코스 목록에 접근성 critical·serious 위반이 없다`, async ({ page }) => {
       await page.goto('/courses');
-      await expect(page.getByRole('list', { name: '코스 목록' }).getByRole('listitem')).toHaveCount(
-        3,
-      );
+      await expect(
+        page.getByRole('list', { name: '올레 코스 목록' }).getByRole('listitem'),
+      ).toHaveCount(3);
       expect(await seriousViolations(page)).toEqual([]);
     });
 
@@ -252,9 +252,9 @@ test.describe('1024px 데스크톱 배치', () => {
   test('@desktop 1024 코스 목록(왼쪽 지도 + 오른쪽 패널)에 위반이 없다', async ({ page }) => {
     await page.goto('/courses');
     await page.waitForFunction(() => window.__mapReady === true);
-    await expect(page.getByRole('list', { name: '코스 목록' }).getByRole('listitem')).toHaveCount(
-      3,
-    );
+    await expect(
+      page.getByRole('list', { name: '올레 코스 목록' }).getByRole('listitem'),
+    ).toHaveCount(3);
     expect(await seriousViolations(page)).toEqual([]);
     expect(await landmarkViolations(page)).toEqual([]);
   });

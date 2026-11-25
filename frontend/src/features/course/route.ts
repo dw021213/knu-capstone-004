@@ -44,6 +44,17 @@ export function courseFocus(key: number, coords: [number, number][], right: numb
   };
 }
 
+/** 장소 한 곳으로 옮겨 동네가 보이게 확대(검색에서 고른 장소, 장소 줄) */
+export function pointFocus(key: number, point: [number, number], right: number): MapFocus {
+  return {
+    key,
+    bbox: [point[0], point[1], point[0], point[1]],
+    point,
+    zoom: { min: 14, max: 14 },
+    ...place(right),
+  };
+}
+
 /** 주의 구간 하나로 옮겨 확대 */
 export function segmentFocus(key: number, seg: Segment, right: number): MapFocus {
   return {

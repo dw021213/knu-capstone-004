@@ -98,3 +98,52 @@
   color: var(--ink);
   white-space: nowrap;
 }
+
+/* 코스 장소 번호 핀: 검정 알약 + 흰 테두리 + 흰 숫자. 빨간 원(주의 지점)과 헷갈리지 않게 네모진 모양 */
+.pin {
+  position: absolute;
+  translate: -50% -50%;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--space-1);
+  border: var(--border-strong) solid var(--white);
+  border-radius: var(--radius-s);
+  background: var(--ink);
+  color: var(--white);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 19px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+/* 검색 결과 글자 표지: 흰 바탕 + 검정 글자로 코스 장소 번호(검정 바탕)와 구분. 고른 것은 검정으로 뒤집고 크게 */
+.pin[data-kind='result'] {
+  border-color: var(--ink);
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--white);
+}
+
+.pin[data-kind='result'][data-active] {
+  z-index: 1;
+  min-width: 30px;
+  height: 30px;
+  border-color: var(--white);
+  background: var(--ink);
+  color: var(--white);
+  font-size: var(--text-s);
+  line-height: 27px;
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+/* 넣기 전 고른 곳: 둥근 핀으로 번호 핀과 구분 */
+.pin[data-kind='draft'] {
+  z-index: 1;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: var(--text-s);
+  line-height: 25px;
+}

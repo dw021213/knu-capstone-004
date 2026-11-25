@@ -232,7 +232,7 @@ test.describe('U9-2 데스크톱 코스 화면', () => {
     await page.clock.setFixedTime(FIXED_NOW);
     await page.goto('/courses');
     await page.waitForFunction(() => window.__mapReady === true);
-    const list = page.getByRole('list', { name: '코스 목록' });
+    const list = page.getByRole('list', { name: '올레 코스 목록' });
     await expect(list.getByRole('listitem')).toHaveCount(3);
     const l = (await list.boundingBox())!;
     const bar = (await page.getByRole('button', { name: '뒤로' }).boundingBox())!;
@@ -310,9 +310,9 @@ for (const [w, h] of [
       await expectUsable('셀을 고른 지도 홈');
 
       await page.goto('/courses');
-      await expect(page.getByRole('list', { name: '코스 목록' }).getByRole('listitem')).toHaveCount(
-        3,
-      );
+      await expect(
+        page.getByRole('list', { name: '올레 코스 목록' }).getByRole('listitem'),
+      ).toHaveCount(3);
       if (w > 768) {
         await page.waitForFunction(() => window.__mapReady === true);
         await expectUsable('코스 목록');
@@ -351,7 +351,7 @@ for (const [w, h] of [
       await page.clock.setFixedTime(FIXED_NOW);
       await page.goto('/courses');
       await page.waitForFunction(() => window.__mapReady === true);
-      const list = page.getByRole('list', { name: '코스 목록' });
+      const list = page.getByRole('list', { name: '올레 코스 목록' });
       await expect(list.getByRole('listitem')).toHaveCount(3);
       const panelX = (await list.boundingBox())!.x;
       const bar = (await page.getByRole('button', { name: '뒤로' }).boundingBox())!;

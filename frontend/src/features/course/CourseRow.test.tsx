@@ -20,7 +20,7 @@ const renderRow = (s: CourseSummary) =>
   render(
     <MemoryRouter>
       <ol>
-        <CourseRow summary={s} />
+        <CourseRow summary={s} href={`/courses/${s.course.id}`} />
       </ol>
     </MemoryRouter>,
   );
@@ -43,6 +43,22 @@ describe('CourseRow', () => {
     expect(badge).toHaveAttribute('data-level', 'none');
     expect(screen.getByText('데이터 부족 구간 100% (도로 자료 미확인)')).toBeInTheDocument();
     expect(screen.getByRole('listitem')).toHaveAttribute('data-level', 'none');
+  });
+
+  it('종류마다 다른 상세 주소와 길이 앞 정보를 보인다', () => {
+    render(
+      <MemoryRouter>
+        <ol>
+          <CourseRow
+            summary={summary({})}
+            href="/courses/mine/abc"
+            meta={['장소 3곳', '직선 연결']}
+          />
+        </ol>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/courses/mine/abc');
+    expect(screen.getByText('장소 3곳 · 직선 연결 · 12.3km')).toBeInTheDocument();
   });
 
   it('데이터 부족 구간이 30%면 그 줄을 보인다', () => {

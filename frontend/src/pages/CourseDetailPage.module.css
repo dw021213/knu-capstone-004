@@ -108,3 +108,50 @@
 .chip {
   composes: chip from '../shared/ui/sheet.module.css';
 }
+
+.dateRow {
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+/* 장소를 무엇으로 이었는지. 직선 연결은 굵은 테두리로 눈에 띄게 */
+.via {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--surf);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+.via[data-via='straight'] {
+  border: var(--border-strong) solid var(--ink);
+  background: var(--white);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+}
+
+/* 보조 조작: 흰 바탕 + 검정 테두리 */
+.secondary {
+  composes: listLink;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-s);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.confirm {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-s);
+}

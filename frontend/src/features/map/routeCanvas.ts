@@ -15,6 +15,8 @@ export interface MapRoute {
   lines: { coords: [number, number][]; level: Level | null }[];
   /** 주의 지점(번호) */
   marks: { lngLat: [number, number]; label: string }[];
+  /** false면 시작·끝 표지를 그리지 않는다(장소 번호 핀이 끝점을 대신할 때) */
+  ends?: boolean;
 }
 
 /** canvas라 CSS 변수 값을 받아 쓴다 */
@@ -134,6 +136,7 @@ export function drawRoute(
     ctx.fillText(m.label, x, y + 0.5);
     hits.push({ x, y, label: m.label });
   }
+  if (route.ends === false) return { marks: hits, ends: [] };
   const first = route.lines[0].coords[0];
   const lastLine = route.lines[route.lines.length - 1].coords;
   const last = lastLine[lastLine.length - 1];
