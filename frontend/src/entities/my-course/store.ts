@@ -9,6 +9,8 @@ export interface Stop {
   lat: number;
   lng: number;
   source: StopSource;
+  /** 카카오 장소 번호(카카오에서 고른 장소만) */
+  kakaoId?: string;
 }
 
 export interface MyCourse {
@@ -39,11 +41,19 @@ const isObj = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !
 const isStr = (v: unknown): v is string => typeof v === 'string';
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
-function toStop(v: unknown): Stop | null {
+export function toStop(v: unknown): Stop | null {
   if (!isObj(v) || !isStr(v.id) || !isStr(v.name) || !isNum(v.lat) || !isNum(v.lng)) return null;
   const source = isStr(v.source) ? (RETIRED_SOURCES[v.source] ?? v.source) : v.source;
   if (!SOURCES.includes(source as StopSource)) return null;
-  return { id: v.id, name: v.name, lat: v.lat, lng: v.lng, source: source as StopSource };
+  const stop: Stop = {
+    id: v.id,
+    name: v.name,
+    lat: v.lat,
+    lng: v.lng,
+    source: source as StopSource,
+  };
+  if (isStr(v.kakaoId)) stop.kakaoId = v.kakaoId;
+  return stop;
 }
 
 function toCourse(v: unknown): MyCourse | null {

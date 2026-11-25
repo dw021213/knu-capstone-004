@@ -210,6 +210,7 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
   const add = (c: Candidate) => {
     if (addBlock(draft.stops, c)) return;
     const stop: Stop = { id: newId(), name: c.name, lat: c.lat, lng: c.lng, source: c.source };
+    if (c.kakaoId !== undefined) stop.kakaoId = c.kakaoId;
     setDraft((d) => ({ ...d, stops: addStop(d.stops, stop) }));
     act({ type: 'close' });
     showPoint([c.lng, c.lat]);

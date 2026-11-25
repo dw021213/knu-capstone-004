@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { addBlock, addStop, moveStop, removeStop, stopRole } from './stops';
+import { addBlock, addStop, moveStop, removeStop, samePlace, stopRole } from './stops';
 import {
   MAX_STOPS,
   STORAGE_KEY,
@@ -158,6 +158,34 @@ describe('읽지 못한 코스', () => {
     localStorage.setItem(STORAGE_KEY, '{broken');
     const a = saveCourse({ name: 'A', stops: [stop(1), stop(2)] });
     expect(raws()).toEqual([a]);
+  });
+});
+
+describe('카카오 장소 번호', () => {
+  const at = (lat: number, kakaoId?: string) => ({ lat, lng: 126.5, kakaoId });
+  // 위도 0.00009도는 약 10m
+  const near = 33.4 + 0.00009;
+
+  it('둘 다 번호가 있으면 번호로 같은 곳인지 본다(20m 안의 다른 가게는 다른 곳)', () => {
+    expect(samePlace(at(33.4, '1'), at(near, '2'))).toBe(false);
+    expect(samePlace(at(33.4, '1'), at(33.4, '1'))).toBe(true);
+    expect(addBlock([{ ...stop(0), ...at(33.4, '1') }], at(near, '2'))).toBeNull();
+  });
+
+  it('한쪽이라도 번호가 없으면(지도에서 고른 곳, 읍면동) 20m 거리로 본다', () => {
+    expect(samePlace(at(33.4), at(near, '2'))).toBe(true);
+    expect(samePlace(at(33.4, '1'), at(near))).toBe(true);
+    expect(samePlace(at(33.4, '1'), at(33.401))).toBe(false);
+  });
+
+  it('번호를 저장하고 다시 읽으며, 번호가 없는 예전 저장값도 그대로 읽는다', () => {
+    const kakao: Stop = { ...stop(1), source: 'kakao', kakaoId: '8123' };
+    const a = saveCourse({ name: 'A', stops: [kakao, stop(2)] });
+    expect(readCourses()[0].stops[0].kakaoId).toBe('8123');
+    expect(readCourses()[0].stops[1]).not.toHaveProperty('kakaoId');
+    const old = { ...a, id: 'old', stops: [stop(3), { ...stop(4), source: 'kakao' }] };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ courses: [old] }));
+    expect(readCourses()).toEqual([old]);
   });
 });
 

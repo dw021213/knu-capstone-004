@@ -11,6 +11,8 @@ export interface Candidate {
   lat: number;
   lng: number;
   source: StopSource;
+  /** 카카오 장소 번호(카카오 결과만) */
+  kakaoId?: string;
 }
 
 /** 줄 아래 작은 글자: 분류 · 주소 */

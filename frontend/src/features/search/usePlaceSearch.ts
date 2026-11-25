@@ -40,6 +40,7 @@ const fromKakao = (p: KakaoPlace): Candidate => ({
   lat: p.lat,
   lng: p.lng,
   source: 'kakao',
+  kakaoId: p.id,
 });
 
 // 추천과 검색 결과 1쪽이 같은 요청을 나눠 쓴다(추천을 본 뒤 엔터를 치면 바로 결과가 뜬다)
