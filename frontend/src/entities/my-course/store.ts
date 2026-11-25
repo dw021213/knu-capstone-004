@@ -41,7 +41,7 @@ const isObj = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !
 const isStr = (v: unknown): v is string => typeof v === 'string';
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
-export function toStop(v: unknown): Stop | null {
+function toStop(v: unknown): Stop | null {
   if (!isObj(v) || !isStr(v.id) || !isStr(v.name) || !isNum(v.lat) || !isNum(v.lng)) return null;
   const source = isStr(v.source) ? (RETIRED_SOURCES[v.source] ?? v.source) : v.source;
   if (!SOURCES.includes(source as StopSource)) return null;
@@ -56,15 +56,22 @@ export function toStop(v: unknown): Stop | null {
   return stop;
 }
 
+/** 저장된 장소 목록. 하나라도 모양이 다르거나 MAX_STOPS를 넘으면 null */
+export function toStops(v: unknown): Stop[] | null {
+  if (!Array.isArray(v) || v.length > MAX_STOPS) return null;
+  const stops = v.map(toStop);
+  return stops.some((s) => s === null) ? null : (stops as Stop[]);
+}
+
 function toCourse(v: unknown): MyCourse | null {
-  if (!isObj(v) || !isStr(v.id) || !isStr(v.name) || !Array.isArray(v.stops)) return null;
+  if (!isObj(v) || !isStr(v.id) || !isStr(v.name)) return null;
   if (!isStr(v.createdAt) || !isStr(v.updatedAt)) return null;
-  const stops = v.stops.map(toStop);
-  if (stops.some((s) => s === null) || stops.length > MAX_STOPS) return null;
+  const stops = toStops(v.stops);
+  if (!stops) return null;
   return {
     id: v.id,
     name: v.name,
-    stops: stops as Stop[],
+    stops,
     createdAt: v.createdAt,
     updatedAt: v.updatedAt,
   };

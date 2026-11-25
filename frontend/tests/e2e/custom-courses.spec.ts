@@ -571,6 +571,7 @@ test.describe('내 코스', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  const sheet = (page: Page) => page.getByTestId('course-editor');
   const saved = (page: Page) =>
     page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? '{"courses":[]}').courses, STORE);
 
@@ -583,6 +584,128 @@ test.describe('내 코스', () => {
     await expect(page).toHaveURL(/\/courses\/mine\/(?!new$)[\w-]+$/);
     await expect(page.getByRole('heading', { level: 1, name: '내 코스' })).toBeVisible();
     expect(await saved(page)).toHaveLength(1);
+  });
+
+  test('검색 결과나 장소 카드에서 뒤로 가기는 그것만 닫고, 편집 화면과 넣은 장소는 남는다', async ({
+    page,
+  }) => {
+    const suggestion = (name: string) =>
+      page.getByRole('listbox', { name: '추천 장소' }).getByRole('option', { name });
+    await page.goto('/courses?tab=mine');
+    await page.getByRole('link', { name: '새 코스 만들기' }).click();
+    await mapReady(page);
+
+    // 지도를 누른 카드
+    await tapMap(page, [126.55, 33.43]);
+    await expect(card(page)).toBeVisible();
+    await page.goBack();
+    await expect(card(page)).toHaveCount(0);
+    await expect(page).toHaveURL(/\/courses\/mine\/new$/);
+    await addFromResults(page, '애월', '애월읍');
+
+    await search(page).fill('성산');
+    await search(page).press('Enter');
+    await expect(sheet(page)).toHaveAttribute('data-mode', 'results');
+    await page.goBack();
+    await expect(sheet(page)).toHaveAttribute('data-mode', 'idle');
+    await expect(page).toHaveURL(/\/courses\/mine\/new$/);
+    expect(await names(page)).toEqual(['애월읍']);
+
+    // 추천에서 고른 카드
+    await search(page).fill('성산');
+    await suggestion('성산읍').click();
+    await expect(card(page)).toBeVisible();
+    await page.goBack();
+    await expect(card(page)).toHaveCount(0);
+    await expect(page).toHaveURL(/\/courses\/mine\/new$/);
+    expect(await names(page)).toEqual(['애월읍']);
+
+    // ←, Esc, 추가, 카드 닫기로 닫은 뒤에도 뒤로 한 번이면 목록이다
+    await search(page).fill('성산');
+    await search(page).press('Enter');
+    await page.getByRole('button', { name: '검색 닫기' }).click();
+    await search(page).fill('성산');
+    await search(page).press('Enter');
+    await expect(sheet(page)).toHaveAttribute('data-mode', 'results');
+    await search(page).press('Escape');
+    await expect(sheet(page)).toHaveAttribute('data-mode', 'idle');
+    await addFromResults(page, '한림', '한림읍');
+    await search(page).fill('성산');
+    await suggestion('성산읍').click();
+    await card(page).getByRole('button', { name: '닫기' }).click();
+    expect(await names(page)).toEqual(['애월읍', '한림읍']);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/courses\?tab=mine$/);
+  });
+
+  test('결과를 연 채 새로고침해도 이어 쓰고, 뒤로 한 번이면 편집 화면을 떠난다', async ({
+    page,
+  }) => {
+    await page.goto('/courses?tab=mine');
+    await page.getByRole('link', { name: '새 코스 만들기' }).click();
+    await mapReady(page);
+    await addFromResults(page, '애월', '애월읍');
+    await search(page).fill('성산');
+    await search(page).press('Enter');
+    await expect(sheet(page)).toHaveAttribute('data-mode', 'results');
+    await page.reload();
+    await expect(page.getByTestId('draft-stop-name')).toHaveText(['애월읍']);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/courses\?tab=mine$/);
+  });
+
+  test('만들던 코스는 새로고침하거나 떠났다 돌아와도 이어 쓰고, 저장하거나 취소하면 비운다', async ({
+    page,
+  }) => {
+    const restored = page.getByText('작성 중이던 코스를 불러왔어요');
+    await page.goto('/courses?tab=mine');
+    await page.getByRole('link', { name: '새 코스 만들기' }).click();
+    await mapReady(page);
+    await expect(restored).toHaveCount(0);
+    await addFromResults(page, '애월', '애월읍');
+    await addFromResults(page, '성산', '성산읍');
+    await page.getByRole('textbox', { name: '코스 이름' }).fill('이어 쓸 코스');
+
+    await page.reload();
+    await expect(page.getByTestId('draft-stop-name')).toHaveText(['애월읍', '성산읍']);
+    await expect(page.getByRole('textbox', { name: '코스 이름' })).toHaveValue('이어 쓸 코스');
+    await expect(restored).toBeVisible();
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/courses\?tab=mine$/);
+    await page.getByRole('link', { name: '새 코스 만들기' }).click();
+    await expect(page.getByTestId('draft-stop-name')).toHaveText(['애월읍', '성산읍']);
+
+    await page.getByRole('button', { name: '저장' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: '이어 쓸 코스' })).toBeVisible();
+    await page.goto('/courses/mine/new');
+    await expect(draft(page)).toHaveCount(0);
+    await expect(restored).toHaveCount(0);
+    expect(await saved(page)).toHaveLength(1);
+
+    await page.goto('/courses?tab=mine');
+    await page.getByRole('link', { name: '새 코스 만들기' }).click();
+    await mapReady(page);
+    await addFromResults(page, '애월', '애월읍');
+    await page.getByRole('link', { name: '취소' }).click();
+    await expect(page).toHaveURL(/\/courses\?tab=mine$/);
+    await page.getByRole('link', { name: '새 코스 만들기' }).click();
+    await expect(draft(page)).toHaveCount(0);
+  });
+
+  test('고치던 코스의 초안은 그 코스에만 남고 새 코스에는 섞이지 않는다', async ({ page }) => {
+    await seed(page, [{ id: 'fix', name: '고칠 코스', stops: [JEJU_MOK, CHUSA] }]);
+    await page.goto('/courses/mine/fix/edit');
+    await expect(draft(page)).toHaveCount(2);
+    await expect(page.getByText('작성 중이던 코스를 불러왔어요')).toHaveCount(0);
+    await page.getByRole('button', { name: '2번 추사관 빼기' }).click();
+    await page.reload();
+    await expect(page.getByTestId('draft-stop-name')).toHaveText(['제주목 관아']);
+    await expect(page.getByText('작성 중이던 코스를 불러왔어요')).toBeVisible();
+    await page.goto('/courses/mine/new');
+    await expect(draft(page)).toHaveCount(0);
+    await page.goto('/courses/mine/fix');
+    await expect(page.getByTestId('stop-list').getByRole('listitem')).toHaveCount(2);
   });
 
   for (const blocked of ['가득 참', '사이트 데이터 막힘'] as const) {
