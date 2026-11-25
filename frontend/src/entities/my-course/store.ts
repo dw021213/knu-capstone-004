@@ -60,17 +60,34 @@ function toCourse(v: unknown): MyCourse | null {
   };
 }
 
-/** 저장된 문자열 → 코스 목록. 깨진 자료(JSON 아님, 모양이 다름)는 버린다 */
-export function parseStored(raw: string | null): MyCourse[] {
-  if (!raw) return [];
+interface Stored {
+  courses: MyCourse[];
+  /** 읽지 못한 항목의 원문. 다음 판이나 다른 탭이 쓴 것일 수 있어 쓸 때 그대로 다시 쓴다 */
+  unread: unknown[];
+}
+
+function parse(raw: string | null): Stored {
+  const none: Stored = { courses: [], unread: [] };
+  if (!raw) return none;
   let data: unknown;
   try {
     data = JSON.parse(raw);
   } catch {
-    return [];
+    return none;
   }
-  if (!isObj(data) || !Array.isArray(data.courses)) return [];
-  return data.courses.map(toCourse).filter((c) => c !== null);
+  if (!isObj(data) || !Array.isArray(data.courses)) return none;
+  const out: Stored = { courses: [], unread: [] };
+  for (const item of data.courses) {
+    const course = toCourse(item);
+    if (course) out.courses.push(course);
+    else out.unread.push(item);
+  }
+  return out;
+}
+
+/** 저장된 문자열 → 읽을 수 있는 코스 목록(JSON이 아니거나 모양이 다른 코스는 빠진다) */
+export function parseStored(raw: string | null): MyCourse[] {
+  return parse(raw).courses;
 }
 
 function storage(): Storage | null {
@@ -82,17 +99,22 @@ function storage(): Storage | null {
 }
 
 const listeners = new Set<() => void>();
-let cache: { raw: string | null; courses: MyCourse[] } | null = null;
+let cache: (Stored & { raw: string | null }) | null = null;
+
+function stored(): Stored {
+  const raw = storage()?.getItem(STORAGE_KEY) ?? null;
+  if (!cache || cache.raw !== raw) cache = { raw, ...parse(raw) };
+  return cache;
+}
 
 /** 지금 저장된 코스(같은 저장 내용이면 같은 배열) */
 export function readCourses(): MyCourse[] {
-  const raw = storage()?.getItem(STORAGE_KEY) ?? null;
-  if (!cache || cache.raw !== raw) cache = { raw, courses: parseStored(raw) };
-  return cache.courses;
+  return stored().courses;
 }
 
 function write(courses: MyCourse[]) {
-  storage()?.setItem(STORAGE_KEY, JSON.stringify({ courses }));
+  const { unread } = stored();
+  storage()?.setItem(STORAGE_KEY, JSON.stringify({ courses: [...courses, ...unread] }));
   for (const l of listeners) l();
 }
 

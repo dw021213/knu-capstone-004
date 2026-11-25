@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addBlock, addStop, moveStop, removeStop, stopRole } from './stops';
 import {
   MAX_STOPS,
@@ -20,6 +20,7 @@ const stop = (i: number): Stop => ({
 });
 
 beforeEach(() => localStorage.clear());
+afterEach(() => vi.restoreAllMocks());
 
 describe('저장소', () => {
   it('저장한 코스를 다시 읽고, 고치면 만든 시각은 두고 고친 시각만 바뀐다', () => {
@@ -128,6 +129,35 @@ describe('깨진 자료', () => {
     });
     expect(readCourses()).toEqual([]);
     spy.mockRestore();
+  });
+});
+
+describe('읽지 못한 코스', () => {
+  const raws = () => JSON.parse(localStorage.getItem(STORAGE_KEY)!).courses;
+
+  it('다른 코스를 저장하거나 지워도 원문 그대로 남는다', () => {
+    const future = {
+      id: 'future',
+      name: '다음 판 코스',
+      stops: [{ ...stop(1), source: 'olle' }],
+      createdAt: '2026-11-24T00:00:00.000Z',
+      updatedAt: '2026-11-24T00:00:00.000Z',
+      tag: { kept: true },
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ courses: [future, 'x'] }));
+    expect(readCourses()).toEqual([]);
+    const a = saveCourse({ name: 'A', stops: [stop(1), stop(2)] });
+    expect(readCourses()).toEqual([a]);
+    expect(raws()).toEqual(expect.arrayContaining([future, 'x']));
+    deleteCourse(a.id);
+    expect(readCourses()).toEqual([]);
+    expect(raws()).toEqual([future, 'x']);
+  });
+
+  it('통째로 깨진 값(JSON 아님)은 빈 목록으로 보고 덮어쓴다', () => {
+    localStorage.setItem(STORAGE_KEY, '{broken');
+    const a = saveCourse({ name: 'A', stops: [stop(1), stop(2)] });
+    expect(raws()).toEqual([a]);
   });
 });
 
