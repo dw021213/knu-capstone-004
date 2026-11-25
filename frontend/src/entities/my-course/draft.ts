@@ -50,9 +50,5 @@ export function keepDraft(courseId: string | undefined, draft: Draft, base: Draf
 }
 
 export function clearDraft(courseId: string | undefined) {
-  try {
-    session()?.removeItem(keyOf(courseId));
-  } catch {
-    // 지우지 못해도 다음에 열 때 처음과 비교해 다시 정리한다
-  }
+  session()?.removeItem(keyOf(courseId));
 }
