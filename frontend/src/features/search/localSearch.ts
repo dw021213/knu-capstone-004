@@ -15,8 +15,12 @@ export interface Candidate {
   kakaoId?: string;
 }
 
+/** 모든 장소가 제주라 주소 앞의 도 이름은 빼고 보인다(좁은 줄에서 시·읍면 뒤가 잘리지 않게) */
+const shortAddress = (address: string) => address.replace(/^제주특별자치도\s+/, '');
+
 /** 줄 아래 작은 글자: 분류 · 주소 */
-export const metaText = (c: Candidate) => [c.category, c.address].filter(Boolean).join(' · ');
+export const metaText = (c: Candidate) =>
+  [c.category, shortAddress(c.address)].filter(Boolean).join(' · ');
 
 const squash = (s: string) => s.replace(/\s+/g, '').toLowerCase();
 

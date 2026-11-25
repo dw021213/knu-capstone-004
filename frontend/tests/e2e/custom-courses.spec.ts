@@ -186,9 +186,9 @@ test.describe('내 코스', () => {
       const rows = results(page).getByRole('listitem');
       await expect(rows).toHaveCount(15);
       await expect(rows.first().getByRole('button', { name: 'A, 제주국제공항' })).toBeVisible();
-      await expect(rows.first()).toContainText('공항 · 제주특별자치도 제주시 공항로 1');
+      await expect(rows.first()).toContainText('공항 · 제주시 공항로 1');
       // 도로명 주소가 없으면 지번
-      await expect(rows.nth(3)).toContainText('한식 · 제주특별자치도 제주시 용담이동 2003');
+      await expect(rows.nth(3)).toContainText('한식 · 제주시 용담이동 2003');
       await expect(sheet).not.toContainText('김포국제공항');
       expect(await pinLabels(page)).toEqual([...'ABCDEFGHIJKLMNO']);
       const calls = await page.evaluate(
@@ -311,7 +311,7 @@ test.describe('내 코스', () => {
     await expect(listbox.getByRole('option')).toHaveCount(8);
     const first = listbox.getByRole('option').first();
     await expect(first.locator('strong')).toHaveText('공항');
-    await expect(first).toContainText('공항 · 제주특별자치도 제주시 공항로 1');
+    await expect(first).toContainText('공항 · 제주시 공항로 1');
 
     await search(page).press('ArrowDown');
     await expect(search(page)).toHaveAttribute(
