@@ -50,6 +50,31 @@
   }
 }
 
+/* 확정 전 자료 안내(예시 코스): 검정 테두리로 다른 안내와 구분 */
+.notice {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  background: var(--white);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+.notice p {
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--text-s);
+  font-weight: 700;
+}
+
+.note {
+  color: var(--ink2);
+}
+
 .lead {
   margin: 0 0 var(--space-3);
   font-size: var(--text-s);
@@ -146,6 +171,15 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   margin: 0 0 var(--space-3);
+}
+
+/* 주 조작 버튼: 검정 바탕(링크 모양과 같게) */
+.primary {
+  composes: listLink;
+  font: inherit;
+  font-size: var(--text-s);
+  font-weight: 700;
+  cursor: pointer;
 }
 
 /* 보조 조작: 흰 바탕 + 검정 테두리 */

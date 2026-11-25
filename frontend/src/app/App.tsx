@@ -27,6 +27,9 @@ const MyCourseEditPage = lazy(() =>
 const MyCourseDetailPage = lazy(() =>
   import('../pages/MyCoursePages').then((m) => ({ default: m.MyCourseDetailPage })),
 );
+const ExampleCourseDetailPage = lazy(() =>
+  import('../pages/MyCoursePages').then((m) => ({ default: m.ExampleCourseDetailPage })),
+);
 
 function Home() {
   usePageTitle();
@@ -48,6 +51,7 @@ export default function App() {
                 <Route path="/courses/mine/new" element={<MyCourseNewPage />} />
                 <Route path="/courses/mine/:id" element={<MyCourseDetailPage />} />
                 <Route path="/courses/mine/:id/edit" element={<MyCourseEditPage />} />
+                <Route path="/courses/examples/:id" element={<ExampleCourseDetailPage />} />
                 <Route path="*" element={<Home />} />
               </Routes>
             </Suspense>

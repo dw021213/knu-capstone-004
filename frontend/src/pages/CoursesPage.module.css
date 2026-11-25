@@ -136,3 +136,28 @@
 .source a {
   color: var(--ink2);
 }
+
+/* 탭 안 묶음(예시 코스): 위 목록과 굵은 선으로 나눈다 */
+.group {
+  border-top: 6px solid var(--surf);
+}
+
+.groupHead {
+  padding: var(--space-4) var(--space-4) 0;
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: var(--text-m);
+  font-weight: 700;
+}
+
+.groupNotice {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-strong) solid var(--ink);
+  border-radius: var(--radius-s);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  word-break: keep-all;
+}

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { dataSource, type DataSource } from '../data';
 import { groupCoords, type CautionGroup } from '../entities/course/caution';
-import { kindOfId, tabHref } from '../entities/course/kinds';
+import { COURSE_KINDS, kindOfId, tabHref } from '../entities/course/kinds';
 import { cautionCount } from '../entities/course/summary';
 import { EMD_QUERY_KEY, fetchEmd, placeAt } from '../entities/place/emd';
 import { MODEL_SOURCE } from '../entities/risk/reason';
@@ -83,6 +83,7 @@ export function CourseDetailScreen({ source, state, fallback, actions }: ScreenP
   };
 
   const title = summary?.course.name ?? '코스';
+  const notice = view ? COURSE_KINDS[view.kind].notice : null;
   return (
     <main className={styles.page} aria-label="코스 지도">
       {/* 뒤로 막대·시트를 지도보다 먼저 두어 첫 Tab이 뒤로 버튼으로 간다(지도는 z-index로 아래에 깐다) */}
@@ -111,6 +112,13 @@ export function CourseDetailScreen({ source, state, fallback, actions }: ScreenP
             <div className={styles.dateRow}>
               <DayToggle mode={source.mode} />
             </div>
+            {notice && (
+              <div className={styles.notice} data-testid="course-notice">
+                {view.subtitle && <p className={styles.subtitle}>{view.subtitle}</p>}
+                <p>{notice}</p>
+                {view.note && <p className={styles.note}>{view.note}</p>}
+              </div>
+            )}
             <p className={styles.lead}>
               빨간 구간은 조금 더 유의해서 지나 주세요. 가지 말라는 뜻은 아니에요.
             </p>
@@ -189,6 +197,11 @@ export function CourseDetailPage({ source = dataSource }: { source?: DataSource 
   const state = useCatalogDetail(source, id, kind);
   // 뒤로·앞으로 가기로 다른 코스가 되면 고른 주의할 구간과 지도 맞춤을 처음부터 다시 한다
   return (
-    <CourseDetailScreen key={id} source={source} state={state} fallback={tabHref(kind ?? 'olle')} />
+    <CourseDetailScreen
+      key={id}
+      source={source}
+      state={state}
+      fallback={tabHref(COURSE_KINDS[kind ?? 'olle'].tab)}
+    />
   );
 }

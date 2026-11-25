@@ -12,6 +12,7 @@ export function CourseRow({
   href,
   meta = [],
   tag = null,
+  headingLevel = 2,
   onPreview,
 }: {
   summary: CourseSummary;
@@ -21,10 +22,13 @@ export function CourseRow({
   meta?: readonly string[];
   /** 이름 옆 표지(예시 코스) */
   tag?: string | null;
+  /** 탭 안 묶음 제목(h2) 아래 목록이면 3 */
+  headingLevel?: 2 | 3;
   onPreview?: (id: string | null) => void;
 }) {
   const { course, noDataRatio } = summary;
   const noData = noDataLine(noDataRatio);
+  const Name = headingLevel === 3 ? 'h3' : 'h2';
   return (
     <li className={styles.row}>
       <Link
@@ -36,10 +40,10 @@ export function CourseRow({
         onBlur={() => onPreview?.(null)}
       >
         <div className={styles.body}>
-          <h2 className={styles.name}>
+          <Name className={styles.name}>
             {course.name}
             {tag && <span className={styles.tag}>{tag}</span>}
-          </h2>
+          </Name>
           {/* 색 띠는 바로 아래 글(주의할 구간 수)과 같은 내용이라 화면 읽기에서 숨긴다 */}
           <div className={styles.band}>
             <RiskBand segments={summary.segments} />

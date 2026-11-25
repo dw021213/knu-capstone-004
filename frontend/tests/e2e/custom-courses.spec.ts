@@ -609,3 +609,173 @@ test.describe('내 코스', () => {
     });
   }
 });
+
+const exampleList = (page: Page) => page.getByRole('list', { name: '예시 코스 목록' });
+const mineList = (page: Page) => page.getByRole('list', { name: '내 코스 목록' });
+const DRAFT_NOTICE =
+  '회사에서 받은 인문학 코스 초안을 임시로 넣은 예시예요. 장소와 순서는 확정 전이라 바뀔 수 있어요.';
+
+/** OSRM 대신 장소 사이를 꺾어 지나는 가짜 도로를 준다 */
+async function fakeOsrm(page: Page) {
+  await page.route('**/router.project-osrm.org/**', (r) => {
+    const pts = new URL(r.request().url()).pathname
+      .split('/')
+      .pop()!
+      .split(';')
+      .map((p) => p.split(',').map(Number));
+    const coords = pts.flatMap((p, i) =>
+      i === 0 ? [p] : [[(pts[i - 1][0] + p[0]) / 2, (pts[i - 1][1] + p[1]) / 2 + 0.005], p],
+    );
+    return r.fulfill({ json: { code: 'Ok', routes: [{ geometry: { coordinates: coords } }] } });
+  });
+}
+
+test.describe('예시 코스', () => {
+  for (const tag of ['', '@desktop ']) {
+    test(`${tag}내 코스 탭에 내 코스와 따로 예시 코스 두 개가 확정 전 표시와 함께 보인다`, async ({
+      page,
+    }) => {
+      await seed(page, [{ id: 'mine-1', name: '시연 코스', stops: [JEJU_MOK, HANGPA] }]);
+      await page.goto('/courses?tab=mine');
+      await expect(mineList(page).getByRole('listitem')).toHaveCount(1);
+      const group = page.getByRole('region', { name: '예시 코스' });
+      await expect(group.getByRole('heading', { level: 2, name: '예시 코스' })).toBeVisible();
+      await expect(group).toContainText(DRAFT_NOTICE);
+      const rows = exampleList(page).getByRole('listitem');
+      await expect(rows).toHaveCount(2);
+      await expect(exampleList(page).getByRole('heading', { level: 3 })).toHaveText([
+        '유배 코스 2일차예시 · 확정 전',
+        '여성 코스 2일차예시 · 확정 전',
+      ]);
+      await expect(rows.first()).toContainText(/장소 6곳 · 직선 연결 · \d+\.\dkm · 주의할 구간/);
+      await expect(rows.first().getByTestId('risk-band')).toBeVisible();
+      await expect(group).toContainText('장소 카카오 로컬 검색(2026-11-23)');
+      // 올레 탭에는 없다
+      await tabs(page).getByRole('link', { name: '올레 코스' }).click();
+      await expect(olleList(page)).toBeVisible();
+      await expect(exampleList(page)).toHaveCount(0);
+    });
+  }
+
+  test('@desktop 예시 코스 줄에 마우스를 올리면 왼쪽 지도에 그 경로를 미리 보여 준다', async ({
+    page,
+  }) => {
+    await page.goto('/courses?tab=mine');
+    await mapReady(page);
+    const routeLines = async () => (await page.evaluate(() => window.__mapDebug!.route())).lines;
+    await exampleList(page)
+      .getByRole('link', { name: /여성 코스 2일차/ })
+      .hover();
+    await expect.poll(routeLines).toBeGreaterThan(10);
+    const women = await routeLines();
+    await exampleList(page)
+      .getByRole('link', { name: /유배 코스 2일차/ })
+      .hover();
+    await expect.poll(routeLines).not.toBe(women);
+  });
+
+  test('예시 코스를 열면 도로 경로·구간 색·장소 목록과 확정 전 안내가 있고, 고치기·지우기 대신 가져오기만 있다', async ({
+    page,
+  }) => {
+    await fakeOsrm(page);
+    await page.goto('/courses?tab=mine');
+    await exampleList(page)
+      .getByRole('link', { name: /유배 코스 2일차/ })
+      .click();
+    await expect(page).toHaveURL(/\/courses\/examples\/hum-01-day2$/);
+    await expect(page.getByRole('heading', { level: 1, name: '유배 코스 2일차' })).toBeVisible();
+    const sheet = page.getByTestId('course-sheet');
+    const notice = sheet.getByTestId('course-notice');
+    await expect(notice).toContainText('남부의 유배 흔적과 자연');
+    await expect(notice).toContainText(DRAFT_NOTICE);
+    await expect(notice).toContainText('황우지 해안');
+    await expect(sheet.getByTestId('route-via')).toHaveAttribute('data-via', 'osrm');
+    await expect(sheet.getByTestId('route-via')).toContainText('도보 기준은 준비 중이에요');
+    await expect(sheet.getByRole('img', { name: /^구간 위험 색 띠, 주의할 구간/ })).toBeVisible();
+    // 보이는 번호(지도 핀과 같다) + 화면 읽기용 'n번' + 이름
+    await expect(sheet.getByTestId('stop-list').getByRole('listitem')).toHaveText(
+      [
+        '성읍 정의현성',
+        '천지연폭포',
+        '외돌개',
+        '이중섭거리',
+        '서복공원·서복전시관',
+        '정방폭포',
+      ].map((name, i) => `${i + 1}${i + 1}번 ${name}`),
+    );
+    const chips = sheet.getByRole('list', { name: '출처' });
+    await expect(chips).toContainText('장소: 카카오 로컬 검색(2026-11-23)');
+    await expect(chips).toContainText('코스: 회사에서 받은 인문학 코스 초안(2026-11-02)');
+    // 날짜 없는 일반 카카오 출처 칩은 따로 붙지 않는다
+    await expect(chips.getByText('장소: 카카오 로컬 검색', { exact: true })).toHaveCount(0);
+    await expect(sheet.getByRole('button', { name: '내 코스로 가져오기' })).toBeVisible();
+    await expect(sheet.getByRole('link', { name: '코스 고치기' })).toHaveCount(0);
+    await expect(sheet.getByRole('button', { name: '코스 지우기' })).toHaveCount(0);
+    await mapReady(page);
+    await expect
+      .poll(async () => (await page.evaluate(() => window.__mapDebug!.pins())).length)
+      .toBe(6);
+    expect(await seriousViolations(page)).toEqual([]);
+  });
+
+  test('내 코스로 가져오면 복사해 고치기 화면을 열고, 저장하면 가져온 내 코스로, 뒤로 가면 목록에 둘 다 있다', async ({
+    page,
+  }) => {
+    await page.goto('/courses?tab=mine');
+    await expect(page.getByText('아직 만든 코스가 없어요')).toBeVisible();
+    await exampleList(page)
+      .getByRole('link', { name: /여성 코스 2일차/ })
+      .click();
+    await page.getByRole('button', { name: '내 코스로 가져오기' }).click();
+    await expect(page).toHaveURL(/\/courses\/mine\/[\w-]+\/edit$/);
+    await expect(page.getByRole('heading', { level: 1, name: '내 코스 고치기' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: '코스 이름' })).toHaveValue('여성 코스 2일차');
+    await expect(page.getByTestId('draft-stop-name')).toHaveText([
+      '비자림',
+      '다랑쉬오름',
+      '산굼부리',
+      '삼다수 숲길',
+      '제주돌문화공원',
+      '한라생태숲',
+      '제주국제공항',
+    ]);
+    // 고쳐서 저장하면 가져온 내 코스 상세로 간다
+    await page.getByRole('button', { name: '7번 제주국제공항 빼기' }).click();
+    await page.getByRole('button', { name: '저장' }).click();
+    await expect(page).toHaveURL(/\/courses\/mine\/[\w-]+$/);
+    await expect(page.getByRole('heading', { level: 1, name: '여성 코스 2일차' })).toBeVisible();
+    await expect(page.getByTestId('stop-list').getByRole('listitem')).toHaveCount(6);
+    await expect(page.getByRole('link', { name: '코스 고치기' })).toBeVisible();
+    // 예시 상세 자리를 가져온 내 코스가 차지해, 뒤로 가면 바로 목록
+    await page.goBack();
+    await expect(page).toHaveURL(/\/courses\?tab=mine$/);
+    await expect(mineList(page).getByRole('listitem')).toHaveCount(1);
+    await expect(mineList(page)).toContainText('여성 코스 2일차');
+    await expect(mineList(page)).not.toContainText('확정 전');
+    await expect(exampleList(page).getByRole('listitem')).toHaveCount(2);
+  });
+
+  test('가져온 뒤 고치기에서 취소해도 가져온 코스는 내 코스에 남는다', async ({ page }) => {
+    await page.goto('/courses/examples/hum-01-day2');
+    await page.getByRole('button', { name: '내 코스로 가져오기' }).click();
+    await expect(page).toHaveURL(/\/edit$/);
+    await page.getByRole('link', { name: '취소' }).click();
+    await expect(page).toHaveURL(/\/courses\/mine\/[\w-]+$/);
+    await expect(page.getByRole('heading', { level: 1, name: '유배 코스 2일차' })).toBeVisible();
+    const stored = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)!), STORE);
+    expect(stored.courses).toHaveLength(1);
+    expect(stored.courses[0].stops.map((s: { source: string }) => s.source)).toEqual(
+      Array(6).fill('kakao'),
+    );
+  });
+
+  test('없는 예시 코스 주소는 찾지 못했다고 하고 내 코스 목록으로 가는 길을 준다', async ({
+    page,
+  }) => {
+    await page.goto('/courses/examples/hum-03-day1');
+    await expect(page.getByText('코스를 찾지 못했어요')).toBeVisible();
+    await page.getByRole('link', { name: '코스 목록 보기' }).click();
+    await expect(page).toHaveURL(/\/courses\?tab=mine$/);
+    await expect(exampleList(page).getByRole('listitem')).toHaveCount(2);
+  });
+});
