@@ -248,7 +248,8 @@ test.describe('U9-2 데스크톱 코스 화면', () => {
       .poll(async () => (await page.evaluate(() => window.__mapDebug!.route())).lines)
       .toBe(29);
     const first = await page.evaluate(() => window.__mapDebug!.route());
-    expect(first.marks).toEqual([]);
+    expect(first).not.toHaveProperty('marks');
+    expect(first.highlight).toBeNull();
   });
 
   test('@desktop 1440 목록: 코스 줄에 마우스를 올리거나 포커스하면 그 코스 경로를 미리 보여 준다', async ({

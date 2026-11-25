@@ -57,15 +57,16 @@ export function CourseDetailScreen({ source, state, fallback, actions }: ScreenP
   const summary = view?.summary ?? null;
   usePageTitle(summary?.course.name ?? '코스');
 
-  const route = useMemo(
-    () => (summary ? { ...courseRoute(summary), ends: !view?.stops } : null),
-    [summary, view],
-  );
-  const dim = useMemo(() => (summary ? routeCells(summary) : null), [summary]);
-  const pins = useMemo(() => stopPins(view), [view]);
-  // 처음에는 코스 전체(시트 자리를 잰 뒤), 주의할 구간을 누르면 그 구간으로
+  // 처음에는 코스 전체(시트 자리를 잰 뒤), 주의할 구간을 누르면 그 구간으로 옮겨 굵게
   const [right, measureSheet] = useRightInset();
   const [picked, setPicked] = useState<{ id: number; focus: MapFocus } | null>(null);
+  const route = useMemo(() => {
+    if (!summary) return null;
+    const g = picked ? summary.groups.find((x) => x.id === picked.id) : undefined;
+    return { ...courseRoute(summary), highlight: g?.segments ?? null, ends: !view?.stops };
+  }, [summary, view, picked]);
+  const dim = useMemo(() => (summary ? routeCells(summary) : null), [summary]);
+  const pins = useMemo(() => stopPins(view), [view]);
   const focus = useMemo(
     () =>
       picked?.focus ??

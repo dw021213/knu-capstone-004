@@ -34,6 +34,8 @@ export const ROUTE_WIDTH = 6;
 export const ROUTE_NO_DATA_COLOR = NO_DATA_HATCH_COLOR;
 export const ROUTE_NO_DATA_DASH = [6, 5];
 
-/** 주의 구간 지점(멘토 회의: 위험 지점만 빨간 점) */
-export const CAUTION_MARK_COLOR = RISK_COLOR[5];
-export const CAUTION_MARK_RADIUS = 11;
+/** 목록에서 고른 주의할 구간: 선택한 셀 테두리처럼 검정 테두리를 두른 굵은 선 */
+export const ROUTE_HIGHLIGHT_OUTLINE = SELECTED_STROKE_COLOR;
+export const ROUTE_HIGHLIGHT_OUTLINE_WIDTH = 16;
+export const ROUTE_HIGHLIGHT_UNDER_WIDTH = 12;
+export const ROUTE_HIGHLIGHT_WIDTH = 8;

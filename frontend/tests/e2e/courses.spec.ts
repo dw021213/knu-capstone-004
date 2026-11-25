@@ -193,8 +193,11 @@ test.describe('U8-4 코스 상세', () => {
       await expect(page.getByRole('button', { name: /주의할 구간 모두 보기/ })).toHaveCount(0);
       // 경로는 지도 크기를 잰 뒤 그린다. 목록이 먼저 보일 수 있어 그려질 때까지 기다린다
       await expect.poll(() => drawnLines(page)).toBeGreaterThan(6);
+      // 지도에는 주의 지점 번호 표지가 없다(시작·끝만), 고르기 전에는 강조도 없다
       const route = await page.evaluate(() => window.__mapDebug!.route());
-      expect(route.marks).toEqual([]);
+      expect(route).not.toHaveProperty('marks');
+      expect(route.ends.map((e) => e.label)).toEqual(['시작', '끝']);
+      expect(route.highlight).toBeNull();
       const chips = sheet.getByRole('list', { name: '출처' });
       await expect(chips).toContainText('OpenStreetMap');
       await expect(chips).toContainText('교통사고 도로 모델');
@@ -278,18 +281,33 @@ test.describe('U8-4 코스 상세', () => {
     await expect.poll(() => page.evaluate(() => window.__mapDebug!.focusDone())).toBe(0);
     const before = await page.evaluate(() => window.__mapDebug!.zoom());
     const items = cautionList(page).getByRole('button');
+    const vp = page.viewportSize()!;
+    const sheetBox = (await page.getByTestId('course-sheet').boundingBox())!;
+    const highlight = () => page.evaluate(() => window.__mapDebug!.route().highlight);
     await items.nth(2).click();
     await expect(items.nth(2)).toHaveAttribute('aria-pressed', 'true');
     await expect
       .poll(() => page.evaluate(() => window.__mapDebug!.zoom()))
       .toBeGreaterThan(before + 1);
-    await expect.poll(() => page.evaluate(() => window.__mapDebug!.focusDone())).toBe(1);
+    // 고른 구간을 굵게 그리고, 그 가운데가 화면 가운데 위쪽(시트 위)에 온다
+    await expect
+      .poll(async () => {
+        const h = await highlight();
+        return !!h && Math.abs(h.x - vp.width / 2) < vp.width * 0.15 && h.y > 0 && h.y < sheetBox.y;
+      })
+      .toBe(true);
     // 키보드: 다음 항목으로 옮겨 Enter
     await items.nth(4).focus();
     await page.keyboard.press('Enter');
     await expect(items.nth(4)).toHaveAttribute('aria-pressed', 'true');
     await expect(items.nth(2)).toHaveAttribute('aria-pressed', 'false');
     await expect.poll(() => page.evaluate(() => window.__mapDebug!.focusDone())).toBe(2);
+    await expect
+      .poll(async () => {
+        const h = await highlight();
+        return !!h && Math.abs(h.x - vp.width / 2) < vp.width * 0.15;
+      })
+      .toBe(true);
   });
 
   test('뒤로 가기(브라우저)로 목록, 한 번 더 뒤로 가면 지도 홈', async ({ page }) => {

@@ -1,8 +1,10 @@
 import type { Level } from '../../entities/risk/level';
 import {
-  CAUTION_MARK_COLOR,
-  CAUTION_MARK_RADIUS,
   RISK_COLOR,
+  ROUTE_HIGHLIGHT_OUTLINE,
+  ROUTE_HIGHLIGHT_OUTLINE_WIDTH,
+  ROUTE_HIGHLIGHT_UNDER_WIDTH,
+  ROUTE_HIGHLIGHT_WIDTH,
   ROUTE_NO_DATA_COLOR,
   ROUTE_NO_DATA_DASH,
   ROUTE_UNDER_WIDTH,
@@ -10,11 +12,13 @@ import {
 } from '../../entities/risk/colors';
 import { lngLatToScreen, type View } from './view';
 
+type RouteLine = { coords: [number, number][]; level: Level | null };
+
 /** 지도에 그릴 코스 경로. lines는 코스 순서의 구간(앞 구간 끝점 = 다음 구간 첫 점) */
 export interface MapRoute {
-  lines: { coords: [number, number][]; level: Level | null }[];
-  /** 주의 지점(번호) */
-  marks?: { lngLat: [number, number]; label: string }[];
+  lines: RouteLine[];
+  /** 굵게 강조할 구간(목록에서 고른 주의할 구간 묶음) */
+  highlight?: RouteLine[] | null;
   /** false면 시작·끝 표지를 그리지 않는다(장소 번호 핀이 끝점을 대신할 때) */
   ends?: boolean;
 }
@@ -32,21 +36,21 @@ export interface RouteMarkHit {
   label: string;
 }
 
-/** 그린 주의 지점과 시작·끝 표지의 화면 위치 */
+/** 그린 시작·끝 표지와 강조한 구간 가운데의 화면 위치 */
 export interface RouteHits {
-  marks: RouteMarkHit[];
   ends: RouteMarkHit[];
+  highlight: { x: number; y: number } | null;
 }
 
 /**
  * 시작·끝 표지: 경로 끝점에 검정 점, 그 위에 검정 알약 + 흰 테두리 + 흰 글자(흰 후광 글자를 쓰지 않는다).
- * 첫·마지막 구간이 주의 구간이어도 빨간 점에 가리지 않게 알약을 점 위로 띄운다
+ * 알약이 첫·마지막 구간 색을 가리지 않게 점 위로 띄운다
  */
 const END_H = 20;
 const END_PAD = 6;
 const END_CHAR = 12;
 const END_DOT = 4;
-const END_LIFT = CAUTION_MARK_RADIUS + END_H / 2 + 2;
+const END_LIFT = 23;
 
 function drawEnd(
   ctx: CanvasRenderingContext2D,
@@ -88,9 +92,36 @@ function trace(
   });
 }
 
+function strokeLines(ctx: CanvasRenderingContext2D, view: View, lines: RouteLine[], width: number) {
+  for (const l of lines) {
+    ctx.beginPath();
+    trace(ctx, view, l.coords, true);
+    ctx.setLineDash(l.level === null ? ROUTE_NO_DATA_DASH : []);
+    ctx.strokeStyle = l.level === null ? ROUTE_NO_DATA_COLOR : RISK_COLOR[l.level];
+    ctx.lineWidth = width;
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+function underline(
+  ctx: CanvasRenderingContext2D,
+  view: View,
+  lines: RouteLine[],
+  color: string,
+  width: number,
+) {
+  ctx.beginPath();
+  lines.forEach((l, i) => trace(ctx, view, l.coords, i === 0));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.stroke();
+}
+
 /**
  * 셀 위에 코스를 그린다(변환은 drawCells가 넣은 기기 배율 그대로).
- * 흰 밑선 → 구간 등급 색 선(데이터 부족은 회색 점선) → 주의 지점 빨간 원과 흰 번호 → 시작·끝 표지
+ * 흰 밑선 → 구간 등급 색 선(데이터 부족은 회색 점선) → 고른 구간이 있으면 검정 테두리 + 굵은 색 선 →
+ * 시작·끝 표지. 코스 위에 번호 표지는 찍지 않는다(멘토 회의: 선 색만 보고 더 유의할 곳을 안다)
  */
 export function drawRoute(
   ctx: CanvasRenderingContext2D,
@@ -98,45 +129,25 @@ export function drawRoute(
   view: View,
   style: RouteStyle,
 ): RouteHits {
-  if (route.lines.length === 0) return { marks: [], ends: [] };
+  if (route.lines.length === 0) return { ends: [], highlight: null };
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.setLineDash([]);
+  underline(ctx, view, route.lines, style.white, ROUTE_UNDER_WIDTH);
+  strokeLines(ctx, view, route.lines, ROUTE_WIDTH);
 
-  ctx.beginPath();
-  route.lines.forEach((l, i) => trace(ctx, view, l.coords, i === 0));
-  ctx.strokeStyle = style.white;
-  ctx.lineWidth = ROUTE_UNDER_WIDTH;
-  ctx.stroke();
-
-  for (const l of route.lines) {
-    ctx.beginPath();
-    trace(ctx, view, l.coords, true);
-    ctx.setLineDash(l.level === null ? ROUTE_NO_DATA_DASH : []);
-    ctx.strokeStyle = l.level === null ? ROUTE_NO_DATA_COLOR : RISK_COLOR[l.level];
-    ctx.lineWidth = ROUTE_WIDTH;
-    ctx.stroke();
+  let highlight: RouteHits['highlight'] = null;
+  const hl = route.highlight;
+  if (hl && hl.length > 0) {
+    underline(ctx, view, hl, ROUTE_HIGHLIGHT_OUTLINE, ROUTE_HIGHLIGHT_OUTLINE_WIDTH);
+    underline(ctx, view, hl, style.white, ROUTE_HIGHLIGHT_UNDER_WIDTH);
+    strokeLines(ctx, view, hl, ROUTE_HIGHLIGHT_WIDTH);
+    const pts = hl.flatMap((l) => l.coords);
+    const [x, y] = lngLatToScreen(view, ...pts[Math.floor((pts.length - 1) / 2)]);
+    highlight = { x, y };
   }
-  ctx.setLineDash([]);
 
-  const hits: RouteMarkHit[] = [];
-  for (const m of route.marks ?? []) {
-    const [x, y] = lngLatToScreen(view, ...m.lngLat);
-    ctx.beginPath();
-    ctx.arc(x, y, CAUTION_MARK_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = CAUTION_MARK_COLOR;
-    ctx.fill();
-    ctx.strokeStyle = style.white;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = style.white;
-    ctx.font = `700 12px ${style.font}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(m.label, x, y + 0.5);
-    hits.push({ x, y, label: m.label });
-  }
-  if (route.ends === false) return { marks: hits, ends: [] };
+  if (route.ends === false) return { ends: [], highlight };
   const first = route.lines[0].coords[0];
   const lastLine = route.lines[route.lines.length - 1].coords;
   const last = lastLine[lastLine.length - 1];
@@ -149,5 +160,5 @@ export function drawRoute(
     drawEnd(ctx, [x, y], label, style);
     ends.push({ x, y, label });
   }
-  return { marks: hits, ends };
+  return { ends, highlight };
 }

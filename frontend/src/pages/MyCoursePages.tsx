@@ -251,7 +251,7 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
     );
   }, [aim, start, right, resultItems]);
   const route = useMemo(
-    () => (preview.summary ? { ...courseRoute(preview.summary), marks: [], ends: false } : null),
+    () => (preview.summary ? { ...courseRoute(preview.summary), ends: false } : null),
     [preview.summary],
   );
   const pins = useMemo<MapPin[]>(() => {
