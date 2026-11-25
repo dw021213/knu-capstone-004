@@ -3,6 +3,7 @@ import { addBlock, addStop, moveStop, removeStop, samePlace, stopRole } from './
 import {
   MAX_STOPS,
   STORAGE_KEY,
+  StorageWriteError,
   deleteCourse,
   parseStored,
   readCourses,
@@ -129,6 +130,39 @@ describe('깨진 자료', () => {
     });
     expect(readCourses()).toEqual([]);
     spy.mockRestore();
+  });
+});
+
+describe('저장 실패', () => {
+  it('localStorage에 접근할 수 없으면 저장·지우기가 던진다', () => {
+    const spy = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    expect(() => saveCourse({ name: 'A', stops: [stop(1), stop(2)] })).toThrow(StorageWriteError);
+    expect(() => deleteCourse('x')).toThrow(StorageWriteError);
+    spy.mockRestore();
+  });
+
+  it('setItem이 던지면(가득 참) 저장 내용과 구독자는 그대로이고 StorageWriteError로 알린다', () => {
+    const a = saveCourse({ name: 'A', stops: [stop(1), stop(2)] });
+    const before = localStorage.getItem(STORAGE_KEY);
+    const fn = vi.fn();
+    const off = subscribe(fn);
+    const real = localStorage;
+    const spy = vi.spyOn(window, 'localStorage', 'get').mockReturnValue({
+      ...real,
+      getItem: (k: string) => real.getItem(k),
+      setItem: () => {
+        throw new DOMException('full', 'QuotaExceededError');
+      },
+    });
+    expect(() => saveCourse({ name: 'B', stops: [stop(3), stop(4)] })).toThrow(StorageWriteError);
+    expect(() => deleteCourse(a.id)).toThrow(StorageWriteError);
+    spy.mockRestore();
+    off();
+    expect(fn).not.toHaveBeenCalled();
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(before);
+    expect(readCourses()).toEqual([a]);
   });
 });
 

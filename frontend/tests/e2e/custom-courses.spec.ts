@@ -571,6 +571,60 @@ test.describe('내 코스', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  for (const blocked of ['가득 참', '사이트 데이터 막힘'] as const) {
+    test(`이 기기에 저장하지 못하면(${blocked}) 화면을 넘기지 않고 알리며 만들던 코스를 그대로 둔다`, async ({
+      page,
+    }) => {
+      await page.addInitScript(
+        ([key, mode]) => {
+          if (mode === '가득 참') {
+            const set = Storage.prototype.setItem;
+            Storage.prototype.setItem = function (k: string, v: string) {
+              if (this === window.localStorage && k === key) {
+                throw new DOMException('full', 'QuotaExceededError');
+              }
+              return set.call(this, k, v);
+            };
+          } else {
+            Object.defineProperty(window, 'localStorage', {
+              get() {
+                throw new DOMException('denied', 'SecurityError');
+              },
+            });
+          }
+        },
+        [STORE, blocked] as const,
+      );
+      await page.goto('/courses/mine/new');
+      await mapReady(page);
+      await addFromResults(page, '애월', '애월읍');
+      await addFromResults(page, '성산', '성산읍');
+      await page.getByRole('button', { name: '저장' }).click();
+      await expect(page.getByRole('alert')).toHaveText(
+        '이 기기에 저장하지 못했어요. 브라우저의 사이트 데이터 저장이 막혀 있는지 확인해 주세요.',
+      );
+      await expect(page).toHaveURL(/\/courses\/mine\/new$/);
+      expect(await names(page)).toEqual(['애월읍', '성산읍']);
+    });
+  }
+
+  test('지우지 못하면 상세에 남아 알린다', async ({ page }) => {
+    await seed(page, [{ id: 'keep', name: '남을 코스', stops: [JEJU_MOK, CHUSA] }]);
+    await page.goto('/courses/mine/keep');
+    await expect(page.getByRole('heading', { level: 1, name: '남을 코스' })).toBeVisible();
+    await page.evaluate(() => {
+      Storage.prototype.setItem = () => {
+        throw new DOMException('full', 'QuotaExceededError');
+      };
+    });
+    await page.getByRole('button', { name: '코스 지우기' }).click();
+    await page.getByRole('button', { name: '지우기', exact: true }).click();
+    await expect(page.getByRole('alert')).toHaveText(
+      '이 기기에서 지우지 못했어요. 브라우저의 사이트 데이터 저장이 막혀 있는지 확인해 주세요.',
+    );
+    await expect(page).toHaveURL(/\/courses\/mine\/keep$/);
+  });
+
   test('없는 내 코스 주소는 찾지 못했다고 하고 내 코스 목록으로 가는 길을 준다', async ({
     page,
   }) => {

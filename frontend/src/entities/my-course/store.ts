@@ -108,6 +108,14 @@ function storage(): Storage | null {
   }
 }
 
+/** 이 기기에 쓰지 못함(사이트 데이터 차단, 저장 공간 가득 참) */
+export class StorageWriteError extends Error {
+  constructor(cause: unknown) {
+    super('이 기기 저장소(localStorage)에 쓰지 못했어요', { cause });
+    this.name = 'StorageWriteError';
+  }
+}
+
 const listeners = new Set<() => void>();
 let cache: (Stored & { raw: string | null }) | null = null;
 
@@ -124,7 +132,13 @@ export function readCourses(): MyCourse[] {
 
 function write(courses: MyCourse[]) {
   const { unread } = stored();
-  storage()?.setItem(STORAGE_KEY, JSON.stringify({ courses: [...courses, ...unread] }));
+  const s = storage();
+  if (!s) throw new StorageWriteError(new Error('localStorage 없음'));
+  try {
+    s.setItem(STORAGE_KEY, JSON.stringify({ courses: [...courses, ...unread] }));
+  } catch (e) {
+    throw new StorageWriteError(e);
+  }
   for (const l of listeners) l();
 }
 
@@ -147,7 +161,7 @@ export function newId(): string {
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** 새로 저장하거나(id 없음) 고친다. 장소가 MAX_STOPS를 넘으면 던진다 */
+/** 새로 저장하거나(id 없음) 고친다. 장소가 MAX_STOPS를 넘으면 던지고, 쓰지 못하면 StorageWriteError */
 export function saveCourse(
   input: { id?: string; name: string; stops: Stop[] },
   now: Date = new Date(),

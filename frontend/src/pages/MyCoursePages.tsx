@@ -4,7 +4,15 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { dataSource, type DataSource } from '../data';
 import { COURSE_KINDS, tabHref } from '../entities/course/kinds';
 import { EMD_QUERY_KEY, fetchEmd, placeAt } from '../entities/place/emd';
-import { MAX_STOPS, deleteCourse, newId, saveCourse, type Stop } from '../entities/my-course/store';
+import {
+  MAX_STOPS,
+  StorageWriteError,
+  deleteCourse,
+  newId,
+  saveCourse,
+  type MyCourse,
+  type Stop,
+} from '../entities/my-course/store';
 import {
   addBlock,
   addStop,
@@ -74,6 +82,10 @@ const BLOCK_TEXT = {
   full: `장소는 ${MAX_STOPS}곳까지 넣을 수 있어요.`,
   repeat: '이미 바로 앞에 넣은 장소예요',
 } as const;
+
+const STORE_HINT = '브라우저의 사이트 데이터 저장이 막혀 있는지 확인해 주세요.';
+const SAVE_FAILED = `이 기기에 저장하지 못했어요. ${STORE_HINT}`;
+const DELETE_FAILED = `이 기기에서 지우지 못했어요. ${STORE_HINT}`;
 
 interface Draft {
   name: string;
@@ -167,6 +179,7 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
   const searchRef = useRef<SearchState>(IDLE);
   const [aim, setAim] = useState<Aim>({ key: 0, to: 'start' });
   const [reveal, setReveal] = useState<MapReveal | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
   const local = useLocalCandidates();
   const kakaoOn = useKakaoOn();
   const suggest = useSuggestions(local, search.query, search.mode === 'suggest');
@@ -276,11 +289,18 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
   const canSave = draft.stops.length >= 2;
   const save = () => {
     if (!canSave) return;
-    const saved = saveCourse({
-      id: initial.id,
-      name: draft.name.trim() || '내 코스',
-      stops: draft.stops,
-    });
+    let saved: MyCourse;
+    try {
+      saved = saveCourse({
+        id: initial.id,
+        name: draft.name.trim() || '내 코스',
+        stops: draft.stops,
+      });
+    } catch (e) {
+      if (!(e instanceof StorageWriteError)) throw e;
+      setSaveFailed(true);
+      return;
+    }
     const to = COURSE_KINDS.mine.href(saved.id);
     // 상세에서 고치러 왔으면 그 상세로 돌아간다(같은 상세가 기록에 두 번 쌓이지 않게)
     if (initial.id && location.key !== 'default') navigate(-1);
@@ -374,6 +394,11 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
           </p>
         )}
         <div className={styles.footer}>
+          {saveFailed && (
+            <p className={styles.failed} role="alert">
+              {SAVE_FAILED}
+            </p>
+          )}
           <button type="button" className={styles.primary} disabled={!canSave} onClick={save}>
             저장
           </button>
@@ -473,24 +498,38 @@ export function MyCourseEditPage({ source = dataSource }: { source?: DataSource 
 function MineActions({ id }: { id: string }) {
   const navigate = useNavigate();
   const [asking, setAsking] = useState(false);
+  const [failed, setFailed] = useState(false);
   return (
     <div className={detail.actions}>
       {asking ? (
         <>
           <p className={detail.confirm} role="alert">
-            이 코스를 지울까요? 이 기기에서 지우면 되돌릴 수 없어요.
+            {failed ? DELETE_FAILED : '이 코스를 지울까요? 이 기기에서 지우면 되돌릴 수 없어요.'}
           </p>
           <button
             type="button"
             className={styles.danger}
             onClick={() => {
-              deleteCourse(id);
+              try {
+                deleteCourse(id);
+              } catch (e) {
+                if (!(e instanceof StorageWriteError)) throw e;
+                setFailed(true);
+                return;
+              }
               navigate(LIST, { replace: true });
             }}
           >
             지우기
           </button>
-          <button type="button" className={detail.secondary} onClick={() => setAsking(false)}>
+          <button
+            type="button"
+            className={detail.secondary}
+            onClick={() => {
+              setAsking(false);
+              setFailed(false);
+            }}
+          >
             그만두기
           </button>
         </>
