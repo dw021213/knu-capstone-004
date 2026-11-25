@@ -82,7 +82,7 @@ const olleQuery = (source: DataSource, enabled: boolean) => ({
 });
 
 /** 올레 코스는 자료 순서(코스 번호) 그대로. 위험한 정도로 줄 세우지 않는다 */
-function olleItems(items: Course[], cells: Cells) {
+export function olleItems(items: Course[], cells: Cells) {
   return items.map((c): CourseListItem => ({
     summary: summarizeCourse(c, cells),
     href: COURSE_KINDS.olle.href(c.id),
