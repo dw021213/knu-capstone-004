@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { addBlock, addStop, moveStop, removeStop, stopRole } from './stops';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { addBlock, addStop, moveStop, removeStop, samePlace, stopRole } from './stops';
 import {
   MAX_STOPS,
   STORAGE_KEY,
+  StorageWriteError,
   deleteCourse,
   parseStored,
   readCourses,
@@ -20,6 +21,7 @@ const stop = (i: number): Stop => ({
 });
 
 beforeEach(() => localStorage.clear());
+afterEach(() => vi.restoreAllMocks());
 
 describe('저장소', () => {
   it('저장한 코스를 다시 읽고, 고치면 만든 시각은 두고 고친 시각만 바뀐다', () => {
@@ -36,6 +38,13 @@ describe('저장소', () => {
     expect(b.createdAt).toBe('2026-11-23T01:00:00.000Z');
     expect(b.updatedAt).toBe('2026-11-23T02:00:00.000Z');
     expect(readCourses()[0].stops.map((s) => s.id)).toEqual(['s2', 's1']);
+  });
+
+  it('처음 보는 id로 저장하면 그 id로 만들고, 같은 id로 다시 저장해도 하나만 남는다', () => {
+    const input = { id: 'draft-1', name: 'A', stops: [stop(1), stop(2)] };
+    saveCourse(input);
+    saveCourse(input);
+    expect(readCourses().map((c) => c.id)).toEqual(['draft-1']);
   });
 
   it('여러 코스를 두고 하나를 지울 수 있다', () => {
@@ -128,6 +137,96 @@ describe('깨진 자료', () => {
     });
     expect(readCourses()).toEqual([]);
     spy.mockRestore();
+  });
+});
+
+describe('저장 실패', () => {
+  it('localStorage에 접근할 수 없으면 저장·지우기가 던진다', () => {
+    const spy = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError');
+    });
+    expect(() => saveCourse({ name: 'A', stops: [stop(1), stop(2)] })).toThrow(StorageWriteError);
+    expect(() => deleteCourse('x')).toThrow(StorageWriteError);
+    spy.mockRestore();
+  });
+
+  it('setItem이 던지면(가득 참) 저장 내용과 구독자는 그대로이고 StorageWriteError로 알린다', () => {
+    const a = saveCourse({ name: 'A', stops: [stop(1), stop(2)] });
+    const before = localStorage.getItem(STORAGE_KEY);
+    const fn = vi.fn();
+    const off = subscribe(fn);
+    const real = localStorage;
+    const spy = vi.spyOn(window, 'localStorage', 'get').mockReturnValue({
+      ...real,
+      getItem: (k: string) => real.getItem(k),
+      setItem: () => {
+        throw new DOMException('full', 'QuotaExceededError');
+      },
+    });
+    expect(() => saveCourse({ name: 'B', stops: [stop(3), stop(4)] })).toThrow(StorageWriteError);
+    expect(() => deleteCourse(a.id)).toThrow(StorageWriteError);
+    spy.mockRestore();
+    off();
+    expect(fn).not.toHaveBeenCalled();
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(before);
+    expect(readCourses()).toEqual([a]);
+  });
+});
+
+describe('읽지 못한 코스', () => {
+  const raws = () => JSON.parse(localStorage.getItem(STORAGE_KEY)!).courses;
+
+  it('다른 코스를 저장하거나 지워도 원문 그대로 남는다', () => {
+    const future = {
+      id: 'future',
+      name: '다음 판 코스',
+      stops: [{ ...stop(1), source: 'olle' }],
+      createdAt: '2026-11-24T00:00:00.000Z',
+      updatedAt: '2026-11-24T00:00:00.000Z',
+      tag: { kept: true },
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ courses: [future, 'x'] }));
+    expect(readCourses()).toEqual([]);
+    const a = saveCourse({ name: 'A', stops: [stop(1), stop(2)] });
+    expect(readCourses()).toEqual([a]);
+    expect(raws()).toEqual(expect.arrayContaining([future, 'x']));
+    deleteCourse(a.id);
+    expect(readCourses()).toEqual([]);
+    expect(raws()).toEqual([future, 'x']);
+  });
+
+  it('통째로 깨진 값(JSON 아님)은 빈 목록으로 보고 덮어쓴다', () => {
+    localStorage.setItem(STORAGE_KEY, '{broken');
+    const a = saveCourse({ name: 'A', stops: [stop(1), stop(2)] });
+    expect(raws()).toEqual([a]);
+  });
+});
+
+describe('카카오 장소 번호', () => {
+  const at = (lat: number, kakaoId?: string) => ({ lat, lng: 126.5, kakaoId });
+  // 위도 0.00009도는 약 10m
+  const near = 33.4 + 0.00009;
+
+  it('둘 다 번호가 있으면 번호로 같은 곳인지 본다(20m 안의 다른 가게는 다른 곳)', () => {
+    expect(samePlace(at(33.4, '1'), at(near, '2'))).toBe(false);
+    expect(samePlace(at(33.4, '1'), at(33.4, '1'))).toBe(true);
+    expect(addBlock([{ ...stop(0), ...at(33.4, '1') }], at(near, '2'))).toBeNull();
+  });
+
+  it('한쪽이라도 번호가 없으면(지도에서 고른 곳, 읍면동) 20m 거리로 본다', () => {
+    expect(samePlace(at(33.4), at(near, '2'))).toBe(true);
+    expect(samePlace(at(33.4, '1'), at(near))).toBe(true);
+    expect(samePlace(at(33.4, '1'), at(33.401))).toBe(false);
+  });
+
+  it('번호를 저장하고 다시 읽으며, 번호가 없는 예전 저장값도 그대로 읽는다', () => {
+    const kakao: Stop = { ...stop(1), source: 'kakao', kakaoId: '8123' };
+    const a = saveCourse({ name: 'A', stops: [kakao, stop(2)] });
+    expect(readCourses()[0].stops[0].kakaoId).toBe('8123');
+    expect(readCourses()[0].stops[1]).not.toHaveProperty('kakaoId');
+    const old = { ...a, id: 'old', stops: [stop(3), { ...stop(4), source: 'kakao' }] };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ courses: [old] }));
+    expect(readCourses()).toEqual([old]);
   });
 });
 

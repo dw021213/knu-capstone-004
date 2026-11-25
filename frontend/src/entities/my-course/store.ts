@@ -9,6 +9,8 @@ export interface Stop {
   lat: number;
   lng: number;
   source: StopSource;
+  /** 카카오 장소 번호(카카오에서 고른 장소만) */
+  kakaoId?: string;
 }
 
 export interface MyCourse {
@@ -43,34 +45,66 @@ function toStop(v: unknown): Stop | null {
   if (!isObj(v) || !isStr(v.id) || !isStr(v.name) || !isNum(v.lat) || !isNum(v.lng)) return null;
   const source = isStr(v.source) ? (RETIRED_SOURCES[v.source] ?? v.source) : v.source;
   if (!SOURCES.includes(source as StopSource)) return null;
-  return { id: v.id, name: v.name, lat: v.lat, lng: v.lng, source: source as StopSource };
+  const stop: Stop = {
+    id: v.id,
+    name: v.name,
+    lat: v.lat,
+    lng: v.lng,
+    source: source as StopSource,
+  };
+  if (isStr(v.kakaoId)) stop.kakaoId = v.kakaoId;
+  return stop;
+}
+
+/** 저장된 장소 목록. 하나라도 모양이 다르거나 MAX_STOPS를 넘으면 null */
+export function toStops(v: unknown): Stop[] | null {
+  if (!Array.isArray(v) || v.length > MAX_STOPS) return null;
+  const stops = v.map(toStop);
+  return stops.some((s) => s === null) ? null : (stops as Stop[]);
 }
 
 function toCourse(v: unknown): MyCourse | null {
-  if (!isObj(v) || !isStr(v.id) || !isStr(v.name) || !Array.isArray(v.stops)) return null;
+  if (!isObj(v) || !isStr(v.id) || !isStr(v.name)) return null;
   if (!isStr(v.createdAt) || !isStr(v.updatedAt)) return null;
-  const stops = v.stops.map(toStop);
-  if (stops.some((s) => s === null) || stops.length > MAX_STOPS) return null;
+  const stops = toStops(v.stops);
+  if (!stops) return null;
   return {
     id: v.id,
     name: v.name,
-    stops: stops as Stop[],
+    stops,
     createdAt: v.createdAt,
     updatedAt: v.updatedAt,
   };
 }
 
-/** 저장된 문자열 → 코스 목록. 깨진 자료(JSON 아님, 모양이 다름)는 버린다 */
-export function parseStored(raw: string | null): MyCourse[] {
-  if (!raw) return [];
+interface Stored {
+  courses: MyCourse[];
+  /** 읽지 못한 항목의 원문. 다음 판이나 다른 탭이 쓴 것일 수 있어 쓸 때 그대로 다시 쓴다 */
+  unread: unknown[];
+}
+
+function parse(raw: string | null): Stored {
+  const none: Stored = { courses: [], unread: [] };
+  if (!raw) return none;
   let data: unknown;
   try {
     data = JSON.parse(raw);
   } catch {
-    return [];
+    return none;
   }
-  if (!isObj(data) || !Array.isArray(data.courses)) return [];
-  return data.courses.map(toCourse).filter((c) => c !== null);
+  if (!isObj(data) || !Array.isArray(data.courses)) return none;
+  const out: Stored = { courses: [], unread: [] };
+  for (const item of data.courses) {
+    const course = toCourse(item);
+    if (course) out.courses.push(course);
+    else out.unread.push(item);
+  }
+  return out;
+}
+
+/** 저장된 문자열 → 읽을 수 있는 코스 목록(JSON이 아니거나 모양이 다른 코스는 빠진다) */
+export function parseStored(raw: string | null): MyCourse[] {
+  return parse(raw).courses;
 }
 
 function storage(): Storage | null {
@@ -81,18 +115,37 @@ function storage(): Storage | null {
   }
 }
 
+/** 이 기기에 쓰지 못함(사이트 데이터 차단, 저장 공간 가득 참) */
+export class StorageWriteError extends Error {
+  constructor(cause: unknown) {
+    super('이 기기 저장소(localStorage)에 쓰지 못했어요', { cause });
+    this.name = 'StorageWriteError';
+  }
+}
+
 const listeners = new Set<() => void>();
-let cache: { raw: string | null; courses: MyCourse[] } | null = null;
+let cache: (Stored & { raw: string | null }) | null = null;
+
+function stored(): Stored {
+  const raw = storage()?.getItem(STORAGE_KEY) ?? null;
+  if (!cache || cache.raw !== raw) cache = { raw, ...parse(raw) };
+  return cache;
+}
 
 /** 지금 저장된 코스(같은 저장 내용이면 같은 배열) */
 export function readCourses(): MyCourse[] {
-  const raw = storage()?.getItem(STORAGE_KEY) ?? null;
-  if (!cache || cache.raw !== raw) cache = { raw, courses: parseStored(raw) };
-  return cache.courses;
+  return stored().courses;
 }
 
 function write(courses: MyCourse[]) {
-  storage()?.setItem(STORAGE_KEY, JSON.stringify({ courses }));
+  const { unread } = stored();
+  const s = storage();
+  if (!s) throw new StorageWriteError(new Error('localStorage 없음'));
+  try {
+    s.setItem(STORAGE_KEY, JSON.stringify({ courses: [...courses, ...unread] }));
+  } catch (e) {
+    throw new StorageWriteError(e);
+  }
   for (const l of listeners) l();
 }
 
@@ -115,7 +168,7 @@ export function newId(): string {
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** 새로 저장하거나(id 없음) 고친다. 장소가 MAX_STOPS를 넘으면 던진다 */
+/** 새로 저장하거나(id가 없거나 처음 보는 id) 고친다. 장소가 MAX_STOPS를 넘으면 던지고, 쓰지 못하면 StorageWriteError */
 export function saveCourse(
   input: { id?: string; name: string; stops: Stop[] },
   now: Date = new Date(),

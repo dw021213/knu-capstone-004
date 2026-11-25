@@ -45,6 +45,22 @@
   }
 }
 
+.failed {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-s);
+  font-weight: 700;
+  color: var(--ink);
+  word-break: keep-all;
+}
+
+.restored {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink2);
+  word-break: keep-all;
+}
+
 .label {
   display: block;
   margin: 0 0 var(--space-1);

@@ -1,13 +1,16 @@
 import { distanceMeters } from '../../shared/geo/distance';
 import { MAX_STOPS, type Stop } from './store';
 
-/** 이 거리(m) 안이면 같은 장소로 본다. 카카오 장소 id가 같으면 좌표도 같아 여기에 든다 */
+/** 장소 번호가 없는 쪽(지도에서 고른 곳, 읍면동)이 있으면 이 거리(m) 안을 같은 장소로 본다 */
 export const SAME_PLACE_M = 20;
 
-type Point = Pick<Stop, 'lat' | 'lng'>;
+type Point = Pick<Stop, 'lat' | 'lng' | 'kakaoId'>;
 
+/** 둘 다 카카오 장소면 번호로, 아니면 거리로(같은 건물 안 다른 가게를 같은 곳으로 보지 않게) */
 export const samePlace = (a: Point, b: Point) =>
-  distanceMeters([a.lng, a.lat], [b.lng, b.lat]) <= SAME_PLACE_M;
+  a.kakaoId !== undefined && b.kakaoId !== undefined
+    ? a.kakaoId === b.kakaoId
+    : distanceMeters([a.lng, a.lat], [b.lng, b.lat]) <= SAME_PLACE_M;
 
 /** 끝에 더할 수 없는 까닭. full: 다 참, repeat: 바로 앞 장소와 같음 */
 export function addBlock(stops: readonly Stop[], p: Point): 'full' | 'repeat' | null {

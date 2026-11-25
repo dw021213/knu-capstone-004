@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { matchRange, searchLocal, type Candidate } from './localSearch';
+import { matchRange, metaText, searchLocal, type Candidate } from './localSearch';
 
 const c = (name: string): Candidate => ({
   key: name,
@@ -34,5 +34,21 @@ describe('matchRange', () => {
     expect(matchRange('제주국제공항', ' 공항 ')).toEqual([4, 6]);
     expect(matchRange('Jeju Airport', 'air')).toEqual([5, 8]);
     expect(matchRange('애월읍', '공항')).toBeNull();
+  });
+});
+
+describe('metaText', () => {
+  it('보이는 주소에서 앞의 제주특별자치도를 빼고, 장소의 주소 값은 그대로 둔다', () => {
+    const airport = {
+      ...c('제주국제공항'),
+      category: '공항',
+      address: '제주특별자치도 제주시 공항로 2',
+    };
+    expect(metaText(airport)).toBe('공항 · 제주시 공항로 2');
+    expect(airport.address).toBe('제주특별자치도 제주시 공항로 2');
+    expect(metaText(c('한림읍'))).toBe('읍면동 · 제주시');
+    expect(metaText({ ...c('지점'), category: '지도에서 고른 곳', address: '' })).toBe(
+      '지도에서 고른 곳',
+    );
   });
 });

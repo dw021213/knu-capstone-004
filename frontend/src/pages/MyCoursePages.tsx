@@ -1,10 +1,25 @@
-import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { dataSource, type DataSource } from '../data';
 import { COURSE_KINDS, tabHref } from '../entities/course/kinds';
+import {
+  clearDraft,
+  keepDraft,
+  readDraft,
+  sameDraft,
+  type Draft,
+} from '../entities/my-course/draft';
 import { EMD_QUERY_KEY, fetchEmd, placeAt } from '../entities/place/emd';
-import { MAX_STOPS, deleteCourse, newId, saveCourse, type Stop } from '../entities/my-course/store';
+import {
+  MAX_STOPS,
+  StorageWriteError,
+  deleteCourse,
+  newId,
+  saveCourse,
+  type MyCourse,
+  type Stop,
+} from '../entities/my-course/store';
 import {
   addBlock,
   addStop,
@@ -75,10 +90,9 @@ const BLOCK_TEXT = {
   repeat: '이미 바로 앞에 넣은 장소예요',
 } as const;
 
-interface Draft {
-  name: string;
-  stops: Stop[];
-}
+const STORE_HINT = '브라우저의 사이트 데이터 저장이 막혀 있는지 확인해 주세요.';
+const SAVE_FAILED = `이 기기에 저장하지 못했어요. ${STORE_HINT}`;
+const DELETE_FAILED = `이 기기에서 지우지 못했어요. ${STORE_HINT}`;
 
 /** 장소 줄: 출발·경유·도착 이름표, 누르면 지도를 옮기고, 순서 바꾸기(위·아래)와 빼기 */
 function EditableStops({
@@ -150,6 +164,11 @@ function EditableStops({
   );
 }
 
+const isAway = (s: SearchState) => s.mode === 'results' || s.mode === 'place';
+const SEARCH_ENTRY = { searchOpen: true };
+const isSearchEntry = (state: unknown) =>
+  typeof state === 'object' && state !== null && 'searchOpen' in state;
+
 /** 지도를 어디에 맞출지. 처음 화면, 검색 결과 전체, 장소 한 곳. key가 바뀔 때마다 한 번 옮긴다 */
 type AimTo = { to: 'start' } | { to: 'results' } | { to: 'point'; point: [number, number] };
 type Aim = AimTo & { key: number };
@@ -161,12 +180,27 @@ type Aim = AimTo & { key: number };
 function Editor({ source, initial }: { source: DataSource; initial: Draft & { id?: string } }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [draft, setDraft] = useState<Draft>({ name: initial.name, stops: initial.stops });
+  // 고치기는 연 때의 코스, 새 코스는 빈 코스가 기준. 기준과 다르면 이 탭에 초안으로 둔다
+  const [base] = useState<Draft>(() => ({ name: initial.name, stops: initial.stops }));
+  const [restored] = useState(() => {
+    const saved = readDraft(initial.id);
+    return saved && !sameDraft(saved, base) ? saved : null;
+  });
+  const [draft, setDraft] = useState<Draft>(restored ?? base);
   const [search, setSearch] = useState<SearchState>(IDLE);
   // 한 이벤트 안에서 잇달아 오는 조작(지우기 버튼 → 입력칸 포커스)이 앞 조작의 결과 위에 쌓이게 한다
   const searchRef = useRef<SearchState>(IDLE);
   const [aim, setAim] = useState<Aim>({ key: 0, to: 'start' });
   const [reveal, setReveal] = useState<MapReveal | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
+  // 새 코스 id는 화면을 열 때 정한다(저장을 연달아 눌러도 같은 코스 하나로 모인다)
+  const [courseId] = useState(() => initial.id ?? newId());
+  // 결과 목록·장소 카드를 열면 기록을 한 칸 쌓아, 뒤로 가기가 편집 화면을 떠나지 않고 그것만 닫게 한다
+  const pushed = useRef(false);
+  /** 직접 부른 뒤로 가기 수(그 popstate는 사용자가 누른 뒤로가 아니다) */
+  const ownBacks = useRef(0);
+  // 결과를 연 채 새로고침하면 쌓인 칸만 남으니 걷어 낸다
+  const staleEntry = useRef(isSearchEntry(location.state));
   const local = useLocalCandidates();
   const kakaoOn = useKakaoOn();
   const suggest = useSuggestions(local, search.query, search.mode === 'suggest');
@@ -188,11 +222,48 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
   const showPoint = (point: [number, number]) =>
     setReveal((r) => ({ key: (r?.key ?? 0) + 1, point }));
 
+  const goBack = () => {
+    ownBacks.current += 1;
+    navigate(-1);
+  };
+
+  useEffect(() => keepDraft(initial.id, draft, base), [initial.id, draft, base]);
+
+  useEffect(() => {
+    if (staleEntry.current) {
+      staleEntry.current = false;
+      ownBacks.current += 1;
+      navigate(-1);
+    }
+    const onPop = () => {
+      if (ownBacks.current > 0) {
+        ownBacks.current -= 1;
+        return;
+      }
+      if (!pushed.current) return;
+      pushed.current = false;
+      searchRef.current = IDLE;
+      setSearch(IDLE);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [navigate]);
+
   const act = (a: SearchAction) => {
     const prev = searchRef.current;
     const next = searchReducer(prev, a);
     searchRef.current = next;
     setSearch(next);
+    if (!isAway(prev) && isAway(next) && !pushed.current) {
+      pushed.current = true;
+      navigate(
+        { pathname: location.pathname, search: location.search, hash: location.hash },
+        { state: SEARCH_ENTRY },
+      );
+    } else if (isAway(prev) && !isAway(next) && pushed.current) {
+      pushed.current = false;
+      goBack();
+    }
     if (
       next.mode === 'results' &&
       (prev.mode !== 'results' || prev.query !== next.query || prev.page !== next.page)
@@ -210,6 +281,7 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
   const add = (c: Candidate) => {
     if (addBlock(draft.stops, c)) return;
     const stop: Stop = { id: newId(), name: c.name, lat: c.lat, lng: c.lng, source: c.source };
+    if (c.kakaoId !== undefined) stop.kakaoId = c.kakaoId;
     setDraft((d) => ({ ...d, stops: addStop(d.stops, stop) }));
     act({ type: 'close' });
     showPoint([c.lng, c.lat]);
@@ -234,8 +306,8 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
 
   // 고치기는 처음에 그 코스 장소가 다 보이게, 새로 만들기는 본섬 전체가 보이게(시트 자리를 잰 뒤) 시작한다
   const [start] = useState(() =>
-    initial.stops.length > 0
-      ? initial.stops.map((s): [number, number] => [s.lng, s.lat])
+    draft.stops.length > 0
+      ? draft.stops.map((s): [number, number] => [s.lng, s.lat])
       : ISLAND_CORNERS,
   );
   const resultItems = search.mode === 'results' ? results.items : null;
@@ -275,11 +347,19 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
   const canSave = draft.stops.length >= 2;
   const save = () => {
     if (!canSave) return;
-    const saved = saveCourse({
-      id: initial.id,
-      name: draft.name.trim() || '내 코스',
-      stops: draft.stops,
-    });
+    let saved: MyCourse;
+    try {
+      saved = saveCourse({
+        id: courseId,
+        name: draft.name.trim() || '내 코스',
+        stops: draft.stops,
+      });
+    } catch (e) {
+      if (!(e instanceof StorageWriteError)) throw e;
+      setSaveFailed(true);
+      return;
+    }
+    clearDraft(initial.id);
     const to = COURSE_KINDS.mine.href(saved.id);
     // 상세에서 고치러 왔으면 그 상세로 돌아간다(같은 상세가 기록에 두 번 쌓이지 않게)
     if (initial.id && location.key !== 'default') navigate(-1);
@@ -330,6 +410,11 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
   } else {
     body = (
       <>
+        {restored && (
+          <p className={styles.restored} role="status">
+            작성 중이던 코스를 불러왔어요
+          </p>
+        )}
         <label htmlFor={nameId} className={styles.label}>
           코스 이름
         </label>
@@ -373,6 +458,11 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
           </p>
         )}
         <div className={styles.footer}>
+          {saveFailed && (
+            <p className={styles.failed} role="alert">
+              {SAVE_FAILED}
+            </p>
+          )}
           <button type="button" className={styles.primary} disabled={!canSave} onClick={save}>
             저장
           </button>
@@ -381,6 +471,7 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
             replace
             className={detail.secondary}
             onClick={(e) => {
+              clearDraft(initial.id);
               // 앱 안에서 왔으면 뒤로 가기와 같게(목록·상세가 기록에 두 번 쌓이지 않게)
               if (location.key === 'default') return;
               e.preventDefault();
@@ -472,24 +563,38 @@ export function MyCourseEditPage({ source = dataSource }: { source?: DataSource 
 function MineActions({ id }: { id: string }) {
   const navigate = useNavigate();
   const [asking, setAsking] = useState(false);
+  const [failed, setFailed] = useState(false);
   return (
     <div className={detail.actions}>
       {asking ? (
         <>
           <p className={detail.confirm} role="alert">
-            이 코스를 지울까요? 이 기기에서 지우면 되돌릴 수 없어요.
+            {failed ? DELETE_FAILED : '이 코스를 지울까요? 이 기기에서 지우면 되돌릴 수 없어요.'}
           </p>
           <button
             type="button"
             className={styles.danger}
             onClick={() => {
-              deleteCourse(id);
+              try {
+                deleteCourse(id);
+              } catch (e) {
+                if (!(e instanceof StorageWriteError)) throw e;
+                setFailed(true);
+                return;
+              }
               navigate(LIST, { replace: true });
             }}
           >
             지우기
           </button>
-          <button type="button" className={detail.secondary} onClick={() => setAsking(false)}>
+          <button
+            type="button"
+            className={detail.secondary}
+            onClick={() => {
+              setAsking(false);
+              setFailed(false);
+            }}
+          >
             그만두기
           </button>
         </>
