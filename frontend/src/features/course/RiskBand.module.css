@@ -1,0 +1,42 @@
+.band {
+  display: flex;
+  width: 100%;
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--line);
+}
+
+.band[data-size='s'] {
+  height: 6px;
+}
+
+.piece {
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.piece[data-level='1'] {
+  background: var(--risk-1);
+}
+.piece[data-level='2'] {
+  background: var(--risk-2);
+}
+.piece[data-level='3'] {
+  background: var(--risk-3);
+}
+.piece[data-level='4'] {
+  background: var(--risk-4);
+}
+.piece[data-level='5'] {
+  background: var(--risk-5);
+}
+
+/* 지도와 같은 데이터 부족 빗금(안전처럼 보이는 색을 쓰지 않는다) */
+.piece[data-level='none'] {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--risk-none) 0 3px,
+    var(--risk-none-hatch) 3px 4px
+  );
+}

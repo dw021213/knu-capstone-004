@@ -4,7 +4,7 @@ import type { RouteVia } from '../../entities/route/resolve';
 export const VIA_TEXT: Record<RouteVia, { short: string; note: string; source: string }> = {
   osrm: {
     short: '도로 경로',
-    note: '장소 사이를 자동차 도로 길찾기(OSRM)로 이었어요. 걷는 길과 다를 수 있어요.',
+    note: '지금은 자동차 도로 길찾기(OSRM) 기준으로 이어요. 도보 기준은 준비 중이에요.',
     source: '경로: OSRM 자동차 길찾기(© OpenStreetMap 기여자)',
   },
   walk: {

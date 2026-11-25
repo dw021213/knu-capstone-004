@@ -57,7 +57,7 @@ export interface MapViewProps {
   insets?: Insets | null;
   /** 지도에 찍을 위치 점. me: 내 위치, fallback: 위치를 못 써서 기준으로 삼은 곳(이름을 붙인다) */
   location?: MapLocation | null;
-  /** 코스 경로(구간 등급 색)와 주의 지점 */
+  /** 코스 경로(구간 등급 색)와 강조할 구간 */
   route?: MapRoute | null;
   /** 주면 이 셀들만 그대로 칠하고 나머지 셀은 흐리게(코스 화면) */
   dim?: ReadonlySet<string> | null;
@@ -169,12 +169,12 @@ export function MapView({
     view: { k: 1, x: 0, y: 0 },
     hits: [],
   });
-  // 마지막으로 그린 코스 주의 지점(그린 변환 기준 화면 좌표)
+  // 마지막으로 그린 코스 표지와 강조 구간(그린 변환 기준 화면 좌표)
   const routeRef = useRef<{ view: View; lines: number } & RouteHits>({
     view: { k: 1, x: 0, y: 0 },
     lines: 0,
-    marks: [],
     ends: [],
+    highlight: null,
   });
   const zoomRef = useRef<{
     behavior: ZoomBehavior<HTMLDivElement, unknown>;
@@ -442,7 +442,7 @@ export function MapView({
           ink: cssVar(canvas, '--ink'),
           font: cssVar(canvas, '--font'),
         })
-      : { marks: [], ends: [] };
+      : { ends: [], highlight: null };
     routeRef.current = { view: settled, lines: route?.lines.length ?? 0, ...drawn };
     if (cells.length > 0) {
       performance.mark('cells-drawn');
@@ -530,13 +530,17 @@ export function MapView({
       route() {
         const v = viewRef.current;
         const rect = containerRef.current?.getBoundingClientRect();
-        const { view: drawnAt, lines, marks, ends } = routeRef.current;
-        if (!v || !rect) return { lines, marks: [], ends: [] };
-        const page = (m: { x: number; y: number; label: string }) => {
+        const { view: drawnAt, lines, ends, highlight } = routeRef.current;
+        if (!v || !rect) return { lines, ends: [], highlight: null };
+        const page = (m: { x: number; y: number }) => {
           const [x, y] = reproject(drawnAt, v, [m.x, m.y]);
-          return { x: rect.left + x, y: rect.top + y, label: m.label };
+          return { x: rect.left + x, y: rect.top + y };
         };
-        return { lines, marks: marks.map(page), ends: ends.map(page) };
+        return {
+          lines,
+          ends: ends.map((e) => ({ ...page(e), label: e.label })),
+          highlight: highlight && page(highlight),
+        };
       },
       markers() {
         const v = viewRef.current;

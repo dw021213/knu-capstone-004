@@ -142,7 +142,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
       root.style.setProperty('--date-h', `${chips.height}px`);
       if (isWide() && !fits) root.dataset.stack = 'true';
       else delete root.dataset.stack;
-      // 데스크톱 '오늘 안전한 코스'를 레이어 버튼 바로 옆에 둔다(켠 개수 배지로 너비가 바뀐다)
+      // 데스크톱 '코스 위험 구간'를 레이어 버튼 바로 옆에 둔다(켠 개수 배지로 너비가 바뀐다)
       root.style.setProperty('--layer-w', `${layer.getBoundingClientRect().width}px`);
       root.style.setProperty('--header-h', `${header.getBoundingClientRect().height}px`);
     });
@@ -282,7 +282,7 @@ export function MapPage({ source = dataSource }: { source?: DataSource }) {
                   <circle cx="12.5" cy="3.5" r="1.75" />
                   <path d="M5.25 12.5h4a2.25 2.25 0 0 0 0-4.5h-2.5a2.25 2.25 0 0 1 0-4.5h4" />
                 </svg>
-                오늘 안전한 코스
+                코스 위험 구간
               </Link>
               <div className={styles.locate}>
                 <LocateButton busy={my.state.status === 'locating'} onClick={my.locate} />

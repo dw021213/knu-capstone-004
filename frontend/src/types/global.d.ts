@@ -19,12 +19,12 @@ declare global {
         kind: 'stop' | 'result' | 'draft';
         active: boolean;
       }[];
-      /** 지금 그린 코스 구간 수, 주의 지점, 시작·끝 표지(페이지 좌표) */
+      /** 지금 그린 코스 구간 수, 시작·끝 표지, 강조한 구간 가운데(페이지 좌표) */
       route(): {
         lines: number;
-        marks: { x: number; y: number; label: string }[];
         /** 시작·끝 표지 */
         ends: { x: number; y: number; label: string }[];
+        highlight: { x: number; y: number } | null;
       };
       /** 지금 그린 시설 마커·클러스터(페이지 좌표) */
       markers(): {

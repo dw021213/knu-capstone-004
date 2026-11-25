@@ -44,6 +44,10 @@ export interface CourseView {
   via: RouteVia | null;
   /** 출처 칩 */
   sources: string[];
+  /** 제목 아래 한 줄(예시 코스: 원래 표의 일차 제목) */
+  subtitle: string | null;
+  /** 원래 자료에서 바꾸거나 뺀 것(예시 코스) */
+  note: string | null;
 }
 
 export type CourseDetailState = Loadable<{ view: CourseView }> | { status: 'missing' };

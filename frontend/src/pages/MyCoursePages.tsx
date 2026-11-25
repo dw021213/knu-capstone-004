@@ -2,6 +2,7 @@ import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { dataSource, type DataSource } from '../data';
+import { exampleStops, findExample, type ExampleCourse } from '../entities/course/examples';
 import { COURSE_KINDS, tabHref } from '../entities/course/kinds';
 import { EMD_QUERY_KEY, fetchEmd, placeAt } from '../entities/place/emd';
 import { MAX_STOPS, deleteCourse, newId, saveCourse, type Stop } from '../entities/my-course/store';
@@ -32,7 +33,7 @@ import { StopSearch } from '../features/search/StopSearch';
 import { useKakaoOn, useResults, useSuggestions } from '../features/search/usePlaceSearch';
 import { usePageTitle } from '../shared/page/usePageTitle';
 import { CourseDetailScreen } from './CourseDetailPage';
-import { useDraftPreview, useMineDetail } from './courseData';
+import { useDraftPreview, useExampleDetail, useMineDetail } from './courseData';
 import { useRightInset } from './useRightInset';
 import { useScores } from './useScores';
 import detail from './CourseDetailPage.module.css';
@@ -251,7 +252,7 @@ function Editor({ source, initial }: { source: DataSource; initial: Draft & { id
     );
   }, [aim, start, right, resultItems]);
   const route = useMemo(
-    () => (preview.summary ? { ...courseRoute(preview.summary), marks: [], ends: false } : null),
+    () => (preview.summary ? { ...courseRoute(preview.summary), ends: false } : null),
     [preview.summary],
   );
   const pins = useMemo<MapPin[]>(() => {
@@ -517,6 +518,46 @@ export function MyCourseDetailPage({ source = dataSource }: { source?: DataSourc
       state={state}
       fallback={LIST}
       actions={<MineActions id={id} />}
+    />
+  );
+}
+
+/**
+ * 예시 코스 상세 아래 조작: 내 코스로 가져오기. 복사해 저장한 뒤 그 내 코스 상세를 예시 자리에 두고 고치기 화면을 연다
+ * (고치기에서 저장·취소하면 가져온 내 코스 상세로, 거기서 뒤로 가면 목록으로)
+ */
+function ImportActions({ example }: { example: ExampleCourse }) {
+  const navigate = useNavigate();
+  return (
+    <div className={detail.actions}>
+      <button
+        type="button"
+        className={detail.primary}
+        onClick={() => {
+          const saved = saveCourse({ name: example.name, stops: exampleStops(example) });
+          const href = COURSE_KINDS.mine.href(saved.id);
+          navigate(href, { replace: true });
+          navigate(`${href}/edit`);
+        }}
+      >
+        내 코스로 가져오기
+      </button>
+    </div>
+  );
+}
+
+/** /courses/examples/:id: 예시 코스(내 코스 결과와 같은 화면 + 내 코스로 가져오기) */
+export function ExampleCourseDetailPage({ source = dataSource }: { source?: DataSource }) {
+  const id = useParams().id ?? '';
+  const state = useExampleDetail(source, id);
+  const example = findExample(id);
+  return (
+    <CourseDetailScreen
+      key={id}
+      source={source}
+      state={state}
+      fallback={LIST}
+      actions={example && <ImportActions example={example} />}
     />
   );
 }

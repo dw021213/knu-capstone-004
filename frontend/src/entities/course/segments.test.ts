@@ -4,7 +4,7 @@ import { gridDisk, gridDistance, latLngToCell } from 'h3-js';
 import { distanceMeters } from '../../shared/geo/distance';
 import { cellCenter } from '../../shared/geo/h3';
 import type { Level } from '../risk/level';
-import { cautionSegments, courseLevel, densify, segmentCourse, type Segment } from './segments';
+import { densify, segmentCourse } from './segments';
 
 type P = [number, number];
 
@@ -55,7 +55,7 @@ describe('densify', () => {
   });
 });
 
-describe('segmentCourse와 courseLevel', () => {
+describe('segmentCourse', () => {
   // A(1단계) → B(5단계) → C(1단계), 셀마다 약 1km
   const path: P[] = [...wander(aC), ...wander(bC), ...wander(cC)];
   const segs = segmentCourse(path, levels({ [A]: 1, [B]: 5, [C]: 1 }));
@@ -68,20 +68,6 @@ describe('segmentCourse와 courseLevel', () => {
       expect(s.endKm - s.startKm).toBeGreaterThan(0.8);
       expect(s.endKm - s.startKm).toBeLessThan(1.6);
     }
-  });
-
-  it('코스 등급은 가장 위험한 구간 등급(5)이고 평균(2.33)이 아니다', () => {
-    const lv = courseLevel(segs);
-    expect(lv).toBe(5);
-    const mean = segs.reduce((s, x) => s + (x.level ?? 0), 0) / segs.length;
-    expect(mean).toBeCloseTo(7 / 3, 5);
-    expect(lv).not.toBeCloseTo(mean, 1);
-  });
-
-  it('주의 구간(4단계 이상)은 B 하나', () => {
-    expect(cautionSegments(segs).map((s) => s.h3)).toEqual([B]);
-    // 기준을 낮추면 더 많이 잡힌다
-    expect(cautionSegments(segs, 1)).toHaveLength(3);
   });
 
   it('startKm/endKm이 끊기지 않고 마지막 endKm은 전체 길이', () => {
@@ -104,16 +90,8 @@ describe('segmentCourse와 courseLevel', () => {
 describe('데이터 부족 구간', () => {
   const path: P[] = [...wander(aC), ...wander(bC), ...wander(cC)];
 
-  it('점수가 없는 셀 구간은 level null이고 코스 등급 계산에서 빠진다', () => {
+  it('점수가 없는 셀 구간은 level null', () => {
     const segs = segmentCourse(path, levels({ [A]: 2, [C]: 3 }));
     expect(segs.map((s) => s.level)).toEqual([2, null, 3]);
-    expect(courseLevel(segs)).toBe(3);
-    expect(cautionSegments(segs)).toEqual([]);
-  });
-
-  it('모든 구간이 데이터 부족이면 코스 등급도 null', () => {
-    const segs = segmentCourse(path, () => null);
-    expect(courseLevel(segs)).toBeNull();
-    expect(courseLevel([] as Segment[])).toBeNull();
   });
 });
